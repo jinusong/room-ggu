@@ -27,10 +27,19 @@ export function consult(text,previous,caption=''){
  if(a.type==='sofa'&&!updated.includes(0)&&!a.sources[0].includes('사용자'))reply+=' 보통 몇 명이 앉나요?';else if(a.type==='bed'&&!updated.includes(0))reply+=' 싱글·슈퍼싱글·퀸 중 어느 크기에 가까운가요?';else if(a.sources[2]===DEFAULT_SOURCE)reply+=' 깊이를 알면 “깊이 80cm”처럼 알려주세요. 모르면 이 값으로 먼저 배치해도 돼요.';else reply+=' 추정값은 치수 카드에서 조절한 뒤 방에 놓아보세요.';
  return {item:a,reply,changed:[...new Set(updated)]};
 }
+const limits={sofa:[[60,450],[40,160],[45,200]],bed:[[60,300],[15,180],[100,320]],desk:[[40,350],[30,150],[25,180]],chair:[[20,160],[30,200],[20,180]],wardrobe:[[20,400],[50,350],[15,160]],shelf:[[15,400],[20,350],[10,160]],cabinet:[[20,400],[20,250],[15,160]]};
 export function applyModelResult(raw,previous){
- const match=raw.match(/\{[\s\S]*\}/);if(!match)throw Error('모델 응답에서 치수를 찾지 못했어요.');const v=JSON.parse(match[0]),a=structuredClone(previous);
+ const match=raw.match(/\{[\s\S]*\}/);if(!match)throw Error('모델 응답을 확인하지 못했어요.');const v=JSON.parse(match[0]),a=structuredClone(previous);
  if(typeof v.reply!=='string'||!v.reply.trim())throw Error('모델 응답이 비어 있어요.');
- if(v.type&&Object.hasOwn(TYPES,v.type)&&v.type!==a.type){a.type=v.type;a.name=`나의 ${TYPES[v.type].name}`;for(let i=0;i<3;i++)if(a.sources[i]===DEFAULT_SOURCE)a.dims[i]=TYPES[v.type].dims[i];}
- for(const [key,i]of [['width',0],['height',1],['depth',2]]){const n=v[key];if(typeof n==='number'&&Number.isFinite(n)&&n>=5&&n<=1500&&!a.sources[i].startsWith('사용자')){a.dims[i]=Math.round(n);a.sources[i]='AI 상담 추정';}}
- return {item:a,reply:v.reply.slice(0,900)};
+ const proposals={};
+ if(a.type==='sofa'&&[1,2,3,4].includes(v.seats))proposals[0]=[0,90,180,220,270][v.seats];
+ if(v.size==='compact')proposals[0]={sofa:140,bed:100,desk:90,chair:40,wardrobe:70,shelf:60,cabinet:60}[a.type];
+ if(v.size==='large')proposals[0]={sofa:240,bed:180,desk:160,chair:65,wardrobe:160,shelf:140,cabinet:140}[a.type];
+ if(v.depth_profile==='deep')proposals[2]={sofa:100,bed:210,desk:80,chair:65,wardrobe:70,shelf:45,cabinet:55}[a.type];
+ if(v.depth_profile==='shallow')proposals[2]={sofa:75,bed:190,desk:45,chair:40,wardrobe:45,shelf:25,cabinet:30}[a.type];
+ if(v.height_profile==='low')proposals[1]={sofa:65,bed:35,desk:55,chair:65,wardrobe:120,shelf:90,cabinet:55}[a.type];
+ if(v.height_profile==='tall')proposals[1]={sofa:100,bed:75,desk:100,chair:110,wardrobe:220,shelf:200,cabinet:120}[a.type];
+ for(const [key,i]of [['width',0],['height',1],['depth',2]]){const n=v[key];if(typeof n==='number'&&Number.isFinite(n)&&n>0){const [min,max]=limits[a.type][i];if(n<min||n>max)throw Error('AI가 제안한 치수가 가구 범위를 벗어났어요.');proposals[i]=n;}}
+ for(const [key,n]of Object.entries(proposals)){const i=+key;if(!a.sources[i].startsWith('사용자')&&!a.sources[i].startsWith('대화 추정')){a.dims[i]=Math.round(n);a.sources[i]='AI 단서 · 유형별 추정';}}
+ return {item:a,reply:v.reply.slice(0,700)};
 }

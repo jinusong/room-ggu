@@ -19,13 +19,13 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: npm test
-      - run: npm run build
+      - run: npm run verify
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
   deploy:
+    timeout-minutes: 25
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -35,3 +35,6 @@ jobs:
       - name: 배포
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          timeout: 1200000
+          reporting_interval: 10000

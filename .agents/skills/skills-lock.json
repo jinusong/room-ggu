@@ -1,0 +1,28 @@
+{
+  "installed_on": "2026-11-10",
+  "scope": "project-local",
+  "skills": [
+    {
+      "name": "unslop",
+      "repository": "https://github.com/heydamir/unslop",
+      "ref": "97daa3eb365670ea3f87ed85356cbfcee18105a5",
+      "path": "skills/unslop",
+      "license": "CC-BY-4.0",
+      "credit": "Damir Sokolovsky (@heydamir)"
+    },
+    {
+      "name": "humanizer",
+      "repository": "https://github.com/blader/humanizer",
+      "ref": "0ef9fe5bc3572734fd3ae6c448fe00a30cd5dcf0",
+      "path": ".",
+      "license": "MIT"
+    },
+    {
+      "name": "answer-me-with-html",
+      "repository": "https://github.com/QingYunA/answer-me-with-html",
+      "ref": "5bebfd3974b20b7a89e039cae0fba5e11d933678",
+      "path": "skills/answer-me-with-html",
+      "license": "MIT"
+    }
+  ]
+}

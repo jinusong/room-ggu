@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test src/*.test.js",
-    "check": "node --check src/main.js && node --check src/ai-worker.js"
+    "check": "node --check src/main.js && node --check src/ai-worker.js",
+    "skills:check": "node scripts/check-skills.mjs",
+    "verify": "npm run skills:check && npm run check && npm test && npm run build"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.2",

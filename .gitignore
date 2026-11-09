@@ -2,3 +2,8 @@ node_modules/
 dist/
 work/
 .DS_Store
+
+.playwright-mcp/
+playwright-report/
+test-results/
+.cache/

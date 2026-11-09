@@ -1,8 +1,9 @@
 import * as T from 'three';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 export function furniture(item){
  const g=new T.Group(),[w,h,d]=item.dims.map(n=>n/100);g.userData.id=item.id;
  const main=new T.MeshStandardMaterial({color:item.color,roughness:.78});const wood=new T.MeshStandardMaterial({color:'#b18b65',roughness:.8});const dark=new T.MeshStandardMaterial({color:'#50564f',roughness:.7});const linen=new T.MeshStandardMaterial({color:'#f1ede3',roughness:1});
- function box(x,y,z,a,b,c,m=main){const mesh=new T.Mesh(new T.BoxGeometry(a,b,c),m);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;g.add(mesh);}
+ function box(x,y,z,a,b,c,m=main){const radius=Math.min(.025,a*.04,b*.06,c*.04);const mesh=new T.Mesh(new RoundedBoxGeometry(a,b,c,2,radius),m);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;g.add(mesh);}
  function legs(top,th=.045){for(const x of [-1,1])for(const z of [-1,1])box(x*(w/2-th),top/2,z*(d/2-th),th,top,th,wood);}
  switch(item.type){
  case 'desk':box(0,h-.025,0,w,.05,d);legs(Math.max(.02,h-.05));break;
