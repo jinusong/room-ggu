@@ -4,6 +4,8 @@
 
 [사이트 열기](https://jinusong.github.io/room-ggu/) · [기획 원고](docs/product-plan.md) · [디자인 방향](docs/design-direction.md) · [검증 기록](docs/verification.md)
 
+![룸꾸 데스크톱 편집기](docs/screenshots/desktop.png)
+
 ## 사용하기
 
 1. **방 설정**에서 방 이름과 가로·세로·천장 높이를 입력합니다.
@@ -36,8 +38,11 @@ Node.js 22 이상에서:
 npm ci
 npm run dev
 npm run verify
+npm run test:e2e
 npm run preview
 ```
+
+로컬 브라우저 테스트는 설치된 Chrome을 사용합니다. CI에서는 Playwright Chromium을 설치해 실행합니다. `npm run test:e2e`는 상담·배치·2D 복원 후 3D 드래그·모바일·파일 검증을 확인합니다.
 
 `npm run verify`는 공용 스킬 연결, JavaScript 구문, 핵심 계산 테스트, 정적 빌드를 검사합니다. `dist/`는 서버 없이 배포되는 정적 결과물입니다. 모델 가중치는 저장소에 포함하지 않습니다.
 

@@ -1,0 +1,4 @@
+# Vendored development skills retain their exact upstream formatting.
+.agents/skills/unslop/** -whitespace
+.agents/skills/humanizer/** -whitespace
+.agents/skills/answer-me-with-html/** -whitespace
