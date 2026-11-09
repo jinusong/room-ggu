@@ -1,0 +1,36 @@
+import {TYPES,makeItem,DEFAULT_SOURCE} from './data.js';
+const aliases={sofa:/소파|쇼파|sofa|couch/i,bed:/침대|매트리스|bed|mattress/i,desk:/책상|테이블|식탁|desk|table/i,chair:/의자|chair|stool/i,wardrobe:/옷장|장롱|wardrobe|closet/i,shelf:/선반|책장|shelf|bookcase|bookshelf/i,cabinet:/수납장|서랍장|cabinet|dresser/i};
+export function detectType(t){return Object.entries(aliases).find(([,r])=>r.test(t))?.[0]||null;}
+export function extractDimensions(t){
+ const out={},axes={0:'(?:가로|너비|폭|길이|width|length)',1:'(?:전체\\s*높이|높이|height)',2:'(?:깊이|세로|depth)'};
+ const factor=u=>/^(?:m|미터)$/.test(u||'')?100:/^(?:mm|밀리미터)$/.test(u||'')?.1:1;
+ for(const [i,name]of Object.entries(axes)){const r=new RegExp(name+'(?:는|가|를|은|이|:|\\s)*([0-9]+(?:\\.[0-9]+)?)\\s*(mm|cm|m|밀리미터|센티미터|센치|센티|미터)?','ig');for(const m of t.matchAll(r)){const n=+m[1]*factor(m[2]?.toLowerCase());if(n>=5&&n<=1500)out[i]=Math.round(n*10)/10;}}
+ const triple=t.match(/(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*(cm|m)?/i);
+ if(triple){const f=factor(triple[4]);for(const [i,n]of [[0,+triple[1]*f],[2,+triple[2]*f],[1,+triple[3]*f]])if(n>=5&&n<=1500&&out[i]===undefined)out[i]=n;}return out;
+}
+export function consult(text,previous,caption=''){
+ const a=structuredClone(previous||makeItem());const type=detectType(text)||(!previous?detectType(caption):null);
+ if(type&&type!==a.type){const id=a.id;Object.assign(a,makeItem(type),{id});}
+ const explicit=extractDimensions(text),updated=[];
+ const set=(i,n,src)=>{a.dims[i]=n;a.sources[i]=src;updated.push(i);};
+ if(a.type==='sofa'){
+ if(/1인|한\s*명|혼자/.test(text))set(0,90,'대화 추정 · 1인용');
+ if(/2인|두\s*명|둘이|둘은/.test(text))set(0,/넉넉|여유/.test(text)?190:170,'대화 추정 · 2인용');
+ if(/3인|세\s*명|셋이/.test(text))set(0,220,'대화 추정 · 3인용');
+ if(/4인|네\s*명/.test(text))set(0,270,'대화 추정 · 4인용');
+ if(/깊은|깊어|깊고|깊이도 꽤/.test(text))set(2,100,'대화 추정 · 깊은 좌석');}
+ if(a.type==='bed')for(const [p,w]of [[/슈퍼\s*싱글/,110],[/싱글/,100],[/더블/,140],[/퀸/,150],[/킹/,180]])if(p.test(text)){set(0,w,'대화 추정 · 침대 규격 가정');break;}
+ for(const [p,i]of [[/(?:가로|너비|폭|길이)[^.!?\n]{0,12}(?:더\s*크게|더\s*길게|조금\s*늘려)/,0],[/높이[^.!?\n]{0,12}(?:더\s*높게|늘려)/,1],[/(?:깊이|세로)[^.!?\n]{0,12}(?:늘려|더\s*깊게)/,2]])if(p.test(text)&&explicit[i]===undefined)set(i,Math.min(1500,a.dims[i]+10),'사용자 요청 · 10cm 증가');
+ for(const [i,n]of Object.entries(explicit))set(+i,n,'사용자 설정');
+ if(/무릎/.test(text)&&explicit[1]===undefined)return {item:a,reply:'무릎까지 오는 부분이 앉는 면인가요, 등받이 맨 위인가요? 전체 높이와 좌판 높이는 달라서 구분하면 좋아요. 현재 높이는 기본값으로 남겨둘게요.',changed:[...new Set(updated)]};
+ let reply=updated.length?`${TYPES[a.type].name} 치수 초안을 바꿨어요. 가로 ${a.dims[0]}, 깊이 ${a.dims[2]}, 전체 높이 ${a.dims[1]}cm예요.`:`${TYPES[a.type].name}를 기준으로 시작할게요. 가로 ${a.dims[0]}, 깊이 ${a.dims[2]}, 전체 높이 ${a.dims[1]}cm는 유형별 기본값이에요.`;
+ if(a.type==='sofa'&&!updated.includes(0)&&!a.sources[0].includes('사용자'))reply+=' 보통 몇 명이 앉나요?';else if(a.type==='bed'&&!updated.includes(0))reply+=' 싱글·슈퍼싱글·퀸 중 어느 크기에 가까운가요?';else if(a.sources[2]===DEFAULT_SOURCE)reply+=' 깊이를 알면 “깊이 80cm”처럼 알려주세요. 모르면 이 값으로 먼저 배치해도 돼요.';else reply+=' 추정값은 치수 카드에서 조절한 뒤 방에 놓아보세요.';
+ return {item:a,reply,changed:[...new Set(updated)]};
+}
+export function applyModelResult(raw,previous){
+ const match=raw.match(/\{[\s\S]*\}/);if(!match)throw Error('모델 응답에서 치수를 찾지 못했어요.');const v=JSON.parse(match[0]),a=structuredClone(previous);
+ if(typeof v.reply!=='string'||!v.reply.trim())throw Error('모델 응답이 비어 있어요.');
+ if(v.type&&Object.hasOwn(TYPES,v.type)&&v.type!==a.type){a.type=v.type;a.name=`나의 ${TYPES[v.type].name}`;for(let i=0;i<3;i++)if(a.sources[i]===DEFAULT_SOURCE)a.dims[i]=TYPES[v.type].dims[i];}
+ for(const [key,i]of [['width',0],['height',1],['depth',2]]){const n=v[key];if(typeof n==='number'&&Number.isFinite(n)&&n>=5&&n<=1500&&!a.sources[i].startsWith('사용자')){a.dims[i]=Math.round(n);a.sources[i]='AI 상담 추정';}}
+ return {item:a,reply:v.reply.slice(0,900)};
+}

@@ -1,17 +1,20 @@
 {
-  "name": "body-scale",
-  "version": "1.0.0",
+  "name": "room-ggu",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test src/*.test.js"
+    "test": "node --test src/*.test.js",
+    "check": "node --check src/main.js && node --check src/ai-worker.js"
   },
   "dependencies": {
-    "three": "^0.180.0",
-    "lucide": "^0.468.0"
+    "@huggingface/transformers": "^4.3.2",
+    "@mlc-ai/web-llm": "^0.2.87",
+    "lucide": "^0.468.0",
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "vite": "^6.1.0"
