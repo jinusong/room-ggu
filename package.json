@@ -1,6 +1,6 @@
 {
   "name": "room-ggu",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,10 +8,12 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test src/*.test.js",
-    "check": "node --check src/main.js && node --check src/ai-worker.js",
+    "check": "node --check src/main.js && node --check src/ai-worker.js && node --check src/room-consult.js && node --check src/panels.js && node --check src/catalog-renderer.js",
     "skills:check": "node scripts/check-skills.mjs",
     "verify": "npm run skills:check && npm run check && npm test && npm run build",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "format": "prettier --write src tests",
+    "format:check": "prettier --check src tests"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.2",
@@ -21,6 +23,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.65.0",
+    "prettier": "^3.9.10",
     "vite": "^6.1.0"
   },
   "pnpm": {

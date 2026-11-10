@@ -1,14 +1,76 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {freshState,makeItem,validateState,clampItem,overlaps,layoutWarnings} from './data.js';
-import {consult,extractDimensions,applyModelResult} from './estimator.js';
-test('명시한 cm·m·mm 치수와 가로×깊이×높이 순서를 해석한다',()=>{assert.deepEqual(extractDimensions('가로 1.8m 깊이 850mm 높이는 80cm'),{0:180,1:80,2:85});assert.deepEqual(extractDimensions('180 × 90 × 80cm'),{0:180,1:80,2:90});});
-test('상담이 필요한 치수만 바꾸고 무릎 높이는 확인 질문을 한다',()=>{let a=consult('두 명이 넉넉하게 앉는 소파야',makeItem('sofa')).item;assert.equal(a.dims[0],190);a=consult('깊이 85 가로 200',a).item;assert.deepEqual(a.dims,[200,82,85]);assert.match(consult('무릎까지 와',a).reply,/앉는 면/);});
-test('AI는 사용자 설정 치수와 유효하지 않은 숫자를 덮어쓰지 않는다',()=>{const a=consult('가로 210',makeItem('sofa')).item;const r=applyModelResult('{"width":160,"depth":95,"height":-3,"reply":"초안"}',a);assert.deepEqual(r.item.dims,[210,82,95]);assert.throws(()=>applyModelResult('not json',a));});
-test('회전한 가구를 방 경계 안에 제한한다',()=>{const a=makeItem('sofa');a.angle=45;a.x=10;a.z=10;assert.equal(clampItem(a,{w:4,d:4,h:2.4}),false);assert.ok(a.x<1.1&&a.z<1.1);});
-test('AABB가 겹쳐도 실제 회전 직사각형이 분리되면 충돌하지 않는다',()=>{const a={...makeItem('desk'),dims:[250,75,20],angle:45,x:0,z:0},b={...a,id:'other',x:.4,z:.4};assert.equal(overlaps(a,b),false);b.x=.03;b.z=.03;assert.equal(overlaps(a,b),true);});
-test('배치 파일의 중복 ID·손상값을 거절하고 허용된 필드만 복원한다',()=>{const s=freshState();s.items=[makeItem('sofa')];assert.deepEqual(validateState(s),s);assert.throws(()=>validateState({...s,room:{w:0,d:4,h:2.4}}));assert.throws(()=>validateState({...s,items:[s.items[0],s.items[0]]}));assert.throws(()=>validateState({...s,items:[{...s.items[0],type:'__proto__'}]}));assert.equal(validateState({...s,secret:'ignored'}).secret,undefined);});
-test('방보다 큰 가구와 가구간 충돌을 구분한다',()=>{const s=freshState();s.items=[makeItem('sofa'),makeItem('desk')];assert.equal(layoutWarnings(s).conflicts.size,2);s.items[0].dims[0]=700;assert.equal(layoutWarnings(s).oversized.size,1);});
+import {
+  freshState,
+  makeItem,
+  validateState,
+  clampItem,
+  overlaps,
+  layoutWarnings,
+} from './data.js';
+import { consult, extractDimensions, applyModelResult } from './estimator.js';
+test('명시한 cm·m·mm 치수와 가로×깊이×높이 순서를 해석한다', () => {
+  assert.deepEqual(extractDimensions('가로 1.8m 깊이 850mm 높이는 80cm'), { 0: 180, 1: 80, 2: 85 });
+  assert.deepEqual(extractDimensions('180 × 90 × 80cm'), { 0: 180, 1: 80, 2: 90 });
+});
+test('상담이 필요한 치수만 바꾸고 무릎 높이는 확인 질문을 한다', () => {
+  let a = consult('두 명이 넉넉하게 앉는 소파야', makeItem('sofa')).item;
+  assert.equal(a.dims[0], 190);
+  a = consult('깊이 85 가로 200', a).item;
+  assert.deepEqual(a.dims, [200, 82, 85]);
+  assert.match(consult('무릎까지 와', a).reply, /앉는 면/);
+});
+test('AI는 사용자 설정 치수와 유효하지 않은 숫자를 덮어쓰지 않는다', () => {
+  const a = consult('가로 210', makeItem('sofa')).item;
+  const r = applyModelResult('{"width":160,"depth":95,"height":-3,"reply":"초안"}', a);
+  assert.deepEqual(r.item.dims, [210, 82, 95]);
+  assert.throws(() => applyModelResult('not json', a));
+});
+test('회전한 가구를 방 경계 안에 제한한다', () => {
+  const a = makeItem('sofa');
+  a.angle = 45;
+  a.x = 10;
+  a.z = 10;
+  assert.equal(clampItem(a, { w: 4, d: 4, h: 2.4 }), false);
+  assert.ok(a.x < 1.1 && a.z < 1.1);
+});
+test('AABB가 겹쳐도 실제 회전 직사각형이 분리되면 충돌하지 않는다', () => {
+  const a = { ...makeItem('desk'), dims: [250, 75, 20], angle: 45, x: 0, z: 0 },
+    b = { ...a, id: 'other', x: 0.4, z: 0.4 };
+  assert.equal(overlaps(a, b), false);
+  b.x = 0.03;
+  b.z = 0.03;
+  assert.equal(overlaps(a, b), true);
+});
+test('배치 파일의 중복 ID·손상값을 거절하고 허용된 필드만 복원한다', () => {
+  const s = freshState();
+  s.items = [makeItem('sofa')];
+  assert.deepEqual(validateState(s), s);
+  assert.throws(() => validateState({ ...s, room: { w: 0, d: 4, h: 2.4 } }));
+  assert.throws(() => validateState({ ...s, items: [s.items[0], s.items[0]] }));
+  assert.throws(() => validateState({ ...s, items: [{ ...s.items[0], type: '__proto__' }] }));
+  assert.equal(validateState({ ...s, secret: 'ignored' }).secret, undefined);
+});
+test('방보다 큰 가구와 가구간 충돌을 구분한다', () => {
+  const s = freshState();
+  s.items = [makeItem('sofa'), makeItem('desk')];
+  assert.equal(layoutWarnings(s).conflicts.size, 2);
+  s.items[0].dims[0] = 700;
+  assert.equal(layoutWarnings(s).oversized.size, 1);
+});
 
-test('AI가 모델 단서를 치수로 바꿀 때 직접 입력을 보존한다',()=>{const a=consult('가로 210',makeItem('sofa')).item;const r=applyModelResult('{"seats":3,"size":"unknown","depth_profile":"deep","height_profile":"low","reply":"깊은 소파로 가늠해볼게요."}',a);assert.deepEqual(r.item.dims,[210,65,100]);assert.equal(r.item.sources[0],'사용자 설정');});
-test('물리적으로 비현실적인 AI 제안을 거절한다',()=>{assert.throws(()=>applyModelResult('{"width":30,"depth":150,"height":70,"reply":"초안"}',makeItem('sofa')),/범위/);});
+test('AI가 모델 단서를 치수로 바꿀 때 직접 입력을 보존한다', () => {
+  const a = consult('가로 210', makeItem('sofa')).item;
+  const r = applyModelResult(
+    '{"seats":3,"size":"unknown","depth_profile":"deep","height_profile":"low","reply":"깊은 소파로 가늠해볼게요."}',
+    a,
+  );
+  assert.deepEqual(r.item.dims, [210, 65, 100]);
+  assert.equal(r.item.sources[0], '사용자 설정');
+});
+test('물리적으로 비현실적인 AI 제안을 거절한다', () => {
+  assert.throws(
+    () => applyModelResult('{"width":30,"depth":150,"height":70,"reply":"초안"}', makeItem('sofa')),
+    /범위/,
+  );
+});
