@@ -1,12 +1,12 @@
 import {TYPES,makeItem,DEFAULT_SOURCE} from './data.js';
-const aliases={sofa:/소파|쇼파|sofa|couch/i,bed:/침대|매트리스|bed|mattress/i,desk:/책상|테이블|식탁|desk|table/i,chair:/의자|chair|stool/i,wardrobe:/옷장|장롱|wardrobe|closet/i,shelf:/선반|책장|shelf|bookcase|bookshelf/i,cabinet:/수납장|서랍장|cabinet|dresser/i};
+const aliases={armchair:/라운지체어|암체어|1인용\s*안락|armchair/i,coffee:/소파\s*테이블|커피\s*테이블|coffee\s*table/i,side:/협탁|사이드\s*테이블|nightstand|side\s*table/i,dining:/식탁|다이닝\s*테이블|dining\s*table/i,tvstand:/TV\s*장|티비\s*장|거실장|tv\s*stand/i,shoe_cabinet:/신발장|shoe\s*cabinet/i,dresser:/서랍장|dresser/i,bench:/벤치|bench/i,rug:/러그|카펫|rug|carpet/i,lamp:/조명|스탠드|lamp/i,plant:/화분|식물|plant/i,fridge:/냉장고|fridge|refrigerator/i,washer:/세탁기|washer|washing\s*machine/i,sofa:/소파|쇼파|sofa|couch/i,bed:/침대|매트리스|bed|mattress/i,desk:/책상|테이블|desk|table/i,chair:/의자|chair|stool/i,wardrobe:/옷장|장롱|wardrobe|closet/i,shelf:/선반|책장|shelf|bookcase|bookshelf/i,cabinet:/수납장|cabinet/i};
 export function detectType(t){return Object.entries(aliases).find(([,r])=>r.test(t))?.[0]||null;}
 export function extractDimensions(t){
  const out={},axes={0:'(?:가로|너비|폭|길이|width|length)',1:'(?:전체\\s*높이|높이|height)',2:'(?:깊이|세로|depth)'};
  const factor=u=>/^(?:m|미터)$/.test(u||'')?100:/^(?:mm|밀리미터)$/.test(u||'')?.1:1;
- for(const [i,name]of Object.entries(axes)){const r=new RegExp(name+'(?:는|가|를|은|이|:|\\s)*([0-9]+(?:\\.[0-9]+)?)\\s*(mm|cm|m|밀리미터|센티미터|센치|센티|미터)?','ig');for(const m of t.matchAll(r)){const n=+m[1]*factor(m[2]?.toLowerCase());if(n>=5&&n<=1500)out[i]=Math.round(n*10)/10;}}
+ for(const [i,name]of Object.entries(axes)){const r=new RegExp(name+'(?:는|가|를|은|이|:|\\s)*([0-9]+(?:\\.[0-9]+)?)\\s*(mm|cm|m|밀리미터|센티미터|센치|센티|미터)?','ig');for(const m of t.matchAll(r)){const n=+m[1]*factor(m[2]?.toLowerCase());if(n>=1&&n<=1500)out[i]=Math.round(n*10)/10;}}
  const triple=t.match(/(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*(cm|m)?/i);
- if(triple){const f=factor(triple[4]);for(const [i,n]of [[0,+triple[1]*f],[2,+triple[2]*f],[1,+triple[3]*f]])if(n>=5&&n<=1500&&out[i]===undefined)out[i]=n;}return out;
+ if(triple){const f=factor(triple[4]);for(const [i,n]of [[0,+triple[1]*f],[2,+triple[2]*f],[1,+triple[3]*f]])if(n>=1&&n<=1500&&out[i]===undefined)out[i]=n;}return out;
 }
 export function consult(text,previous,caption=''){
  const a=structuredClone(previous||makeItem());const type=detectType(text)||(!previous?detectType(caption):null);
@@ -39,7 +39,8 @@ export function applyModelResult(raw,previous){
  if(v.depth_profile==='shallow')proposals[2]={sofa:75,bed:190,desk:45,chair:40,wardrobe:45,shelf:25,cabinet:30}[a.type];
  if(v.height_profile==='low')proposals[1]={sofa:65,bed:35,desk:55,chair:65,wardrobe:120,shelf:90,cabinet:55}[a.type];
  if(v.height_profile==='tall')proposals[1]={sofa:100,bed:75,desk:100,chair:110,wardrobe:220,shelf:200,cabinet:120}[a.type];
- for(const [key,i]of [['width',0],['height',1],['depth',2]]){const n=v[key];if(typeof n==='number'&&Number.isFinite(n)&&n>0){const [min,max]=limits[a.type][i];if(n<min||n>max)throw Error('AI가 제안한 치수가 가구 범위를 벗어났어요.');proposals[i]=n;}}
- for(const [key,n]of Object.entries(proposals)){const i=+key;if(!a.sources[i].startsWith('사용자')&&!a.sources[i].startsWith('대화 추정')){a.dims[i]=Math.round(n);a.sources[i]='AI 단서 · 유형별 추정';}}
+ if(!limits[a.type]){const presets=TYPES[a.type].presets;if(['compact','large'].includes(v.size))proposals[0]=presets[v.size==='compact'?0:presets.length-1].dims[0];for(const [i,key,small,large]of [[1,'height_profile','low','tall'],[2,'depth_profile','shallow','deep']])if([small,large].includes(v[key]))proposals[i]=Math.max(1,Math.round(a.dims[i]*(v[key]===small?.8:1.2)));}
+ for(const [key,i]of [['width',0],['height',1],['depth',2]]){const n=v[key];if(typeof n==='number'&&Number.isFinite(n)&&n>0){const [min,max]=(limits[a.type]||[[TYPES[a.type].dims[0]*.4,TYPES[a.type].dims[0]*2],[Math.max(1,TYPES[a.type].dims[1]*.4),TYPES[a.type].dims[1]*2],[TYPES[a.type].dims[2]*.4,TYPES[a.type].dims[2]*2]])[i];if(n<min||n>max)throw Error('AI가 제안한 치수가 가구 범위를 벗어났어요.');proposals[i]=n;}}
+ for(const [key,n]of Object.entries(proposals)){const i=+key;if(!Number.isFinite(n))continue;if(!a.sources[i].startsWith('사용자')&&!a.sources[i].startsWith('대화 추정')){a.dims[i]=Math.round(n);a.sources[i]='AI 단서 · 유형별 추정';}}
  return {item:a,reply:v.reply.slice(0,700)};
 }
