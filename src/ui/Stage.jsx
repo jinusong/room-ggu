@@ -329,6 +329,11 @@ export function Stage({ mobile, sheetRef }) {
           : { left: r.right + 8, top: 56 };
       document.documentElement.style.setProperty('--inset-left', `${insets.left || 0}px`);
       document.documentElement.style.setProperty('--inset-bottom', `${insets.bottom || 0}px`);
+      // 접은 시트는 왼쪽 아래 구석만 차지하므로 방 아래 도구는 화면 맨 아래에 둔다.
+      document.documentElement.style.setProperty(
+        '--controls-bottom',
+        `${isMobile ? insets.bottom || 0 : 0}px`,
+      );
       app.scenes.three?.setInsets(insets);
       app.scenes.plan?.setInsets(insets);
       placeBar();

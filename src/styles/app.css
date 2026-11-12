@@ -1902,7 +1902,7 @@ button.row:hover,
 .stage-bottom {
   position: absolute;
   z-index: 6;
-  bottom: calc(var(--inset-bottom) + 12px);
+  bottom: calc(var(--controls-bottom, 0px) + 12px);
   left: calc(var(--inset-left) + 12px);
   right: 12px;
   display: flex;
@@ -2055,7 +2055,7 @@ button.row:hover,
   bottom: calc(var(--inset-bottom) + 98px);
 }
 .app.is-mobile .stage-bottom {
-  bottom: calc(var(--inset-bottom) + 8px);
+  bottom: calc(var(--controls-bottom, 0px) + 8px);
   left: 8px;
   right: 8px;
 }
@@ -2080,6 +2080,9 @@ button.row:hover,
 }
 .app.is-mobile .composer-foot .save-state {
   display: none;
+}
+.app:has(.sheet.is-collapsed) .stage-hint {
+  visibility: hidden;
 }
 @media (max-width: 360px) {
   .starters {
