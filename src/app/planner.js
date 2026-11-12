@@ -6,6 +6,9 @@ import { consult, detectType, extractDimensions } from '../estimator.js';
 import { consultRoom, consultationScope, detectRoomType } from '../room-consult.js';
 import { chooseSurface, surfaceKind } from '../ui-schema.js';
 
+// 규칙이 기본값으로 물러난 경우(방: 유형, 가구: 규격)가 아니면 요청 단어로 도구를 확신한 것이다.
+const confidentPick = (scope, pick) => pick !== (scope === 'room' ? 'types' : 'sizes');
+
 const ROOM_REFERENCE =
   /(?:방|공간)(?:을|를|은|는|이|가|의)?\s*(?:가로|세로|크기|치수|넓이|면적)|천장|\d\s*평|평수|m²|제곱미터|벽|바닥/;
 
@@ -28,8 +31,12 @@ export function parseFurnitureColor(text) {
 }
 
 // 선택한 가구가 있으면 방 단어가 분명할 때만 방 상담으로 본다.
+const ROOM_TALK =
+  /(?:방|공간|룸)(?:으로|을|를|은|는|이|가)?\s*(?:꾸미|꾸며|바꿔|만들|정리|채우)|(?:아담한|작은|좁은|넓은|큰|밝은)\s*(?:방|공간)/;
+
 export function resolveScope(text, target = { type: 'room' }) {
   if (target.type === 'item' || target.type === 'draft') {
+    if (!detectType(text) && ROOM_TALK.test(text)) return 'room';
     if (detectRoomType(text) || ROOM_REFERENCE.test(text)) {
       const scope = consultationScope(text, 'auto');
       return detectType(text) && !/벽|바닥|천장/.test(text) ? 'furniture' : scope;
@@ -172,6 +179,7 @@ function planRoom(t, ctx) {
   return {
     intent: 'room',
     scope: 'room',
+    confident: confidentPick('room', picked),
     reply: r.reply,
     changed: r.changed || r.add,
     changes: r.add ? { addSpace: r.room.type, room: r.room } : r.changed ? { room: r.room } : {},
@@ -215,6 +223,7 @@ function planFurniture(t, ctx, item) {
     scope: 'furniture',
     mode,
     target,
+    confident: confidentPick('furniture', pick) || !!color,
     reply:
       mode === 'new'
         ? res.reply.replace('치수 초안을 바꿨어요.', '치수 초안을 잡았어요.')

@@ -83,7 +83,7 @@ test('가구 색 이름을 해석한다', () => {
 test('모델 응답의 숫자 문장과 마크업은 쓰지 않고 UI 선택만 허용 목록으로 바꾼다', () => {
   assert.equal(usableReply('가로 200cm가 좋아요', '소파'), null);
   assert.equal(usableReply('<b>좋아요</b>', '소파'), null);
-  assert.equal(usableReply('앉는 부분도 깊은 편인가요?', '소파'), '앉는 부분도 깊은 편인가요?');
+  assert.equal(usableReply('팔걸이가 있는 편인가요?', '소파'), '팔걸이가 있는 편인가요?');
   const sofa = { ...makeItem('sofa'), sources: ['사용자 설정', '유형 기본값', '유형 기본값'] };
   const m = mergeFurnitureModel(
     '{"seats":3,"size":"unknown","depth_profile":"deep","height_profile":"unknown","ui":"colors","reply":"깊은 소파로 볼게요."}',
@@ -101,4 +101,42 @@ test('모델 응답의 숫자 문장과 마크업은 쓰지 않고 UI 선택만 
   assert.equal(r.room.type, 'studio');
   assert.equal(r.room.w, 4);
   assert.equal(r.kind, 'finishes');
+});
+test('실제 모델 확인에서 찾은 경우: 깊은 좌석·초안 중 방 이야기·분명한 도구', () => {
+  const s = freshState();
+  const sofa = planTurn('세 명이 앉는 낮은 소파야', { state: s, target: room });
+  assert.equal(sofa.confident, false);
+  const deep = planTurn('앉는 부분이 깊었으면 좋겠어', {
+    state: s,
+    target: { type: 'draft' },
+    draft: sofa.changes.draft,
+  });
+  assert.equal(deep.changes.draft.dims[2], 100);
+  assert.doesNotMatch(deep.reply, /유형별 기본값/);
+  const roomTalk = planTurn('책 읽는 아담한 방으로 꾸며줘', {
+    state: s,
+    target: { type: 'draft' },
+    draft: sofa.changes.draft,
+  });
+  assert.equal(roomTalk.intent, 'room');
+  const wall = planTurn('벽 색상을 고르고 싶어. 벽은 세이지로 바꿔줘', { state: s, target: room });
+  assert.equal(wall.confident, true);
+  assert.equal(
+    usableReply('벽 색상을 고르시는군요. 벽은 세이지로 바꿔주세요.', '벽은 세이지로 바꿔줘'),
+    null,
+  );
+});
+test('모델 답이 프롬프트 예시를 베끼거나 말하지 않은 인원수를 말하면 버린다', () => {
+  assert.equal(
+    usableReply(
+      '1인용의 소파로 가늠해볼게요. 앉는 부분도 깊은 편인가요?',
+      '두 명이 앉는 소파 색상은 네이비로',
+    ),
+    null,
+  );
+  assert.equal(usableReply('세 명이 앉기 좋겠어요.', '두 명이 앉는 소파'), null);
+  assert.equal(
+    usableReply('두 명이 쓰기 좋은 크기예요. 팔걸이가 있나요?', '두 명이 앉는 소파'),
+    '두 명이 쓰기 좋은 크기예요. 팔걸이가 있나요?',
+  );
 });

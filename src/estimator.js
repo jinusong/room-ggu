@@ -79,7 +79,8 @@ export function consult(text, previous, caption = '') {
       set(0, /넉넉|여유/.test(text) ? 190 : 170, '대화 추정 · 2인용');
     if (/3인|세\s*명|셋이/.test(text)) set(0, 220, '대화 추정 · 3인용');
     if (/4인|네\s*명/.test(text)) set(0, 270, '대화 추정 · 4인용');
-    if (/깊은|깊어|깊고|깊이도 꽤/.test(text)) set(2, 100, '대화 추정 · 깊은 좌석');
+    if (/깊은|깊어|깊고|깊었|깊게|깊숙|푹\s*(?:앉|파묻)|깊이도 꽤/.test(text) && !/얕/.test(text))
+      set(2, 100, '대화 추정 · 깊은 좌석');
   }
   if (a.type === 'bed')
     for (const [p, w] of [
@@ -115,14 +116,17 @@ export function consult(text, previous, caption = '') {
         '무릎까지 오는 부분이 앉는 면인가요, 등받이 맨 위인가요? 전체 높이와 좌판 높이는 달라서 구분하면 좋아요. 현재 높이는 기본값으로 남겨둘게요.',
       changed: [...new Set(updated)],
     };
+  const allDefault = a.sources.every((x) => x === DEFAULT_SOURCE);
   let reply = updated.length
     ? `${TYPES[a.type].name} 치수 초안을 바꿨어요. 가로 ${a.dims[0]}, 깊이 ${a.dims[2]}, 전체 높이 ${a.dims[1]}cm예요.`
-    : `${TYPES[a.type].name}를 기준으로 시작할게요. 가로 ${a.dims[0]}, 깊이 ${a.dims[2]}, 전체 높이 ${a.dims[1]}cm는 유형별 기본값이에요.`;
-  if (a.type === 'sofa' && !updated.includes(0) && !a.sources[0].includes('사용자'))
+    : allDefault
+      ? `${TYPES[a.type].name}를 기준으로 시작할게요. 가로 ${a.dims[0]}, 깊이 ${a.dims[2]}, 전체 높이 ${a.dims[1]}cm는 유형별 기본값이에요.`
+      : `지금 ${TYPES[a.type].name} 초안은 가로 ${a.dims[0]}, 깊이 ${a.dims[2]}, 전체 높이 ${a.dims[1]}cm예요. 바꿀 치수를 알려주세요.`;
+  if (a.type === 'sofa' && !updated.includes(0) && a.sources[0] === DEFAULT_SOURCE)
     reply += ' 보통 몇 명이 앉나요?';
-  else if (a.type === 'bed' && !updated.includes(0))
+  else if (a.type === 'bed' && !updated.includes(0) && a.sources[0] === DEFAULT_SOURCE)
     reply += ' 싱글·슈퍼싱글·퀸 중 어느 크기에 가까운가요?';
-  else if (a.sources[2] === DEFAULT_SOURCE)
+  else if (allDefault || (updated.length && a.sources[2] === DEFAULT_SOURCE))
     reply += ' 깊이를 알면 “깊이 80cm”처럼 알려주세요. 모르면 이 값으로 먼저 배치해도 돼요.';
   else reply += ' 아래 도구에서 더 조절할 수 있어요.';
   return { item: a, reply, changed: [...new Set(updated)] };

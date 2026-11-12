@@ -60,9 +60,9 @@ function engineLabel(turn) {
   if (turn.uiBy === 'user') return '직접 연 도구';
   const model = turn.engine === 'gemma' ? 'Gemma' : turn.engine === 'qwen' ? 'Qwen' : null;
   if (!model) return '기본 상담 · 규칙 기반';
-  return turn.uiBy === 'model'
-    ? `${model} 답변 · 도구도 ${model}가 고름`
-    : `${model} 답변 · 도구는 규칙으로 고름`;
+  if (turn.uiBy === 'model') return `${model} 답변 · 도구도 ${model}가 고름`;
+  if (turn.uiBy === 'rule-kept') return `${model} 답변 · 요청 단어가 분명해 도구는 규칙대로 유지`;
+  return `${model} 답변 · 도구는 규칙으로 고름`;
 }
 
 function Receipt({ turn, canUndo }) {

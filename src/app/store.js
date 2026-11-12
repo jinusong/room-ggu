@@ -118,7 +118,7 @@ function sanitizeTurn(t) {
   }
   if (t.role === 'assistant') {
     turn.engine = ['rule', 'gemma', 'qwen'].includes(t.engine) ? t.engine : 'rule';
-    turn.uiBy = ['rule', 'model', 'user'].includes(t.uiBy) ? t.uiBy : 'rule';
+    turn.uiBy = ['rule', 'model', 'user', 'rule-kept'].includes(t.uiBy) ? t.uiBy : 'rule';
     turn.modelReply = cleanText(t.modelReply, 400) || undefined;
     turn.note = cleanText(t.note, 300) || undefined;
     turn.tone = t.tone === 'error' ? 'error' : undefined;
@@ -522,8 +522,24 @@ async function refine(plan, turn, text) {
     }
     if (merged.kind) {
       const i = turn.surfaces.findIndex((s) => SURFACE_KINDS[s.kind].scope === plan.scope);
-      if (i >= 0) turn.surfaces[i] = { ...turn.surfaces[i], kind: merged.kind };
-      turn.uiBy = 'model';
+      const current = i >= 0 ? turn.surfaces[i].kind : null;
+      // 요청 문장에 분명한 단어(벽·가로·색 등)가 있어 규칙이 고른 도구는 모델이 바꾸지 않는다.
+      // 그때 모델이 다른 도구를 고르면 칩으로만 제안한다.
+      if (current === merged.kind) turn.uiBy = 'model';
+      else if (i >= 0 && !plan.confident) {
+        turn.surfaces[i] = { ...turn.surfaces[i], kind: merged.kind };
+        turn.uiBy = 'model';
+      } else if (i >= 0) {
+        turn.uiBy = 'rule-kept';
+        turn.suggestions = [
+          ...turn.suggestions.slice(0, 3),
+          {
+            label: `모델 제안 · ${SURFACE_KINDS[merged.kind].title}`,
+            action: 'tool',
+            arg: merged.kind,
+          },
+        ];
+      }
     }
     turn.engine = engine;
     if (merged.reply) turn.modelReply = merged.reply;
