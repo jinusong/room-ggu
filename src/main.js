@@ -77,7 +77,9 @@ import {
 } from './data.js';
 import { consult, detectType, applyModelResult } from './estimator.js';
 import { consultRoom, consultationScope, applyRoomModel, detectRoomType } from './room-consult.js';
-import { roomPanel, catalogPanel, catalogGrid, furniturePicker } from './panels.js';
+import { roomPanel, catalogPanel, catalogGrid } from './panels.js';
+import { consultPanel } from './consult-panel.js';
+import { chooseSurface, validateSurface } from './ui-schema.js';
 import { PlanScene } from './plan.js';
 import { runAI, onAIStatus, stopAI, imageData } from './ai.js';
 const icons = {
@@ -156,7 +158,7 @@ try {
 }
 let selected = null,
   draft = makeItem(),
-  panel = 'room',
+  panel = 'consult',
   entry = 'chat',
   scene = null,
   plan = null,
@@ -180,7 +182,9 @@ let history = [],
   category = 'all',
   catalogSearch = '',
   chatScope = 'auto',
-  lastChatScope = 'furniture';
+  lastChatScope = null,
+  composerDraft = '',
+  surfaceState = { scope: 'room', kind: 'dimensions', origin: 'rule', visible: false };
 function refreshIcons() {
   createIcons({ icons, attrs: { 'stroke-width': 1.6 } });
 }
@@ -234,12 +238,12 @@ function dimsForm(a, context) {
 }
 $('#app').innerHTML = `
 <header class="app-header"><a href="./" class="brand" aria-label="룸꾸 홈"><span class="brand-mark">${ic('house')}</span><strong>룸꾸<span>room ggu</span></strong></a><span class="header-divider"></span><div class="project-heading"><span class="project-label">나만의 공간</span><button id="project-name" title="방 이름과 크기 설정"></button></div><div class="header-actions"><span id="save-status" class="save-status">이 기기에 저장됨</span><button id="help" class="icon-button" aria-label="사용 방법">${ic('help-circle')}</button><button id="import" class="quiet desktop-label" aria-label="배치 불러오기" title="배치 파일 불러오기">${ic('folder-open')}<span>불러오기</span></button><button id="export" class="quiet">${ic('download')}<span>배치 저장</span></button><button id="png" class="primary">${ic('camera')}<span>이미지 저장</span></button></div></header>
-<div class="app-body"><aside class="left-panel" id="left-panel"><div class="mobile-panel-nav"><button data-panel="room">${ic('house')}<span>공간</span></button><button data-panel="catalog">${ic('armchair')}<span>가구</span></button><button data-panel="consult">${ic('message-circle')}<span>상담</span></button><button data-panel="items">${ic('layers')}<span>목록</span></button><button id="mobile-close" aria-label="편집 패널 닫기">${ic('x')}</button></div><div id="left-content"></div></aside>
-<main class="workspace"><div class="space-strip"><div id="space-tabs" class="space-tabs" aria-label="내 공간 목록"></div><button id="space-add" data-action="add-room" class="icon-button" aria-label="공간 추가">${ic('plus')}</button></div><div class="workspace-header"><div><span class="eyebrow">ROOM GGU / 공간 스튜디오</span><h1 id="room-title"></h1><p id="room-meta"></p></div><div class="view-switch" aria-label="보기 모드"><button data-view="2d">2D 평면</button><button data-view="3d">3D 공간</button></div></div>
+<div class="app-body"><aside class="left-panel" id="left-panel"><div class="mobile-panel-nav"><button data-panel="consult">${ic('message-circle')}<span>상담</span></button><button data-panel="room">${ic('house')}<span>공간 도구</span></button><button data-panel="catalog">${ic('armchair')}<span>가구 찾기</span></button><button data-panel="items">${ic('layers')}<span>목록</span></button><button id="mobile-close" aria-label="편집 패널 닫기">${ic('x')}</button></div><div id="left-content"></div></aside>
+<main class="workspace"><div class="space-strip"><div id="space-tabs" class="space-tabs" aria-label="내 공간 목록"></div><button id="space-add" data-action="add-room" class="icon-button" aria-label="공간 추가">${ic('plus')}</button></div><div class="workspace-header"><div><span class="eyebrow">대화와 연결된 미리보기</span><h1 id="room-title"></h1><p id="room-meta"></p></div><div class="view-switch" aria-label="보기 모드"><button data-view="2d">2D 평면</button><button data-view="3d">3D 공간</button></div></div>
 <div class="stage"><div id="viewport-3d" class="viewport"></div><div id="viewport-2d" class="viewport" hidden></div><div class="stage-top"><div class="scale-chip">${ic('ruler')}<span>1칸 25cm</span></div><div class="stage-toggles"><button id="grid" title="격자 표시" aria-label="격자 표시">${ic('grid-2x2')}</button><button id="snap" title="5cm 단위 이동" aria-label="5cm 단위 이동">${ic('magnet')}</button><button id="dimension" title="치수 표시" aria-label="치수 표시">${ic('ruler')}</button></div></div><div class="stage-history"><button id="undo" aria-label="실행 취소" title="실행 취소 · Ctrl/⌘ Z">${ic('undo-2')}</button><button id="redo" aria-label="다시 실행" title="다시 실행 · Ctrl/⌘ Shift Z">${ic('redo-2')}</button></div><div class="stage-camera"><button id="home" aria-label="기본 시점" title="기본 시점">${ic('maximize-2')}</button><button id="zoom-in" aria-label="확대">${ic('plus')}</button><button id="zoom-out" aria-label="축소">${ic('minus')}</button></div><div id="stage-empty" class="stage-empty" hidden><span>${ic('armchair')}</span><h2>어떤 방이 될까요?</h2><p>사진이나 대화로 첫 가구를 추가해보세요.</p><button id="stage-example" data-action="load-example" class="outline">예시 공간 둘러보기 ${ic('arrow-up-right')}</button></div><div id="selection-tools" class="selection-tools"></div><div id="warning" class="warning" role="status" hidden></div><div class="stage-caption"><span id="view-hint"></span><span class="private-label">${ic('shield-check')} 개인 파일은 서버로 전송하지 않아요</span></div></div>
 <div class="quick-library"><span>바로 놓아보기</span><div class="quick-items">${['sofa', 'bed', 'desk', 'dining', 'shelf', 'rug'].map((k) => `<button data-quick="${k}">${ic(TYPES[k].icon)}<span>${TYPES[k].name}</span></button>`).join('')}</div><button data-panel="catalog" class="text-button">전체 가구 ${ic('arrow-up-right')}</button></div>
 </main><aside id="inspector" class="inspector"></aside></div>
-<button id="mobile-menu" class="mobile-menu primary">${ic('settings-2')} 공간 편집 · 가구 추가</button><div id="mobile-backdrop" hidden></div>
+<button id="mobile-menu" class="mobile-menu primary">${ic('message-circle')} 상담으로 공간 꾸미기</button><div id="mobile-backdrop" hidden></div>
 <dialog id="modal"><div id="modal-content"></div></dialog><div id="toast" role="status"></div><input id="layout-file" type="file" accept=".json,application/json" hidden><input id="photo-file" type="file" accept="image/*" hidden>`;
 let previewPromise;
 async function decorateCatalog() {
@@ -262,6 +266,8 @@ async function decorateCatalog() {
   }
 }
 function renderLeft() {
+  document.body.classList.toggle('consult-mode', panel === 'consult');
+  $('#left-panel').classList.toggle('is-consult', panel === 'consult');
   const a = current();
   if (panel === 'items') {
     $('#left-content').innerHTML =
@@ -280,32 +286,36 @@ function renderLeft() {
     decorateCatalog();
     return;
   }
-  $('#left-content').innerHTML =
-    `<div class="panel-title"><div><span class="eyebrow">사진 한 장, 혹은 이야기로</span><h2>${selected ? '선택 가구 상담' : entry === 'manual' ? '가구 치수 설정' : '말하면서 꾸미는 방'}</h2></div>${selected ? `<button id="header-new" data-action="new" class="icon-button" aria-label="새 가구 등록">${ic('plus')}</button>` : ''}</div><p class="panel-description">방 크기부터 가구 치수까지 알려주세요.<br>아는 치수는 바로 화면에 반영해요.</p><div class="entry-tabs"><button data-entry="chat" class="${entry === 'chat' ? 'active' : ''}">${ic('message-circle')} 상담으로</button><button data-entry="manual" class="${entry === 'manual' ? 'active' : ''}">${ic('ruler')} 직접 입력</button></div>
- ${
-   entry === 'chat'
-     ? `<div class="scope-tabs" aria-label="상담 대상">${[
-         ['auto', '자동'],
-         ['room', '방 · 공간'],
-         ['furniture', '가구'],
-       ]
-         .map(
-           ([k, v]) =>
-             `<button data-scope="${k}" class="${chatScope === k ? 'active' : ''}" aria-pressed="${chatScope === k}">${v}</button>`,
-         )
-         .join(
-           '',
-         )}</div><div class="photo-drop ${photo ? 'has-photo' : ''}" id="photo-drop" tabindex="0" role="button" aria-label="가구 사진 선택 또는 파일 드롭">${photo ? `<img src="${photo}" alt="상담할 가구 사진"><div class="photo-actions"><button id="analyze-photo" ${busy ? 'disabled' : ''}>${ic('image')} 사진 AI 분석</button><button id="remove-photo" aria-label="사진 삭제">${ic('x')}</button></div>` : `<span class="upload-icon">${ic('image-plus')}</span><strong>가구 사진을 올려주세요</strong><small>클릭 또는 드래그 · 사진 없이도 상담 가능</small>`}</div>${caption ? `<div class="photo-caption"><span>사진 AI의 설명</span><p>${esc(caption)}</p></div>` : ''}<div class="assistant-status"><span class="status-dot ${textReady ? 'ready' : ''}"></span><span>${textReady ? textLabel + ' · 이 기기에서 실행 중' : '기본 상담 · 규칙 기반'}</span><button id="consult-ai-settings" data-action="ai-settings" class="text-button">${textReady ? '설정' : 'AI 켜기'} ${ic('chevron-right')}</button></div><div class="chat-log" id="chat-log" role="log" aria-label="공간과 가구 상담">${messages.length ? messages.map((m) => bubble(m.role, m.content)).join('') : bubble('assistant', defaultMessage())}</div>${busy ? `<div class="ai-progress" role="status"><div>${ic('loader-circle')}<span id="progress-text">${esc(progressText || 'AI가 준비하고 있어요')}</span><button id="cancel-ai" aria-label="AI 작업 취소">${ic('x')}</button></div><progress id="ai-progress-bar" max="1" value="${progressValue}"></progress></div>` : ''}<form id="chat-form" class="chat-form"><textarea id="chat-input" aria-label="공간 또는 가구 설명" placeholder="예: 침실 가로 4m, 세로 3.5m로 바꿔줘" rows="2" maxlength="1500" ${busy ? 'disabled' : ''}></textarea><button class="send-button" aria-label="설명 보내기" ${busy ? 'disabled' : ''}>${ic('arrow-up')}</button></form><div class="prompt-chips"><button data-prompt="거실 가로 5m 세로 4m로 바꿔줘">5 × 4m 거실</button><button data-prompt="아담한 서재 하나 추가해줘">서재 추가</button><button data-prompt="두 명이 넉넉하게 앉는 소파야">2인용 소파</button></div>`
-     : ''
- }
- ${entry === 'chat' && (chatScope === 'room' || (lastChatScope === 'room' && chatScope === 'auto')) ? `<section class="conversation-space"><span class="eyebrow">지금 반영된 공간</span><h3>${esc(state.name)} <small>${ROOM_TYPES[state.room.type].name}</small></h3><strong>${state.room.w} × ${state.room.d} × ${state.room.h}<small> m</small></strong><p>가로 × 세로 × 천장 높이</p><button data-panel="room" class="outline full">${ic('settings-2')} 공간 상세 조절</button><button id="chat-catalog" data-panel="catalog" class="text-button">다음은 가구를 놓아볼까요 ${ic('arrow-up-right')}</button></section>` : ` <section class="draft-section"><div class="section-heading"><h3>${selected ? '배치 중인 가구' : '치수 초안'}</h3><span class="unit-note">가로 × 깊이 × 높이</span></div>${furniturePicker(a)}<label class="text-field">이름<input id="draft-name" maxlength="100" value="${esc(a.name)}"></label>${dimsForm(a, '등록 가구')}<div class="color-row"><span>색상</span><div>${COLORS.map((c) => `<button data-color="${c}" style="--swatch:${c}" class="swatch ${a.color === c ? 'active' : ''}" aria-label="${c} 색상"></button>`).join('')}<input id="custom-color" type="color" value="${a.color}" aria-label="사용자 색상"></div></div><button id="add-item" class="primary full">${ic(selected ? 'check' : 'plus')}${selected ? '새 가구 등록하기' : '내 방에 놓아보기'}${ic('arrow-up-right')}</button><p class="estimate-note">${ic('info')} 추정값은 직접 수정할 수 있어요. 구매·설치 전 실측을 확인해주세요.</p></section>`}`;
+  $('#left-content').innerHTML = consultPanel({
+    state,
+    a,
+    selected,
+    entry,
+    scope: chatScope,
+    messagesHTML: messages.map((m) => bubble(m.role, m.content)).join(''),
+    hasMessages: messages.length > 0,
+    photo,
+    caption,
+    busy,
+    textReady,
+    textLabel,
+    progressText,
+    progressValue,
+    dimsForm,
+    surface: surfaceState.kind,
+    surfaceScope: surfaceState.scope,
+    surfaceOrigin: surfaceState.origin,
+    hasSurface: surfaceState.visible,
+    defaultMessage: defaultMessage(),
+    composerDraft,
+  });
   refreshIcons();
   const log = $('#chat-log');
-  if (log) log.scrollTop = log.scrollHeight;
+  if (log && messages.length) log.scrollTop = log.scrollHeight;
 }
 function renderInspector() {
   const a = state.items.find((i) => i.id === selected);
-  $('#inspector').hidden = !a;
+  $('#inspector').hidden = !a || panel === 'consult';
   document.body.classList.toggle('has-selection', !!a);
   if (!a) {
     $('#inspector').innerHTML = '';
@@ -330,6 +340,13 @@ function renderInspector() {
 }
 function renderMeta() {
   const warn = layoutWarnings(state);
+  const context = $('.consult-context');
+  if (context) {
+    context.querySelector('small').textContent = `${state.room.w} × ${state.room.d} m`;
+  }
+  const surfaceSummary = $('.generated-surface .surface-summary');
+  if (surfaceSummary && surfaceState.scope === 'room')
+    surfaceSummary.innerHTML = `${state.room.w} × ${state.room.d} m <span>· ${(state.room.w * state.room.d).toFixed(1)} m²</span>`;
   $('#project-name').textContent = state.name;
   $('#room-title').textContent = state.name;
   $('#space-tabs').innerHTML = spaces(state)
@@ -346,9 +363,10 @@ function renderMeta() {
   document
     .querySelectorAll('[data-view]')
     .forEach((b) => b.classList.toggle('active', b.dataset.view === state.view));
-  document
-    .querySelectorAll('[data-panel]')
-    .forEach((b) => b.classList.toggle('active', b.dataset.panel === panel));
+  document.querySelectorAll('[data-panel]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.panel === panel);
+    b.setAttribute('aria-pressed', String(b.dataset.panel === panel));
+  });
   for (const [id, key] of [
     ['grid', 'grid'],
     ['snap', 'snap'],
@@ -391,6 +409,8 @@ function sync() {
 }
 function resetConversation() {
   messages = [];
+  composerDraft = '';
+  surfaceState.visible = false;
   photo = null;
   caption = '';
   contextVersion++;
@@ -398,11 +418,14 @@ function resetConversation() {
 function select(id) {
   if (selected !== id) {
     selected = id;
-    resetConversation();
+    contextVersion++;
+    photo = null;
+    caption = '';
     if (id) {
-      chatScope = 'furniture';
+      chatScope = 'auto';
       lastChatScope = 'furniture';
-    }
+      surfaceState = { scope: 'furniture', kind: 'dimensions', origin: 'rule', visible: true };
+    } else surfaceState.visible = false;
   }
   render();
 }
@@ -413,6 +436,7 @@ function newFurniture(type = 'sofa') {
   chatScope = 'furniture';
   lastChatScope = 'furniture';
   resetConversation();
+  surfaceState = { scope: 'furniture', kind: 'sizes', origin: 'rule', visible: true };
   render();
 }
 function afterEdit() {
@@ -452,7 +476,13 @@ function addItem(a) {
   }
   state.items.push(item);
   selected = item.id;
-  resetConversation();
+  contextVersion++;
+  chatScope = 'auto';
+  surfaceState = { scope: 'furniture', kind: 'dimensions', origin: 'rule', visible: true };
+  messages.push({
+    role: 'assistant',
+    content: `${item.name}을 방에 놓았어요. 도면에서 옮기거나 아래 카드에서 치수를 더 조절할 수 있어요.`,
+  });
   sync();
   persist();
   render();
@@ -558,6 +588,7 @@ function createSpace(type) {
 async function sendChat(text) {
   text = text.trim().slice(0, 1500);
   if (!text || busy) return;
+  composerDraft = '';
   const scope = consultationScope(text, chatScope);
   lastChatScope = scope;
   messages.push({ role: 'user', content: text });
@@ -594,6 +625,7 @@ async function sendChat(text) {
     render();
     return;
   }
+  surfaceState = { scope, kind: chooseSurface(text, scope), origin: 'rule', visible: true };
   messages.push({ role: 'assistant', content: result.reply });
   if (messages.length > 24) messages = messages.slice(-24);
   render();
@@ -615,7 +647,9 @@ async function sendChat(text) {
     );
     if (version !== contextVersion || id !== selected || roomId !== state.roomId) return;
     if (scope === 'room') {
-      const refined = applyRoomModel(raw, state.room);
+      const refined = applyRoomModel(raw, state.room, { text });
+      surfaceState.kind = validateSurface(refined.ui, scope, surfaceState.kind);
+      surfaceState.origin = refined.ui ? 'model' : 'rule';
       if (detectRoomType(text)) refined.room.type = state.room.type;
       state.room = refined.room;
       slot.content = `${ROOM_TYPES[state.room.type].name}을 가로 ${state.room.w}m, 세로 ${state.room.d}m, 천장 ${state.room.h}m로 ${result.add ? '새로 만들었어요' : '반영했어요'}.`;
@@ -628,7 +662,9 @@ async function sendChat(text) {
         slot.content += '\n' + refined.reply;
       persist();
     } else {
-      const refined = applyModelResult(raw, current());
+      const refined = applyModelResult(raw, current(), { text });
+      surfaceState.kind = validateSurface(refined.ui, scope, surfaceState.kind);
+      surfaceState.origin = refined.ui ? 'model' : 'rule';
       if (selected) {
         Object.assign(current(), refined.item);
         clampItem(current(), state.room);
@@ -673,6 +709,7 @@ async function analyzePhoto() {
     const result = await runAI('caption', { image: photo, device: visionDevice });
     if (version !== contextVersion || id !== selected) return;
     caption = result;
+    surfaceState = { scope: 'furniture', kind: 'sizes', origin: 'rule', visible: true };
     const type = detectType(result);
     if (type && type !== current().type) {
       if (selected) snapshot();
@@ -765,6 +802,15 @@ document.addEventListener('click', (e) => {
     category = b.dataset.category;
     renderLeft();
   }
+  if (b.dataset.surfaceKind) {
+    surfaceState.kind = validateSurface(
+      b.dataset.surfaceKind,
+      surfaceState.scope,
+      surfaceState.kind,
+    );
+    surfaceState.origin = 'rule';
+    renderLeft();
+  }
   if (b.dataset.scope) {
     chatScope = b.dataset.scope;
     contextVersion++;
@@ -853,6 +899,21 @@ document.addEventListener('click', (e) => {
   if (b.dataset.prompt) sendChat(b.dataset.prompt);
   if (b.hasAttribute('data-close')) $('#modal').close();
   switch (b.dataset.action || b.id) {
+    case 'attach-photo':
+      $('#photo-file').click();
+      break;
+    case 'preview':
+      closeMobile();
+      break;
+    case 'new-conversation':
+      selected = null;
+      draft = makeItem();
+      chatScope = 'auto';
+      lastChatScope = null;
+      entry = 'chat';
+      resetConversation();
+      render();
+      break;
     case 'new':
       newFurniture();
       break;
@@ -1038,17 +1099,24 @@ document.addEventListener('click', (e) => {
       closeMobile();
       break;
     case 'mobile-menu':
-      document.body.classList.contains('panel-open') ? closeMobile() : openMobile();
+      if (document.body.classList.contains('panel-open')) closeMobile();
+      else {
+        panel = 'consult';
+        entry = 'chat';
+        render();
+        openMobile();
+      }
       break;
   }
 });
 document.addEventListener('focusin', (e) => {
-  if (e.target.matches('#room-form input')) {
+  if (e.target.matches('#room-form input, [data-room-dim]')) {
     snapshot();
   }
 });
 document.addEventListener('input', (e) => {
   const el = e.target;
+  if (el.id === 'chat-input') composerDraft = el.value;
   if (el.id === 'catalog-search') {
     catalogSearch = el.value;
     $('#catalog-grid').innerHTML = catalogGrid(category, catalogSearch);
@@ -1216,16 +1284,16 @@ document.addEventListener('keydown', (e) => {
   }
 });
 document.addEventListener('dragover', (e) => {
-  if (e.target.closest('#photo-drop')) {
+  if (e.target.closest('#photo-drop, .consult-shell')) {
     e.preventDefault();
-    e.target.closest('#photo-drop').classList.add('drag-over');
+    e.target.closest('#photo-drop, .consult-shell').classList.add('drag-over');
   }
 });
 document.addEventListener('dragleave', (e) =>
-  e.target.closest('#photo-drop')?.classList.remove('drag-over'),
+  e.target.closest('#photo-drop, .consult-shell')?.classList.remove('drag-over'),
 );
 document.addEventListener('drop', (e) => {
-  const drop = e.target.closest('#photo-drop');
+  const drop = e.target.closest('#photo-drop, .consult-shell');
   if (drop) {
     e.preventDefault();
     drop.classList.remove('drag-over');
@@ -1303,6 +1371,7 @@ async function init3D() {
   }
 }
 init3D();
+if (innerWidth < 800) openMobile();
 persist();
 if (readError) toast('이전 배치를 읽지 못해 예시 공간으로 열었어요.');
 window.addEventListener('pagehide', (e) => {

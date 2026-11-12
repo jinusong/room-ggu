@@ -2034,3 +2034,1108 @@ dialog p {
   padding: 2px 4px;
   border-radius: 3px;
 }
+
+/* Conversation workspace: input and intent-generated controls are the primary surface. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.app-header {
+  height: 68px;
+  padding: 0 24px;
+}
+.app-body {
+  height: calc(100dvh - 68px);
+}
+.mobile-panel-nav {
+  height: 52px;
+  padding: 0 24px;
+  gap: 12px;
+}
+.mobile-panel-nav button {
+  flex-direction: row;
+  gap: 7px;
+  font-size: 11px;
+  padding: 12px 8px;
+  color: #7e887b;
+}
+.mobile-panel-nav button.active:after {
+  left: 4px;
+  right: 4px;
+}
+.mobile-panel-nav button svg {
+  width: 15px;
+  height: 15px;
+}
+.consult-mode .app-body,
+.consult-mode.has-selection .app-body {
+  grid-template-columns: minmax(440px, 0.98fr) minmax(0, 1fr);
+  min-height: 560px;
+}
+.consult-mode .inspector {
+  display: none !important;
+}
+.consult-mode .quick-library {
+  display: none;
+}
+.consult-mode .workspace {
+  background: #f3f3ed;
+  padding: 0 24px 24px;
+}
+.consult-mode .space-strip {
+  height: 52px;
+}
+.consult-mode .workspace-header {
+  padding: 22px 0 20px;
+  align-items: center;
+}
+.consult-mode .workspace-header h1 {
+  font-size: 21px;
+  letter-spacing: -0.7px;
+}
+.consult-mode .workspace-header .eyebrow {
+  font-size: 10px;
+  letter-spacing: 0;
+  margin-bottom: 7px;
+  color: #85907d;
+}
+.consult-mode .workspace-header p {
+  font-size: 11px;
+  color: #758269;
+}
+.consult-mode .stage {
+  border-radius: 12px;
+  min-height: 280px;
+}
+.consult-mode .stage-caption {
+  font-size: 9px;
+}
+.consult-mode .private-label {
+  display: none;
+}
+.is-consult #left-content {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+.consult-shell {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+.consult-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 26px 32px 18px;
+  flex-shrink: 0;
+}
+.consult-heading > div {
+  flex: 1;
+  min-width: 0;
+}
+.consult-heading .eyebrow {
+  font-size: 10px;
+  letter-spacing: 0;
+  color: #87957c;
+  margin-bottom: 6px;
+}
+.consult-heading h2 {
+  font-size: 21px;
+  letter-spacing: -0.7px;
+  font-weight: 500;
+}
+.consult-heading > .icon-button {
+  color: #7d8e70;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+}
+.consult-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 32px;
+  padding: 0 0 16px;
+  border-bottom: 1px solid #edf0e7;
+  flex-shrink: 0;
+  color: #7b8b6d;
+  min-width: 0;
+}
+.consult-context > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.consult-context svg {
+  width: 13px;
+  height: 13px;
+}
+.consult-context > small {
+  font-size: 10px;
+  white-space: nowrap;
+  color: #8d9980;
+}
+.consult-context .context-saved {
+  margin-left: auto;
+  font-size: 9px;
+  color: #9aa58e;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.consult-shell .chat-log {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  padding: 24px 32px 28px;
+  scrollbar-width: thin;
+  scrollbar-color: #d7decf transparent;
+  scroll-behavior: smooth;
+}
+.chat-log.is-empty {
+  display: flex;
+  flex-direction: column;
+}
+.chat-welcome {
+  margin: auto 0;
+  padding: 24px 0;
+  max-width: 540px;
+  width: 100%;
+  align-self: center;
+}
+.welcome-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #dce6cf;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  color: #6b8052;
+  background: #f5f8ee;
+}
+.welcome-mark svg {
+  width: 25px;
+  height: 25px;
+  stroke-width: 1.3;
+}
+.welcome-kicker {
+  font-size: 11px;
+  color: #92a080;
+  display: block;
+  margin-bottom: 12px;
+}
+.chat-welcome h3 {
+  font-size: 35px;
+  line-height: 1.35;
+  letter-spacing: -1.4px;
+  font-weight: 500;
+  color: #2e4436;
+}
+.chat-welcome > p {
+  font-size: 13px;
+  line-height: 1.9;
+  color: #87967a;
+  margin: 18px 0 25px;
+}
+.welcome-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.welcome-prompts button {
+  justify-content: flex-start;
+  gap: 14px;
+  text-align: left;
+  padding: 15px 16px;
+  border: 1px solid #e7ebdf;
+  border-radius: 9px;
+  background: #fff;
+}
+.welcome-prompts button > svg:first-child {
+  width: 19px;
+  height: 19px;
+  color: #8b9b77;
+}
+.welcome-prompts button > svg:last-child {
+  margin-left: auto;
+  width: 14px;
+  height: 14px;
+  color: #a4af94;
+}
+.welcome-prompts span {
+  min-width: 0;
+}
+.welcome-prompts strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #5b7050;
+}
+.welcome-prompts small {
+  display: block;
+  font-size: 10px;
+  color: #99a58b;
+  margin-top: 5px;
+}
+.consult-shell .bubble {
+  font-size: 13px;
+  line-height: 1.9;
+  gap: 11px;
+  margin: 18px 0;
+}
+.consult-shell .bubble-avatar {
+  padding: 8px;
+  background: #f1f5e9;
+  border-radius: 7px;
+}
+.consult-shell .bubble-avatar svg {
+  width: 15px;
+  height: 15px;
+}
+.consult-shell .bubble.assistant > div {
+  color: #617357;
+  max-width: 100%;
+}
+.consult-shell .bubble.user > div {
+  background: #f0f3e9;
+  border-radius: 12px 12px 3px 12px;
+  padding: 13px 16px;
+  max-width: 88%;
+  color: #4a6040;
+}
+.composer-area {
+  flex-shrink: 0;
+  padding: 14px 28px 18px;
+  background: #fff;
+  border-top: 1px solid #f0f2eb;
+}
+.consult-shell .chat-form {
+  margin: 0;
+  border: 1px solid #d9e1cf;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px #30402705;
+  overflow: hidden;
+  background: #fff;
+}
+.consult-shell .chat-form:focus-within {
+  border-color: #93a479;
+  box-shadow: 0 0 0 3px #8eaa680c;
+}
+.consult-shell .chat-form textarea {
+  font-size: 13px;
+  line-height: 1.8;
+  padding: 16px 17px 8px;
+  min-height: 82px;
+  max-height: 160px;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  resize: vertical;
+  background: none;
+  overflow: auto;
+}
+.consult-shell .chat-form textarea::placeholder {
+  color: #a3ad96;
+}
+.composer-tools {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 11px 11px;
+  height: 43px;
+}
+.composer-tools > button:first-child {
+  height: 30px;
+  width: 30px;
+  color: #8e9c7d;
+  border-radius: 6px;
+}
+.composer-tools > button:first-child svg {
+  width: 17px;
+  height: 17px;
+}
+.consult-shell .scope-tabs {
+  border: 0;
+  margin: 0;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 5px;
+  background: #f6f8f1;
+}
+.consult-shell .scope-tabs button {
+  font-size: 10px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 3px;
+  color: #93a180;
+}
+.consult-shell .scope-tabs button.active {
+  background: #e7eedb;
+  color: #5d7546;
+}
+.consult-shell .chat-form .send-button {
+  position: static;
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #3a5d48;
+}
+.composer-footnote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+}
+.consult-shell .assistant-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 10px;
+  color: #8b9980;
+}
+.consult-shell .assistant-status button {
+  display: inline-flex;
+  font-size: 10px;
+  padding: 0 0 0 4px;
+  color: #7f926d;
+  gap: 3px;
+}
+.consult-shell .assistant-status svg {
+  width: 11px;
+  height: 11px;
+}
+.composer-footnote > span {
+  font-size: 9px;
+  color: #a5ae99;
+}
+.consult-shell .ai-progress {
+  padding: 0 0 12px;
+  font-size: 11px;
+}
+.consult-shell .photo-drop.has-photo {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 10px;
+  min-height: 0;
+  height: auto;
+  max-height: 130px;
+  gap: 12px;
+  border: 1px solid #e3e8db;
+  background: #f8faf4;
+  margin-bottom: 12px;
+  border-radius: 9px;
+  cursor: default;
+}
+.consult-shell .photo-drop img {
+  width: 65px;
+  height: 65px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.consult-shell .photo-drop > div {
+  flex: 1;
+  min-width: 0;
+}
+.consult-shell .photo-drop strong {
+  font-size: 11px;
+  color: #6e805d;
+  display: block;
+}
+.consult-shell .photo-drop small {
+  display: block;
+  font-size: 10px;
+  line-height: 1.5;
+  margin: 5px 0;
+  max-height: 30px;
+  overflow: auto;
+  color: #91a07e;
+}
+.consult-shell .photo-drop button:not(.icon-button) {
+  font-size: 10px;
+  padding: 4px 0;
+  color: #7b8e64;
+  display: flex;
+  gap: 5px;
+}
+.consult-shell .photo-drop button svg {
+  width: 12px;
+  height: 12px;
+}
+.generated-surface {
+  background: #fff;
+  border: 1px solid #dce5d0;
+  border-radius: 12px;
+  margin: 16px 0 8px;
+  padding: 20px;
+  box-shadow: 0 3px 10px #34462d04;
+  flex-shrink: 0;
+}
+.surface-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.surface-top > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #81946c;
+}
+.surface-top svg {
+  width: 14px;
+  height: 14px;
+}
+.surface-top > small {
+  font-size: 9px;
+  color: #a3ae96;
+}
+.generated-surface h3 {
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.4px;
+  margin: 0 0 9px;
+  color: #45613a;
+}
+.generated-surface .surface-summary {
+  font-size: 22px;
+  letter-spacing: -0.4px;
+  font-weight: 500;
+  color: #4b6340;
+  margin: 0 0 18px;
+  line-height: 1.5;
+}
+.surface-summary > span {
+  font-size: 10px;
+  font-weight: 400;
+  color: #9ca88e;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.generated-surface .room-form-fields {
+  margin: 16px 0;
+}
+.generated-surface .text-field {
+  margin: 14px 0;
+}
+.generated-surface .number-unit input {
+  font-size: 17px;
+  color: #5d7450;
+}
+.generated-surface .room-source,
+.generated-surface .provenance {
+  font-size: 9px;
+  color: #8f9d7c;
+}
+.surface-room-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 16px 0;
+}
+.surface-room-types button {
+  border: 1px solid #e2e8d8;
+  border-radius: 6px;
+  padding: 9px 11px;
+  font-size: 11px;
+  color: #829371;
+  gap: 7px;
+}
+.surface-room-types button.active {
+  background: #eff5e6;
+  border-color: #9db488;
+  color: #5d7a45;
+}
+.surface-room-types svg {
+  width: 15px;
+  height: 15px;
+}
+.surface-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  border-top: 1px solid #eef1e7;
+  padding-top: 14px;
+  margin-top: 16px;
+}
+.surface-switch button {
+  padding: 5px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: #98a489;
+}
+.surface-switch button.active {
+  background: #eef3e4;
+  color: #6c8551;
+}
+.surface-footer {
+  border-top: 1px solid #edf1e5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 15px;
+  justify-content: space-between;
+}
+.surface-footer > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #8f9e7c;
+  font-size: 10px;
+}
+.surface-footer > span svg {
+  width: 13px;
+  height: 13px;
+}
+.surface-footer .primary {
+  font-size: 11px;
+  padding: 9px 12px;
+  min-height: 36px;
+}
+.surface-footer .primary svg {
+  width: 15px;
+  height: 15px;
+}
+.surface-footer .text-button {
+  font-size: 10px;
+}
+.surface-footer .text-button svg {
+  width: 13px;
+  height: 13px;
+}
+.surface-details {
+  border-top: 1px solid #edf1e5;
+  margin-top: 15px;
+}
+.surface-details summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 0 0;
+  color: #91a17e;
+  font-size: 10px;
+  list-style: none;
+}
+.surface-details summary::-webkit-details-marker {
+  display: none;
+}
+.surface-details summary svg {
+  width: 13px;
+  height: 13px;
+}
+.surface-details[open] summary svg {
+  transform: rotate(90deg);
+}
+.manual-header {
+  padding: 28px 32px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.manual-header h2 {
+  font-size: 23px;
+  font-weight: 500;
+  margin-bottom: 15px;
+}
+.manual-header .outline {
+  font-size: 11px;
+}
+.manual-content {
+  padding: 10px 32px 30px;
+  overflow: auto;
+  min-height: 0;
+}
+.mobile-preview-link {
+  display: none;
+}
+@media (min-width: 1700px) {
+  .consult-mode .app-body,
+  .consult-mode.has-selection .app-body {
+    grid-template-columns: minmax(480px, 0.9fr) minmax(0, 1fr);
+  }
+  .consult-shell .chat-log,
+  .consult-heading {
+    padding-left: 48px;
+    padding-right: 48px;
+  }
+  .consult-context {
+    margin-left: 48px;
+    margin-right: 48px;
+  }
+  .composer-area {
+    padding-left: 44px;
+    padding-right: 44px;
+  }
+}
+@media (max-width: 1150px) and (min-width: 800px) {
+  .consult-mode .app-body,
+  .consult-mode.has-selection .app-body {
+    grid-template-columns: minmax(420px, 1.05fr) minmax(0, 1fr);
+  }
+  .consult-mode .workspace {
+    padding: 0 16px 20px;
+  }
+  .consult-mode .workspace-header {
+    display: block;
+    padding: 18px 0;
+  }
+  .consult-mode .view-switch {
+    width: max-content;
+    margin-top: 12px;
+  }
+  .consult-shell .chat-log,
+  .consult-heading {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+  .consult-context {
+    margin-left: 24px;
+    margin-right: 24px;
+  }
+  .composer-area {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .consult-context .context-saved {
+    display: none;
+  }
+  .chat-welcome h3 {
+    font-size: 31px;
+  }
+  .composer-footnote > span {
+    display: none;
+  }
+}
+@media (max-width: 799px) {
+  .app-header {
+    height: 62px;
+    padding: 0 14px;
+  }
+  .app-body,
+  .consult-mode .app-body,
+  .consult-mode.has-selection .app-body {
+    height: calc(100dvh - 62px);
+    display: block;
+    min-height: 0;
+  }
+  .consult-mode .workspace {
+    padding: 0 14px 0;
+    height: 100%;
+  }
+  .consult-mode .stage {
+    min-height: 200px;
+  }
+  .consult-mode .workspace-header {
+    padding: 18px 0;
+  }
+  .consult-mode .workspace-header h1 {
+    font-size: 20px;
+  }
+  .consult-mode .workspace-header .eyebrow {
+    font-size: 9px;
+  }
+  .consult-mode .workspace-header p {
+    font-size: 9px;
+  }
+  .consult-mode .quick-library {
+    display: flex;
+  }
+  .mobile-panel-nav {
+    height: 51px;
+    padding: 0 12px;
+    gap: 3px;
+  }
+  .mobile-panel-nav button {
+    flex-direction: row;
+    font-size: 10px;
+    gap: 5px;
+    padding: 8px 4px;
+  }
+  .mobile-panel-nav button svg {
+    width: 14px;
+    height: 14px;
+  }
+  #mobile-close {
+    flex: 0 0 28px;
+  }
+  .consult-mode .left-panel {
+    inset: 62px 0 0;
+    height: auto;
+    max-height: none;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+  }
+  .consult-mode.panel-open #mobile-backdrop {
+    display: none;
+  }
+  .consult-heading {
+    padding: 20px 20px 14px;
+    gap: 8px;
+  }
+  .consult-heading h2 {
+    font-size: 17px;
+    letter-spacing: -0.5px;
+  }
+  .consult-heading .eyebrow {
+    font-size: 9px;
+  }
+  .consult-heading > .icon-button {
+    width: 28px;
+    height: 28px;
+    display: none;
+  }
+  .consult-context {
+    margin: 0 20px;
+    padding-bottom: 12px;
+    gap: 6px;
+  }
+  .consult-context > span {
+    font-size: 10px;
+    max-width: 190px;
+  }
+  .consult-context small {
+    font-size: 9px;
+  }
+  .consult-context .context-saved {
+    display: none;
+  }
+  .consult-shell .chat-log {
+    padding: 18px 20px;
+  }
+  .chat-welcome {
+    padding: 15px 0;
+  }
+  .welcome-mark {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    margin-bottom: 18px;
+  }
+  .welcome-mark svg {
+    width: 21px;
+    height: 21px;
+  }
+  .welcome-kicker {
+    font-size: 10px;
+    margin-bottom: 9px;
+  }
+  .chat-welcome h3 {
+    font-size: 29px;
+    line-height: 1.3;
+  }
+  .chat-welcome > p {
+    font-size: 12px;
+    line-height: 1.8;
+    margin: 14px 0 20px;
+  }
+  .welcome-prompts {
+    gap: 7px;
+  }
+  .welcome-prompts button {
+    padding: 12px 13px;
+    gap: 11px;
+  }
+  .welcome-prompts strong {
+    font-size: 11px;
+  }
+  .welcome-prompts small {
+    font-size: 9px;
+  }
+  .welcome-prompts button > svg:first-child {
+    width: 17px;
+    height: 17px;
+  }
+  .consult-shell .bubble {
+    font-size: 12px;
+    gap: 8px;
+    margin: 13px 0;
+  }
+  .consult-shell .bubble-avatar {
+    padding: 6px;
+  }
+  .consult-shell .bubble.user > div {
+    padding: 11px 13px;
+  }
+  .composer-area {
+    padding: 10px 16px max(13px, env(safe-area-inset-bottom));
+    border-top-color: #edf0e7;
+  }
+  .consult-shell .chat-form textarea {
+    font-size: 12px;
+    min-height: 70px;
+    max-height: 110px;
+    padding: 12px 13px 5px;
+  }
+  .composer-tools {
+    height: 39px;
+    padding: 0 9px 9px;
+  }
+  .composer-footnote {
+    padding-top: 8px;
+  }
+  .composer-footnote > span {
+    display: none;
+  }
+  .consult-shell .assistant-status {
+    font-size: 9px;
+  }
+  .consult-shell .assistant-status button {
+    font-size: 9px;
+  }
+  .mobile-preview-link {
+    display: inline-flex;
+    color: #81966b;
+    font-size: 10px;
+    white-space: nowrap;
+    gap: 4px;
+    padding: 5px 0;
+  }
+  .mobile-preview-link svg {
+    width: 13px;
+    height: 13px;
+  }
+  .consult-heading .mobile-preview-link {
+    margin-left: auto;
+  }
+  .generated-surface {
+    padding: 16px;
+    border-radius: 10px;
+    margin-top: 13px;
+  }
+  .generated-surface h3 {
+    font-size: 16px;
+  }
+  .generated-surface .surface-summary {
+    font-size: 20px;
+    margin-bottom: 15px;
+  }
+  .surface-summary > span {
+    font-size: 9px;
+  }
+  .surface-top {
+    margin-bottom: 13px;
+  }
+  .surface-top > small {
+    font-size: 8px;
+  }
+  .surface-top > span {
+    font-size: 10px;
+  }
+  .surface-footer {
+    gap: 7px;
+  }
+  .surface-footer .text-button {
+    display: none;
+  }
+  .surface-switch button {
+    font-size: 9px;
+  }
+  .generated-surface .room-source,
+  .generated-surface .provenance {
+    font-size: 8px;
+  }
+  .surface-room-types button {
+    font-size: 10px;
+    padding: 8px 9px;
+  }
+  .surface-room-types {
+    gap: 5px;
+  }
+  .surface-details summary {
+    font-size: 10px;
+  }
+  .generated-surface .swatch {
+    width: 21px;
+    height: 21px;
+  }
+  .generated-surface .finish-row > div {
+    gap: 7px;
+  }
+  .manual-header {
+    padding: 24px 20px 16px;
+  }
+  .manual-content {
+    padding: 10px 20px 25px;
+  }
+  .manual-header h2 {
+    font-size: 21px;
+  }
+  .consult-shell .photo-drop.has-photo {
+    max-height: 105px;
+    padding: 8px;
+    gap: 8px;
+  }
+  .consult-shell .photo-drop img {
+    width: 49px;
+    height: 49px;
+  }
+  .consult-shell .photo-drop strong {
+    font-size: 10px;
+  }
+  .consult-shell .photo-drop small {
+    font-size: 9px;
+  }
+  .consult-shell .photo-drop button:not(.icon-button) {
+    font-size: 9px;
+  }
+}
+@media (max-height: 780px) and (min-width: 800px) {
+  .chat-welcome {
+    padding: 10px 0;
+  }
+  .chat-welcome h3 {
+    font-size: 28px;
+  }
+  .welcome-mark {
+    display: none;
+  }
+  .chat-welcome > p {
+    font-size: 12px;
+    margin: 12px 0 18px;
+  }
+  .welcome-prompts button {
+    padding: 11px 13px;
+  }
+  .consult-heading {
+    padding-top: 20px;
+    padding-bottom: 12px;
+  }
+  .consult-shell .chat-log {
+    padding-top: 16px;
+    padding-bottom: 18px;
+  }
+}
+@media (max-width: 350px) {
+  .consult-heading {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .consult-heading h2 {
+    font-size: 15px;
+  }
+  .consult-context {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+  .consult-context > span {
+    max-width: 160px;
+  }
+  .consult-shell .chat-log {
+    padding: 14px 16px;
+  }
+  .chat-welcome h3 {
+    font-size: 25px;
+  }
+  .welcome-kicker {
+    font-size: 9px;
+  }
+  .chat-welcome > p {
+    font-size: 11px;
+  }
+  .welcome-prompts button {
+    padding: 10px;
+    gap: 8px;
+  }
+  .welcome-prompts strong {
+    font-size: 10px;
+  }
+  .welcome-prompts small {
+    font-size: 9px;
+  }
+  .welcome-mark {
+    display: none;
+  }
+  .surface-summary > span {
+    display: block;
+  }
+  .surface-top > small {
+    max-width: 90px;
+    text-align: right;
+  }
+  .generated-surface .finish-row {
+    display: block;
+  }
+  .generated-surface .finish-row > div {
+    margin-top: 10px;
+  }
+  .composer-area {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .mobile-panel-nav button {
+    font-size: 9px;
+    gap: 4px;
+  }
+  .mobile-panel-nav button svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+/* Keep every starting action visible above the fixed composer. */
+.chat-welcome .welcome-mark {
+  display: none;
+}
+.chat-welcome {
+  padding: 16px 0;
+}
+.chat-welcome h3 {
+  font-size: 32px;
+}
+.chat-welcome > p {
+  margin: 14px 0 20px;
+}
+.welcome-prompts button {
+  padding: 12px 15px;
+}
+@media (max-width: 799px) {
+  .chat-welcome {
+    padding: 10px 0;
+  }
+  .chat-welcome h3 {
+    font-size: 28px;
+  }
+  .chat-welcome > p {
+    margin: 12px 0 17px;
+  }
+  .welcome-prompts button {
+    padding: 11px 12px;
+  }
+}
+@media (max-width: 350px) {
+  .chat-welcome h3 {
+    font-size: 24px;
+  }
+  .chat-welcome > p {
+    margin: 9px 0 13px;
+  }
+  .welcome-prompts button {
+    padding: 9px 10px;
+  }
+}

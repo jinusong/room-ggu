@@ -1,3 +1,4 @@
+import { UI_SURFACES } from './ui-schema.js';
 import { TYPES, makeItem, DEFAULT_SOURCE } from './data.js';
 const aliases = {
   armchair: /라운지체어|암체어|1인용\s*안락|armchair/i,
@@ -156,12 +157,20 @@ const limits = {
     [15, 160],
   ],
 };
-export function applyModelResult(raw, previous) {
+export function applyModelResult(raw, previous, options = {}) {
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) throw Error('모델 응답을 확인하지 못했어요.');
   const v = JSON.parse(match[0]),
     a = structuredClone(previous);
   if (typeof v.reply !== 'string' || !v.reply.trim()) throw Error('모델 응답이 비어 있어요.');
+  if (typeof options.text === 'string') {
+    const text = options.text;
+    if (!/명|인용|혼자|둘|셋|넷|함께|식구|people|seat|person|two|three/i.test(text)) v.seats = null;
+    if (!/작|아담|좁|컴팩트|크|넓|넉넉|여유|큰|보통|compact|large/i.test(text)) v.size = 'unknown';
+    if (!/깊|얕|푹|depth|deep|shallow/i.test(text)) v.depth_profile = 'unknown';
+    if (!/낮|높|키가|로우|하이|등받이|허리|무릎|height|low|tall/i.test(text))
+      v.height_profile = 'unknown';
+  }
   const proposals = {};
   if (a.type === 'sofa' && [1, 2, 3, 4].includes(v.seats))
     proposals[0] = [0, 90, 180, 220, 270][v.seats];
@@ -260,5 +269,9 @@ export function applyModelResult(raw, previous) {
       a.sources[i] = 'AI 단서 · 유형별 추정';
     }
   }
-  return { item: a, reply: v.reply.slice(0, 700) };
+  return {
+    item: a,
+    reply: v.reply.slice(0, 700),
+    ui: UI_SURFACES.furniture.includes(v.ui) ? v.ui : null,
+  };
 }

@@ -1,3 +1,4 @@
+import { UI_SURFACES } from './ui-schema.js';
 let engine = null,
   vision = null,
   processor = null,
@@ -86,9 +87,10 @@ const schema = {
     size: { type: 'string', enum: ['unknown', 'compact', 'standard', 'large'] },
     depth_profile: { type: 'string', enum: ['unknown', 'shallow', 'deep'] },
     height_profile: { type: 'string', enum: ['unknown', 'low', 'tall'] },
+    ui: { type: 'string', enum: UI_SURFACES.furniture },
     reply: { type: 'string' },
   },
-  required: ['seats', 'size', 'depth_profile', 'height_profile', 'reply'],
+  required: ['seats', 'size', 'depth_profile', 'height_profile', 'ui', 'reply'],
   additionalProperties: false,
 };
 async function chat(payload) {
@@ -106,11 +108,12 @@ seats: 소파 인원수 1~4, 모르면 null.
 size: 작은 가구 compact, 보통 standard, 큰 가구 large, 단서 없으면 unknown.
 depth_profile: 얕으면 shallow, 깊으면 deep, 모르면 unknown.
 height_profile: 낮으면 low, 높으면 tall, 모르면 unknown.
+ui: 치수를 조절하려면 dimensions, 크기 규격을 고르려면 sizes, 색상을 고르려면 colors. 사용자에게 지금 필요한 UI 하나를 고르세요.
 reply: 크기 단서를 반영하고 필요한 질문 하나를 하는 한국어 문장. 사용자 문장을 반복하지 마세요.
 예시 사용자: 세 명이 앉는 낮은 소파야.
-예시 응답: {"seats":3,"size":"unknown","depth_profile":"unknown","height_profile":"low","reply":"3인용의 낮은 소파로 가늠해볼게요. 앉는 부분도 깊은 편인가요?"}
+예시 응답: {"seats":3,"size":"unknown","depth_profile":"unknown","height_profile":"low","ui":"sizes","reply":"3인용의 낮은 소파로 가늠해볼게요. 앉는 부분도 깊은 편인가요?"}
 예시 사용자: 작은 책상이야. 깊이는 잘 몰라.
-예시 응답: {"seats":null,"size":"compact","depth_profile":"unknown","height_profile":"unknown","reply":"작은 책상을 기준으로 잡을게요. 노트북 하나를 놓는 정도인가요?"}
+예시 응답: {"seats":null,"size":"compact","depth_profile":"unknown","height_profile":"unknown","ui":"sizes","reply":"작은 책상을 기준으로 잡을게요. 노트북 하나를 놓는 정도인가요?"}
 현재 가구: ${JSON.stringify(state)}
 직전 대화: ${JSON.stringify(payload.messages.slice(-5, -1))}
 사진 설명: ${JSON.stringify((payload.caption || '없음').slice(0, 300))}
@@ -118,7 +121,7 @@ reply: 크기 단서를 반영하고 필요한 질문 하나를 하는 한국어
 응답 JSON:`;
   const r = await engine.chat.completions.create({
     messages: [{ role: 'user', content: prompt }],
-    max_tokens: 220,
+    max_tokens: 280,
     temperature: 0.1,
     response_format: { type: 'json_object', schema: JSON.stringify(schema) },
     ...(textId.startsWith('Qwen3') ? { extra_body: { enable_thinking: false } } : {}),
@@ -135,25 +138,27 @@ const roomSchema = {
       enum: ['unknown', 'studio', 'living', 'bedroom', 'office', 'dining', 'kitchen', 'kids'],
     },
     size: { type: 'string', enum: ['unknown', 'compact', 'standard', 'large'] },
+    ui: { type: 'string', enum: UI_SURFACES.room },
     reply: { type: 'string' },
   },
-  required: ['room_type', 'size', 'reply'],
+  required: ['room_type', 'size', 'ui', 'reply'],
   additionalProperties: false,
 };
 async function roomChat(payload) {
   const prompt = `한국어 인테리어 상담 도우미입니다. 사용자가 말한 방 유형과 크기 느낌만 추출하세요. 숫자 치수는 앱에서 이미 반영했습니다. 새 숫자를 만들지 마세요. 모르면 unknown으로 답하세요.
 room_type: 원룸 studio, 거실 living, 침실 bedroom, 서재 office, 식사공간 dining, 주방 kitchen, 아이방 kids, 모르면 unknown.
 size: 작고 아담하면 compact, 보통 standard, 넓고 크면 large, 모르면 unknown.
+ui: 방 치수 입력은 dimensions, 방 종류 선택은 types, 벽과 바닥 색상 선택은 finishes. 지금 필요한 UI 하나를 고르세요.
 reply: 한국어 한두 문장. 알려진 치수를 반복하지 말고 가구 배치에 도움이 되는 질문 하나를 하세요.
 예시 사용자: 책을 읽는 아담한 방으로 꾸미고 싶어.
-예시 JSON: {"room_type":"office","size":"compact","reply":"작은 서재로 시작해볼게요. 책상과 책장 중 어느 가구가 중심인가요?"}
+예시 JSON: {"room_type":"office","size":"compact","ui":"types","reply":"작은 서재로 시작해볼게요. 책상과 책장 중 어느 가구가 중심인가요?"}
 현재 공간: ${JSON.stringify(payload.room)}
 직전 대화: ${JSON.stringify(payload.messages.slice(-5, -1))}
 사용자: ${payload.messages.at(-1)?.content || ''}
 응답 JSON:`;
   const r = await engine.chat.completions.create({
     messages: [{ role: 'user', content: prompt }],
-    max_tokens: 180,
+    max_tokens: 240,
     temperature: 0.1,
     response_format: { type: 'json_object', schema: JSON.stringify(roomSchema) },
     ...(textId.startsWith('Qwen3') ? { extra_body: { enable_thinking: false } } : {}),

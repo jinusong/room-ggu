@@ -1,3 +1,4 @@
+import { UI_SURFACES } from './ui-schema.js';
 import { detectType } from './estimator.js';
 import { ROOM_TYPES, makeRoom } from './catalog.js';
 const roomAliases = {
@@ -162,14 +163,32 @@ export function consultRoom(text, previous) {
       ' 면적만으로 가로·세로는 알 수 없어 현재 비율로 나눈 초안이에요. 벽 하나의 길이를 알면 더 조절할 수 있어요.';
   return { room, reply, add, changed };
 }
-export function applyRoomModel(raw, previous) {
+export function applyRoomModel(raw, previous, options = {}) {
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) throw Error('방 상담 응답을 읽지 못했어요.');
   const v = JSON.parse(match[0]),
     room = structuredClone(previous);
   if (typeof v.reply !== 'string' || !v.reply.trim()) throw Error('방 상담 응답이 비어 있어요.');
-  if (Object.hasOwn(ROOM_TYPES, v.room_type)) room.type = v.room_type;
-  if (['compact', 'standard', 'large'].includes(v.size)) {
+  const text = options.text;
+  const allowedTypes = [];
+  if (typeof text === 'string') {
+    for (const [pattern, types] of [
+      [/책|공부|업무|작업/, ['office']],
+      [/잠|수면/, ['bedroom']],
+      [/아이|어린이/, ['kids']],
+      [/요리|조리/, ['kitchen']],
+      [/식사/, ['dining']],
+      [/손님|가족.*모여/, ['living']],
+    ])
+      if (pattern.test(text)) allowedTypes.push(...types);
+  }
+  const allowType =
+    text === undefined || (!detectRoomType(text) && allowedTypes.includes(v.room_type));
+  if (allowType && Object.hasOwn(ROOM_TYPES, v.room_type)) room.type = v.room_type;
+  const allowSize =
+    text === undefined ||
+    /아담|작은|작게|좁은|컴팩트|넓은|넓게|넉넉|큰\s*(?:방|공간)|크게|보통|표준/.test(text);
+  if (allowSize && ['compact', 'standard', 'large'].includes(v.size)) {
     const values = ROOM_TYPES[room.type].sizes[['compact', 'standard', 'large'].indexOf(v.size)];
     for (const [i, k] of ['w', 'd', 'h'].entries())
       if (!/^(사용자|대화 추정)/.test(room.sources[k])) {
@@ -177,5 +196,5 @@ export function applyRoomModel(raw, previous) {
         room.sources[k] = 'AI 단서 · 공간 유형 추정';
       }
   }
-  return { room, reply: v.reply.slice(0, 700) };
+  return { room, reply: v.reply.slice(0, 700), ui: UI_SURFACES.room.includes(v.ui) ? v.ui : null };
 }
