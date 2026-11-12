@@ -1,48 +1,57 @@
 # 룸꾸 · room ggu
 
-**대화에 맞는 편집 카드가 나타나고, 2D·3D 도면에 바로 연결되는 인테리어 웹사이트.**
+**말이나 사진으로 방과 가구를 설명하면 필요한 도구가 대화에 나타나고, 실제 치수의 2D·3D 방에 바로 반영되는 인테리어 웹.**
 
-[사이트 열기](https://jinusong.github.io/room-ggu/) · [기획 원고](docs/product-plan.md) · [디자인 방향](docs/design-direction.md) · [검증 기록](docs/verification.md)
+[사이트 열기](https://jinusong.github.io/room-ggu/) · [기획](docs/product-plan.md) ([HTML](docs/product-plan.html)) · [디자인 방향](docs/design-direction.md) · [검증 기록](docs/verification.md)
 
-![룸꾸 데스크톱 편집기](docs/screenshots/desktop.png)
+![대화 시트와 방 모형. 소파 초안이 점선으로 방 안에 먼저 나타나고 규격 비교 도구가 대화에 떠 있다](docs/screenshots/desktop.png)
 
-![대화에 따라 나타난 마감 편집 카드](docs/screenshots/generated-ui.png)
+| 벽·바닥 비교 | 가구 고르기 | 모바일 |
+| --- | --- | --- |
+| ![벽과 바닥 도구가 지금과 바꾸기 전 모서리를 비교한다](docs/screenshots/generated-ui.png) | ![20종 가구 썸네일](docs/screenshots/catalog.png) | ![모바일 하단 대화 시트와 선택한 소파의 도구 막대](docs/screenshots/mobile.png) |
 
 ## 사용하기
 
-1. 첫 화면의 **상담**에서 방 크기나 놓고 싶은 가구를 설명합니다. “거실 가로 5m 세로 4m”, “두 명이 앉는 소파”로 시작할 수 있습니다.
-2. 대화에 맞춰 **치수·공간 유형·마감·가구 규격·색상 카드**가 나타납니다. 카드에서 조절한 값이 도면에 반영됩니다.
-3. **내 방에 놓기**로 가구를 배치하고 대화를 이어갑니다. 사진은 입력창에서 첨부하거나 드롭할 수 있습니다.
-4. 공간·가구 찾기·목록은 보조 메뉴입니다. 모바일은 상담으로 시작하고 **도면 보기**와 **상담으로 공간 꾸미기**로 화면을 오갑니다.
-5. **배치 저장**은 JSON, **이미지 저장**은 현재 화면 PNG를 내려받습니다. JSON으로 다른 기기에서 배치를 불러올 수 있습니다.
+1. 첫 화면의 입력창에 방이나 가구를 말합니다. “거실 가로 5m 세로 4m”, “두 명이 앉는 소파”, “벽은 세이지, 바닥은 월넛”처럼 쓰면 됩니다. 시작점 버튼(방 크기·가구 고르기·사진·벽과 바닥)으로 시작해도 됩니다.
+2. 대화에 맞는 도구가 나타납니다. 방 크기, 공간 유형, 벽과 바닥 비교, 규격 비교, 치수 입력, 가구 색상, 배치 확인 등이 있습니다. 도구를 만지면 방이 바로 바뀌고, 턴마다 바뀐 내용이 영수증처럼 남습니다.
+3. 가구를 말하면 점선 초안이 방의 빈자리에 먼저 나타납니다. 벽 쪽을 먼저 찾고 방 안쪽을 보게 둡니다. **방에 놓기**를 누르면 실제로 놓입니다.
+4. 놓거나 선택한 가구는 입력창의 대상이 됩니다. “가로 140cm로”, “초록색으로”, “45도 돌려줘”가 그 가구에 적용됩니다. 도면의 도구 막대로 크기·색·회전·복제·삭제를 합니다.
+5. 입력창의 `+`에서 모든 도구를 열 수 있습니다. 직접 연 도구도 대화에 남습니다. 공간은 위쪽 공간 버튼에서 바꾸고 최대 12개까지 만듭니다.
+6. 파일 메뉴(`…`)에서 배치 JSON 저장·불러오기와 PNG 저장을 합니다. ⌘/Ctrl+Z로 되돌리고, `/`로 입력창에 갑니다.
 
-자동 저장은 현재 브라우저에만 적용됩니다. 사진과 대화 기록은 배치 파일에 포함하지 않습니다.
+모바일은 방이 위, 대화가 아래 시트입니다. 손잡이를 누르거나 끌어 낮게·절반·전체로 바꿉니다. 자동 저장은 이 브라우저에만 남습니다. 사진은 저장하지 않고, 대화 글은 이 브라우저에만 저장합니다. 둘 다 배치 파일에는 넣지 않습니다.
 
-## 공개 모델과 개인정보
+## 치수의 출처
 
-- **기본 상담:** 규칙 기반. 모델 다운로드 없이 유형·인원수·명시한 숫자로 치수 초안을 만듭니다.
-- **Gemma 상담:** AI 설정에서 모델을 준비하면 `gemma3-1b-it-q4f16_1-MLC`를 WebLLM으로 실행합니다. f16 미지원 GPU에서는 지원되는 Qwen3 변형을 선택합니다.
-- **사진 이해:** SmolVLM 256M의 q4 ONNX 모델을 Transformers.js로 실행합니다. 사진의 종류·형태를 파악하고 유형별 치수 초안을 만듭니다. 기본 GPU 방식과 CPU 호환 모드를 제공합니다.
-- 최초 사용 시 공개 모델 파일을 내려받습니다. 모델은 브라우저 캐시에 보관될 수 있습니다. 사진·대화는 추론 서버로 보내지 않으며, 추론은 웹워커에서 실행합니다.
-- 사진 모델과 텍스트 모델은 메모리를 아끼도록 번갈아 로드합니다. 최신 데스크톱 Chrome/Edge와 하드웨어 가속을 권장합니다. GPU·메모리가 부족해도 직접 입력과 2D 편집은 사용할 수 있습니다.
+치수 옆의 줄자 칩으로 출처를 구분합니다. 노란 줄자는 사용자가 직접 정한 값이고, 점선은 유형 기본값·대화로 가늠한 값·모델 단서·사진 유형 기본값 같은 초안입니다. 사용자가 알려준 숫자는 상담이나 모델이 덮어쓰지 않습니다. 치수는 배치용 초안이므로 구매·설치 전에는 실제로 재야 합니다.
 
-AI는 크기의 단서를 정리합니다. 앱이 유형·인원수·크기 단서를 편집 가능한 시작값에 반영하고, 사용자 설정을 보존합니다. 치수는 실측 결과가 아니므로 구매·설치 전 직접 확인해야 합니다. 3D 가구는 치수를 반영하는 기본 형상이며 사진에서 정교한 3D 모델을 복원하지 않습니다.
+## 로컬 모델과 개인정보
+
+- **기본 상담:** 규칙 기반입니다. 모델 없이 숫자·유형·인원수·마감 단어로 방과 가구를 바꾸고 도구를 고릅니다.
+- **상담 모델:** 입력창 아래 **모델 켜기**에서 준비하면 `gemma3-1b-it-q4f16_1-MLC`를 WebLLM으로 실행합니다. f16을 지원하지 않는 GPU에서는 `Qwen3-0.6B-q4f32_1-MLC`를 씁니다.
+- **사진 모델:** SmolVLM 256M(q4 ONNX)을 Transformers.js로 실행해 사진 속 가구 종류와 모양을 읽습니다. GPU 방식과 CPU 호환 방식이 있습니다.
+- 처음 한 번 공개 저장소에서 모델을 내려받고 브라우저 캐시에 보관될 수 있습니다. 추론은 Web Worker에서 하며 사진과 대화는 추론 서버로 보내지 않습니다. 메모리를 아끼려고 두 모델을 번갈아 올립니다.
+- 화면의 각 답 아래에 “기본 상담 · 규칙 기반”, “Gemma 답변 · 도구도 Gemma가 고름”처럼 무엇이 답하고 무엇이 도구를 골랐는지 표시합니다.
 
 ## 생성형 UI
 
-Google Cloud GenUI, A2UI, Vercel AI SDK의 컴포넌트 선택과 상태 바인딩 원리를 참고했습니다. 자체 JSON 스키마를 사용하며 A2UI 프로토콜 구현은 아닙니다.
+Google Cloud의 분류로 보면 미리 만든 구성요소 중에서 고르는 정적 방식에 가깝습니다. 앱이 렌더링하는 컴포넌트는 `src/ui-schema.js`의 `SURFACE_KINDS` 14가지이고, 모델은 그중 방 3가지·가구 3가지만 `ui` 문자열로 고를 수 있습니다. 앱이 허용 목록으로 검증하고 `src/ui/surfaces.jsx`의 자체 컴포넌트에 실제 상태를 연결합니다. 모델이 만든 HTML·CSS·JavaScript는 실행하지 않습니다.
 
-Gemma가 응답의 `ui` 필드로 방의 `dimensions/types/finishes`, 가구의 `dimensions/sizes/colors` 중 필요한 카드를 고릅니다. 앱이 허용 목록으로 검증하고 자체 컴포넌트에 실제 상태를 연결합니다. 모델의 원시 마크업을 실행하지 않습니다. 모델이 없어도 규칙 기반으로 같은 편집 카드를 사용할 수 있습니다.
+요청 단어가 분명해 규칙이 고른 도구는 모델이 바꾸지 않고, 모델의 다른 선택은 칩으로 제안합니다. A2UI 프로토콜을 구현하거나 호환을 주장하지 않습니다. 참고 문서는 [디자인 방향](docs/design-direction.md)에 있습니다.
 
-직접 입력한 값은 모델이 덮어쓰지 않습니다. 마감 요청에 방 유형·크기를 바꾸거나, 언급하지 않은 가구 높이를 바꾸는 제안도 제한합니다. 화면에서 AI가 고른 도구와 기본 상담 도구를 구분합니다. 입력창은 고정되고 대화 기록과 카드는 스크롤됩니다.
+## 구조
 
-참고한 공식 문서는 [디자인 방향](docs/design-direction.md)에 있습니다.
-
-## 기능
-
-공간 7유형·21가지 크기 초안, 최대 12개 독립 공간, 치수 실시간 변경, 벽·바닥 마감 색상, 공간·가구 상담, 가구 20종·63가지 치수 초안, 검색·분류와 실제 3D 미리보기, 자유 회전, 복제·삭제, 5cm 이동 스냅, 벽 경계 제한, 회전 직사각형 SAT 충돌 검사, 벽까지 거리, 치수선, 실행 취소·다시 실행, JSON 검증·이전 프로토타입 파일 변환, PNG 내보내기, 모바일 편집 패널을 제공합니다.
-
-여러 공간은 각자 독립된 직사각형 도면입니다. 집 전체를 연결한 복잡한 평면도나 실제 제품 카탈로그는 제공하지 않습니다. 러그 위의 가구는 의도된 배치이므로 겹침 경고에서 제외합니다. 기존 v1·v2 배치 파일은 v3로 변환합니다.
+| 경로 | 역할 |
+| --- | --- |
+| `src/catalog.js`, `src/data.js` | 가구·공간 카탈로그, 저장 형식 v3 검증, 경계·충돌 |
+| `src/estimator.js`, `src/room-consult.js` | 문장에서 가구·방 치수와 단서 읽기, 모델 응답 검증 |
+| `src/app/planner.js` | 문장 하나 → 바꿀 내용·보여줄 도구·다음 칩 (상태를 바꾸지 않음) |
+| `src/app/ops.js` | 검증된 상태 연산, 빈자리 찾기, 변경 내역 |
+| `src/app/model-turn.js` | 로컬 모델 답을 허용된 단서·도구만 합치기 |
+| `src/app/store.js` | 대화·초안·선택·실행 취소·저장·모델 상태 |
+| `src/ui/` | Preact 화면: 대화 시트, 입력창, 방 위 도구, 생성형 컴포넌트 |
+| `src/scene.js`, `src/plan.js`, `src/furniture.js` | 3D 모형, 2D 평면도, 파라메트릭 가구 |
+| `src/ai.js`, `src/ai-worker.js` | 브라우저 Worker의 WebLLM·Transformers.js |
 
 ## 실행
 
@@ -51,15 +60,13 @@ Node.js 22 이상에서:
 ```sh
 npm ci
 npm run dev
+npm run verify      # 스킬 연결, 문법, 단위 테스트, 정적 빌드
+npm run test:e2e    # Chrome 브라우저 회귀 테스트
 npm run format:check
-npm run verify
-npm run test:e2e
 npm run preview
 ```
 
-로컬 브라우저 테스트는 설치된 Chrome을 사용합니다. CI에서는 Playwright Chromium을 설치해 실행합니다. `npm run test:e2e`는 공간 상담·추가·전환·삭제·실시간 변경·실행 취소, 가구 초안·배치, 2D 복원 후 3D 드래그, 모바일·파일 검증을 확인합니다.
-
-`npm run verify`는 공용 스킬 연결, JavaScript 구문, 핵심 계산 테스트, 정적 빌드를 검사합니다. `dist/`는 서버 없이 배포되는 정적 결과물입니다. 모델 가중치는 저장소에 포함하지 않습니다.
+로컬 브라우저 테스트는 설치된 Chrome을, CI는 Playwright Chromium을 씁니다. `dist/`는 서버 없이 배포되는 정적 결과물이며 모델 가중치는 저장소에 넣지 않습니다.
 
 ## Codex · Claude Code 공용 파이프라인
 
@@ -72,7 +79,7 @@ npm run preview
 | `unslop` | 간격·아이콘·레이아웃·색·타이포그래피·렌더링 검토 |
 | `humanizer` | UI·오류·설명 문구를 자연스럽고 구체적으로 수정 |
 
-Codex: `$room-ggu-pipeline`, Claude Code: `/room-ggu-pipeline`. 원본은 `.agents/skills/`, Claude 경로는 `.claude/skills/`의 상대 심볼릭 링크입니다. 새 채팅에서 프로젝트 스킬이 발견됩니다. 스킬은 저장소에 포함되어 있고, 정확한 버전은 `skills-lock.json`에 고정했습니다.
+Codex: `$room-ggu-pipeline`, Claude Code: `/room-ggu-pipeline`. 원본은 `.agents/skills/`, Claude 경로는 `.claude/skills/`의 상대 심볼릭 링크입니다. 정확한 버전은 `skills-lock.json`에 고정했습니다.
 
 기획 페이지 다시 만들기:
 
@@ -80,8 +87,8 @@ Codex: `$room-ggu-pipeline`, Claude Code: `/room-ggu-pipeline`. 원본은 `.agen
 node .agents/skills/answer-me-with-html/scripts/am.mjs render docs/product-plan.md -o docs/product-plan.html --no-open
 ```
 
-디자인 검토에 사용한 **unslop by Damir Sokolovsky (@heydamir), CC BY 4.0**를 비롯한 출처는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 있습니다.
+디자인 점검에 쓴 **unslop by Damir Sokolovsky (@heydamir), CC BY 4.0**를 비롯한 출처는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 있습니다. 글꼴은 Pretendard(OFL, jsDelivr)와 JetBrains Mono(OFL, @fontsource)입니다.
 
 ## 배포
 
-`main`에 푸시하면 GitHub Actions가 검증하고 GitHub Pages에 배포합니다. `base: './'`로 `/room-ggu/` 하위 경로를 지원합니다. 비밀키·백엔드·회원가입은 필요하지 않습니다.
+`main`에 푸시하면 GitHub Actions가 검증·브라우저 테스트 후 GitHub Pages에 배포합니다. `base: './'`로 `/room-ggu/` 하위 경로를 지원하고, 배포 버전은 `version.json`의 커밋으로 확인합니다. 비밀키·백엔드·회원가입은 필요하지 않습니다.

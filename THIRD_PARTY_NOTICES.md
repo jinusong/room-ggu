@@ -14,6 +14,6 @@
 
 ## Runtime libraries and models
 
-Three.js (MIT), Lucide (ISC), Vite (MIT), WebLLM (Apache-2.0), Transformers.js (Apache-2.0)를 사용합니다. 각 패키지의 저작권과 라이선스는 해당 upstream 및 npm 배포물에 있습니다.
+Three.js (MIT), Preact (MIT), Lucide (ISC), Vite (MIT), esbuild (MIT), WebLLM (Apache-2.0), Transformers.js (Apache-2.0)를 사용합니다. 글꼴은 [Pretendard](https://github.com/orioncactus/pretendard)(SIL OFL 1.1, jsDelivr에서 불러옴)와 [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono)(SIL OFL 1.1, @fontsource로 번들)입니다. 각 패키지의 저작권과 라이선스는 해당 upstream 및 npm 배포물에 있습니다.
 
 Gemma 모델은 Google Gemma 이용 조건을 따릅니다. [Gemma terms](https://ai.google.dev/gemma/terms). Qwen3 및 SmolVLM 모델은 각각의 모델 카드와 라이선스를 따릅니다. 모델 가중치는 이 저장소에 포함하지 않으며 사용자 브라우저가 공개 저장소에서 내려받습니다.

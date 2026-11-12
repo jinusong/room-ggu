@@ -23,7 +23,13 @@ test('가구를 빈자리에 놓고 회전·복제·삭제를 기록한다', () 
   const { item, free } = ops.placeItem(s, makeItem('desk'));
   assert.equal(free, true);
   assert.equal(layoutWarnings(s).conflicts.has(item.id), false);
-  assert.deepEqual(ops.rotateItem(s, item.id)[0], { label: '회전', from: '0°', to: '90°' });
+  assert.ok([0, 90, 180, 270].includes(item.angle), '벽에 붙이면 방 안쪽을 본다');
+  const before = item.angle;
+  assert.deepEqual(ops.rotateItem(s, item.id)[0], {
+    label: '회전',
+    from: `${before}°`,
+    to: `${(before + 90) % 360}°`,
+  });
   const copy = ops.duplicateItem(s, item.id).item;
   assert.match(copy.name, /복사$/);
   ops.removeItem(s, copy.id);

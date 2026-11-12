@@ -71,8 +71,10 @@ test('가구 설명 → 방 안의 점선 초안 → 놓기 → 회전·삭제·
   await expect(page.locator('.thread')).toContainText('방에 놓았어요');
   await expect(page.locator('[data-surface=furniture-dims] .surface-meta')).toHaveText('방에 놓임');
   await expect(page.locator('.target.is-item')).toContainText('선택한 가구');
+  const placedAngle = s.items.at(-1).angle;
+  expect([0, 90, 180, 270]).toContain(placedAngle);
   await page.locator('#rotate').click();
-  expect((await stored(page)).items.at(-1).angle).toBe(90);
+  expect((await stored(page)).items.at(-1).angle).toBe((placedAngle + 90) % 360);
   await page.locator('#delete').click();
   expect((await stored(page)).items).toHaveLength(4);
   await expect(page.locator('.event').last()).toContainText('뺐어요');

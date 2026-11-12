@@ -200,7 +200,7 @@ function presetFits(item, isDraft) {
     const cand = { ...item, dims: p.dims };
     if (isDraft) {
       const spot = findFreeSpot(s, cand);
-      return fitStatus(s, { ...cand, x: spot.x, z: spot.z });
+      return fitStatus(s, { ...cand, x: spot.x, z: spot.z, angle: spot.angle });
     }
     return fitStatus(s, cand);
   });
@@ -705,10 +705,12 @@ function Photo({ spec }) {
                   ? `${josa(TYPES[p.type].name, '으로/로')} 보여요.`
                   : '종류를 확실히 찾지 못했어요.'}
               </p>
-              <p class="vision-caption">
-                <span>SmolVLM 원문</span>
-                {p.caption}
-              </p>
+              {p.caption && (
+                <p class="vision-caption">
+                  <span>SmolVLM 원문</span>
+                  {p.caption}
+                </p>
+              )}
             </>
           ) : (
             <>

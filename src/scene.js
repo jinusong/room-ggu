@@ -395,6 +395,8 @@ export class RoomScene {
       dl.position.set(w / 2 + WALL_T + 0.42, 0.06, 0);
       const hl = tapeSprite(`천장 ${Math.round(h * 100)} cm`, { fill: '#ffffff' }, this.height);
       hl.position.set(-w / 2 - WALL_T, h + 0.14, -d / 2 - WALL_T);
+      this.roomTapes = [wl, dl];
+      for (const t of this.roomTapes) t.visible = !this.selected;
       this.room.add(wl, dl, hl);
     }
     this.dirty = true;
@@ -453,6 +455,8 @@ export class RoomScene {
   decorate(id, warnings) {
     this.selected = id;
     this.warnings = warnings;
+    // 가구를 고르면 방 치수 라벨을 숨겨 가구 치수와 겹치지 않게 한다.
+    for (const t of this.roomTapes || []) t.visible = !id;
     this.clear(this.overlay);
     for (const a of this.state.items) {
       const warn = warnings.has(a.id);

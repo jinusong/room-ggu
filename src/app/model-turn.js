@@ -62,3 +62,13 @@ export function mergeFurnitureModel(raw, item, text) {
     summary: `${TYPES[a.type].name} 초안 · 가로 ${a.dims[0]}, 깊이 ${a.dims[2]}, 높이 ${a.dims[1]}cm`,
   };
 }
+
+// 사진 모델 설명이 숫자·기호 반복처럼 읽을 수 없으면 보여주지 않는다.
+export function usableCaption(caption) {
+  const c = String(caption || '').trim();
+  const words = c.match(/[A-Za-z]{3,}/g) || [];
+  if (words.length < 2) return '';
+  const digits = (c.match(/[0-9]/g) || []).length;
+  if (digits > c.length * 0.3 || /(.)\1{7,}/.test(c)) return '';
+  return c.slice(0, 300);
+}

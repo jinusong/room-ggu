@@ -75,6 +75,7 @@ function planMeta(t, ctx, item) {
   if (/^(?:방금\s*(?:거|것|건)?\s*)?(?:되돌려|되돌리기|실행\s*취소|취소해)/.test(t))
     return metaPlan('undo', '방금 바꾼 내용을 되돌렸어요.');
   if (/^다시\s*실행/.test(t)) return metaPlan('redo', '되돌린 내용을 다시 적용했어요.');
+  if (/예시\s*(?:방|공간)/.test(t)) return metaPlan('example', '');
   if (/(?:저장|내보내|불러오|이미지로|png|json|배치\s*파일)/i.test(t) && !numbers)
     return surfacePlan(
       'files',
@@ -111,7 +112,6 @@ function planMeta(t, ctx, item) {
     return metaPlan('relocate', '');
   if (/빈\s*방(?:으로|에서)|가구\s*(?:를\s*)?(?:다|모두|전부)\s*(?:치워|비워|빼)/.test(t))
     return metaPlan('clear', '');
-  if (/예시\s*(?:방|공간)/.test(t)) return metaPlan('example', '');
   if (item) {
     if (/회전|돌려/.test(t)) {
       const m = t.match(/(-?\d{1,3})\s*도/);
@@ -247,7 +247,7 @@ export function planTurn(text, ctx) {
 // 첫 화면과 빈 대화에서 보여줄 시작점.
 export const STARTERS = [
   { label: '방 크기부터', detail: '가로·세로·천장 높이', action: 'tool', arg: 'room-size' },
-  { label: '가구 고르기', detail: '20종 · 63가지 크기 초안', action: 'tool', arg: 'catalog' },
+  { label: '가구 고르기', detail: '20종 · 63가지 크기', action: 'tool', arg: 'catalog' },
   { label: '사진으로 시작', detail: '가구 사진에서 종류부터 잡기', action: 'photo' },
   { label: '벽과 바닥', detail: '마감 색 비교하기', action: 'tool', arg: 'finishes' },
 ];

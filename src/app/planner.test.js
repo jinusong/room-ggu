@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { exampleState, freshState, makeItem } from '../data.js';
 import { planTurn, resolveScope, parseFurnitureColor } from './planner.js';
-import { mergeFurnitureModel, mergeRoomModel, usableReply } from './model-turn.js';
+import { mergeFurnitureModel, mergeRoomModel, usableReply, usableCaption } from './model-turn.js';
 
 const room = { type: 'room' };
 test('방 설명은 방 크기 도구와 변경 계획을 만든다', () => {
@@ -138,5 +138,18 @@ test('모델 답이 프롬프트 예시를 베끼거나 말하지 않은 인원�
   assert.equal(
     usableReply('두 명이 쓰기 좋은 크기예요. 팔걸이가 있나요?', '두 명이 앉는 소파'),
     '두 명이 쓰기 좋은 크기예요. 팔걸이가 있나요?',
+  );
+});
+test('예시 방 요청은 파일 불러오기보다 먼저 해석하고, 읽을 수 없는 사진 설명은 버린다', () => {
+  const s = freshState();
+  assert.equal(planTurn('예시 방 불러오기', { state: s, target: room }).action, 'example');
+  assert.equal(
+    planTurn('배치 파일 불러오기', { state: s, target: room }).surfaces[0].kind,
+    'files',
+  );
+  assert.equal(usableCaption('1. 1.111111111111111111111111'), '');
+  assert.equal(
+    usableCaption('Couch, shape, color, visible seating.'),
+    'Couch, shape, color, visible seating.',
   );
 });

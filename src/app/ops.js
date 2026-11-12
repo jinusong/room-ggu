@@ -157,20 +157,61 @@ function oversizedAt(item, room) {
   return f.w > room.w + 0.001 || f.d > room.d + 0.001 || item.dims[1] / 100 > room.h;
 }
 
-// 다른 가구와 겹치지 않는 자리를 뒤쪽 벽부터 찾는다. 없으면 가운데에 둔다.
+// 빈자리를 찾는다. 먼저 벽에 붙여 방 안쪽을 보게 두고(여유 30cm), 없으면 방 안쪽,
+// 그래도 없으면 여유 없이 찾는다. 러그는 겹침 검사에서 빠지므로 바닥 가운데부터 둔다.
+const MARGIN = 0.3;
+function freeAt(c, others, margin) {
+  const probe = margin
+    ? { ...c, dims: [c.dims[0] + margin * 200, c.dims[1], c.dims[2] + margin * 200] }
+    : c;
+  return !others.some((o) => overlaps(probe, o));
+}
+function wallSpots(item, room) {
+  const spots = [],
+    w = item.dims[0] / 100,
+    d = item.dims[2] / 100;
+  const step = 0.25;
+  // [각도, 벽에 붙는 좌표 계산] — 0° 뒤 벽, 90° 왼쪽 벽, 270° 오른쪽 벽, 180° 앞 벽
+  for (let x = -room.w / 2 + w / 2; x <= room.w / 2 - w / 2 + 0.001; x += step)
+    spots.push({ x, z: -room.d / 2 + d / 2, angle: 0 });
+  for (let z = -room.d / 2 + w / 2; z <= room.d / 2 - w / 2 + 0.001; z += step)
+    spots.push({ x: -room.w / 2 + d / 2, z, angle: 90 });
+  for (let z = -room.d / 2 + w / 2; z <= room.d / 2 - w / 2 + 0.001; z += step)
+    spots.push({ x: room.w / 2 - d / 2, z, angle: 270 });
+  for (let x = -room.w / 2 + w / 2; x <= room.w / 2 - w / 2 + 0.001; x += step)
+    spots.push({ x, z: room.d / 2 - d / 2, angle: 180 });
+  return spots;
+}
+function gridSpots(room, angle) {
+  const spots = [];
+  for (let z = -room.d / 2 + 0.3; z < room.d / 2; z += 0.25)
+    for (let x = -room.w / 2 + 0.3; x < room.w / 2; x += 0.25) spots.push({ x, z, angle });
+  return spots;
+}
 export function findFreeSpot(state, item) {
   const room = state.room,
     others = state.items.filter((o) => o.id !== item.id);
   const fallback = { ...item, x: 0, z: 0 };
   clampItem(fallback, room);
-  if (oversizedAt(item, room)) return { x: fallback.x, z: fallback.z, free: false };
-  for (let z = -room.d / 2 + 0.3; z < room.d / 2; z += 0.25)
-    for (let x = -room.w / 2 + 0.3; x < room.w / 2; x += 0.25) {
-      const c = { ...item, x, z };
+  const result = (c, free) => ({ x: c.x, z: c.z, angle: c.angle, free });
+  if (oversizedAt(item, room)) return result(fallback, false);
+  if (item.type === 'rug') {
+    const c = { ...item, x: 0, z: 0, angle: item.angle || 0 };
+    clampItem(c, room);
+    return result(c, true);
+  }
+  const passes = [
+    [wallSpots(item, room), MARGIN],
+    [gridSpots(room, item.angle || 0), MARGIN],
+    [gridSpots(room, item.angle || 0), 0],
+  ];
+  for (const [spots, margin] of passes)
+    for (const spot of spots) {
+      const c = { ...item, ...spot };
       clampItem(c, room);
-      if (!others.some((o) => overlaps(c, o))) return { x: c.x, z: c.z, free: true };
+      if (!oversizedAt(c, room) && freeAt(c, others, margin)) return result(c, true);
     }
-  return { x: fallback.x, z: fallback.z, free: false };
+  return result(fallback, false);
 }
 
 export function sanitizeItem(a) {
@@ -200,6 +241,7 @@ export function placeItem(state, draft) {
   const spot = findFreeSpot(state, item);
   item.x = spot.x;
   item.z = spot.z;
+  item.angle = spot.angle;
   clampItem(item, state.room);
   state.items.push(item);
   return { item, free: spot.free };
@@ -247,6 +289,7 @@ export function relocateConflicts(state) {
     if (spot.free) {
       a.x = spot.x;
       a.z = spot.z;
+      a.angle = spot.angle;
       moved++;
     }
   }

@@ -22,14 +22,9 @@ export function ghostItem() {
   }
   const d = app.draft;
   if (!d) return null;
-  const cand = {
-    ...d,
-    id: 'ghost',
-    dims: p?.target?.type === 'draft' ? p.dims : d.dims,
-    angle: d.angle || 0,
-  };
+  const cand = { ...d, id: 'ghost', dims: p?.target?.type === 'draft' ? p.dims : d.dims };
   const spot = findFreeSpot(s, cand);
-  const g = { ...cand, x: spot.x, z: spot.z };
+  const g = { ...cand, x: spot.x, z: spot.z, angle: spot.angle };
   return { ...g, fit: spot.free ? 'fits' : fitStatus(s, g) };
 }
 

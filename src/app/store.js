@@ -15,7 +15,7 @@ import { validateSurfaceSpec, SURFACE_KINDS } from '../ui-schema.js';
 import { runAI, stopAI, onAIStatus, imageData } from '../ai.js';
 import * as ops from './ops.js';
 import { planTurn } from './planner.js';
-import { mergeFurnitureModel, mergeRoomModel } from './model-turn.js';
+import { mergeFurnitureModel, mergeRoomModel, usableCaption } from './model-turn.js';
 import { josa, dimsText } from './text.js';
 
 export const KEY = 'room-ggu-v2';
@@ -971,8 +971,9 @@ export async function analyzePhoto() {
   app.ai.progress = 0;
   emit();
   try {
-    const caption = await runAI('caption', { image: photo.data, device: app.ai.device });
+    const raw = await runAI('caption', { image: photo.data, device: app.ai.device });
     if (app.photo !== photo) return;
+    const caption = usableCaption(raw);
     photo.caption = caption;
     photo.analyzed = true;
     app.ai.vision = 'ready';
@@ -992,8 +993,10 @@ export async function analyzePhoto() {
       role: 'assistant',
       engine: 'rule',
       text: type
-        ? `사진은 ${TYPES[type].name}로 보여요. 그 유형의 기본 크기로 초안을 띄웠어요. 사진만으로는 실제 cm를 알 수 없으니 아는 치수를 알려주세요.`
-        : '사진에서 가구 종류를 확실히 찾지 못했어요. 아래에서 종류를 골라 주세요.',
+        ? `사진은 ${josa(TYPES[type].name, '으로/로')} 보여요. 그 유형의 기본 크기로 초안을 띄웠어요. 사진만으로는 실제 cm를 알 수 없으니 아는 치수를 알려주세요.`
+        : caption
+          ? '사진에서 가구 종류를 확실히 찾지 못했어요. 아래에서 종류를 골라 주세요.'
+          : '사진 모델이 읽을 수 있는 설명을 내지 못했어요. 가구가 크게 보이는 사진으로 다시 해보거나 아래에서 종류를 골라 주세요.',
       surfaces: type
         ? [{ kind: 'furniture-size', target: { type: 'draft', id: app.draft.id } }]
         : [{ kind: 'catalog', target: roomTarget() }],
@@ -1004,7 +1007,7 @@ export async function analyzePhoto() {
             { label: '가로 알려주기', text: `${TYPES[type].name} 가로 ` },
           ]
         : [],
-      visionCaption: caption.slice(0, 300),
+      visionCaption: caption || undefined,
     });
   } catch (e) {
     app.ai.vision = 'error';

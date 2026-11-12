@@ -2024,6 +2024,9 @@ button.row:hover,
 .sheet.is-mobile .welcome {
   padding-top: 4px;
 }
+.sheet.is-mobile .welcome-kicker {
+  display: none;
+}
 .sheet.is-mobile .welcome h1 {
   font-size: 24px;
 }
