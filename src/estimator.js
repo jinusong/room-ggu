@@ -100,6 +100,13 @@ export function consult(text, previous, caption = '') {
   ])
     if (p.test(text) && explicit[i] === undefined)
       set(i, Math.min(1500, a.dims[i] + 10), '사용자 요청 · 10cm 증가');
+  for (const [p, i] of [
+    [/(?:가로|너비|폭|길이)[^.!?\n]{0,12}(?:더\s*작게|줄여|짧게)|^(?:조금\s*)?(?:더\s*)?작게/, 0],
+    [/높이[^.!?\n]{0,12}(?:더\s*낮게|낮춰|줄여)/, 1],
+    [/(?:깊이|세로)[^.!?\n]{0,12}(?:줄여|더\s*얕게)/, 2],
+  ])
+    if (p.test(text.trim()) && explicit[i] === undefined && !updated.includes(i))
+      set(i, Math.max(1, a.dims[i] - 10), '사용자 요청 · 10cm 감소');
   for (const [i, n] of Object.entries(explicit)) set(+i, n, '사용자 설정');
   if (/무릎/.test(text) && explicit[1] === undefined)
     return {
@@ -117,7 +124,7 @@ export function consult(text, previous, caption = '') {
     reply += ' 싱글·슈퍼싱글·퀸 중 어느 크기에 가까운가요?';
   else if (a.sources[2] === DEFAULT_SOURCE)
     reply += ' 깊이를 알면 “깊이 80cm”처럼 알려주세요. 모르면 이 값으로 먼저 배치해도 돼요.';
-  else reply += ' 추정값은 치수 카드에서 조절한 뒤 방에 놓아보세요.';
+  else reply += ' 아래 도구에서 더 조절할 수 있어요.';
   return { item: a, reply, changed: [...new Set(updated)] };
 }
 const limits = {

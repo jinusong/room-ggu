@@ -1,0 +1,324 @@
+// 상태 변경 연산. 모든 함수는 앱 상태(v3)를 직접 바꾸고, 대화에 보여줄 변경 내역을 돌려준다.
+// 숫자 범위·경계·충돌 검사는 여기서 끝낸다. AI와 UI는 이 함수만 호출한다.
+import {
+  TYPES,
+  ROOM_TYPES,
+  WALL_COLORS,
+  FLOOR_COLORS,
+  FURNITURE_COLORS,
+  makeRoom,
+} from '../catalog.js';
+import {
+  clampItem,
+  overlaps,
+  footprint,
+  layoutWarnings,
+  newId,
+  addRoom,
+  switchRoom,
+  spaces,
+  exampleState,
+  DEFAULT_SOURCE,
+} from '../data.js';
+
+export const round2 = (n) => Math.round(n * 100) / 100;
+export const fmtM = (n) => `${round2(n)}m`;
+export const fmtCm = (n) => `${Math.round(n * 10) / 10}cm`;
+export const pyeong = (w, d) => (w * d) / 3.3058;
+export const isUserSource = (s) => typeof s === 'string' && s.startsWith('사용자');
+export const MAX_ITEMS = 100;
+
+const named = (hex, list) =>
+  list.find(([, c]) => c.toLowerCase() === String(hex).toLowerCase())?.[0] || hex;
+export const wallName = (hex) => named(hex, WALL_COLORS);
+export const floorName = (hex) => named(hex, FLOOR_COLORS);
+export const furnitureColorName = (hex) => named(hex, FURNITURE_COLORS);
+
+export function diffRoom(before, after) {
+  const rows = [];
+  if (before.type !== after.type)
+    rows.push({
+      label: '공간 유형',
+      from: ROOM_TYPES[before.type].name,
+      to: ROOM_TYPES[after.type].name,
+    });
+  for (const [k, label] of [
+    ['w', '가로'],
+    ['d', '세로'],
+    ['h', '천장'],
+  ])
+    if (before[k] !== after[k]) rows.push({ label, from: fmtM(before[k]), to: fmtM(after[k]) });
+  if (before.wallColor !== after.wallColor)
+    rows.push({
+      label: '벽',
+      from: wallName(before.wallColor),
+      to: wallName(after.wallColor),
+      swatch: after.wallColor,
+    });
+  if (before.floorColor !== after.floorColor)
+    rows.push({
+      label: '바닥',
+      from: floorName(before.floorColor),
+      to: floorName(after.floorColor),
+      swatch: after.floorColor,
+    });
+  return rows;
+}
+
+export function diffItem(before, after) {
+  const rows = [];
+  if (before.type !== after.type)
+    rows.push({ label: '종류', from: TYPES[before.type].name, to: TYPES[after.type].name });
+  for (const [i, label] of [
+    [0, '가로'],
+    [2, '깊이'],
+    [1, '높이'],
+  ])
+    if (before.dims[i] !== after.dims[i])
+      rows.push({ label, from: fmtCm(before.dims[i]), to: fmtCm(after.dims[i]) });
+  if (before.color !== after.color)
+    rows.push({
+      label: '색상',
+      from: furnitureColorName(before.color),
+      to: furnitureColorName(after.color),
+      swatch: after.color,
+    });
+  if (before.angle !== after.angle)
+    rows.push({
+      label: '회전',
+      from: `${Math.round(before.angle)}°`,
+      to: `${Math.round(after.angle)}°`,
+    });
+  if (before.name !== after.name) rows.push({ label: '이름', from: before.name, to: after.name });
+  return rows;
+}
+
+const validRoomNumber = (n) => typeof n === 'number' && Number.isFinite(n) && n >= 1 && n <= 15;
+const validDim = (n) => typeof n === 'number' && Number.isFinite(n) && n >= 1 && n <= 1500;
+const validColor = (c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
+
+// 방 전체를 검증한 뒤 교체한다. 가구는 새 경계 안으로 옮긴다.
+export function setRoom(state, room) {
+  for (const k of ['w', 'd', 'h'])
+    if (!validRoomNumber(room[k])) throw Error('방 치수는 1~15m 범위로 알려주세요.');
+  if (!Object.hasOwn(ROOM_TYPES, room.type)) throw Error('알 수 없는 공간 유형이에요.');
+  if (!validColor(room.wallColor) || !validColor(room.floorColor))
+    throw Error('마감 색상이 올바르지 않아요.');
+  const before = state.room;
+  state.room = room;
+  for (const a of state.items) clampItem(a, room);
+  return diffRoom(before, room);
+}
+
+export function roomWithDims(room, patch, source = '사용자 설정') {
+  const next = structuredClone(room);
+  for (const [k, v] of Object.entries(patch)) {
+    if (!['w', 'd', 'h'].includes(k)) continue;
+    if (!validRoomNumber(v)) throw Error('방 치수는 1~15m 범위로 알려주세요.');
+    next[k] = round2(v);
+    next.sources[k] = source;
+  }
+  return next;
+}
+
+// 공간 유형만 바꾸고, 사용자가 정한 치수는 남긴다.
+export function roomWithType(room, type) {
+  if (!Object.hasOwn(ROOM_TYPES, type)) throw Error('알 수 없는 공간 유형이에요.');
+  const next = structuredClone(room),
+    base = makeRoom(type);
+  next.type = type;
+  for (const k of ['w', 'd', 'h'])
+    if (!isUserSource(room.sources[k])) {
+      next[k] = base[k];
+      next.sources[k] = '공간 유형 기본값';
+    }
+  return next;
+}
+
+export function roomWithPreset(room, index) {
+  const size = ROOM_TYPES[room.type].sizes[index];
+  if (!size) throw Error('크기 초안을 찾지 못했어요.');
+  const next = structuredClone(room);
+  for (const [i, k] of ['w', 'd', 'h'].entries()) {
+    next[k] = size[i];
+    next.sources[k] = '사용자 선택 · 크기 초안';
+  }
+  return next;
+}
+
+export function roomWithFinish(room, key, color) {
+  if (!['wallColor', 'floorColor'].includes(key) || !validColor(color))
+    throw Error('마감 색상이 올바르지 않아요.');
+  return { ...structuredClone(room), [key]: color.toLowerCase() };
+}
+
+function oversizedAt(item, room) {
+  const f = footprint(item);
+  return f.w > room.w + 0.001 || f.d > room.d + 0.001 || item.dims[1] / 100 > room.h;
+}
+
+// 다른 가구와 겹치지 않는 자리를 뒤쪽 벽부터 찾는다. 없으면 가운데에 둔다.
+export function findFreeSpot(state, item) {
+  const room = state.room,
+    others = state.items.filter((o) => o.id !== item.id);
+  const fallback = { ...item, x: 0, z: 0 };
+  clampItem(fallback, room);
+  if (oversizedAt(item, room)) return { x: fallback.x, z: fallback.z, free: false };
+  for (let z = -room.d / 2 + 0.3; z < room.d / 2; z += 0.25)
+    for (let x = -room.w / 2 + 0.3; x < room.w / 2; x += 0.25) {
+      const c = { ...item, x, z };
+      clampItem(c, room);
+      if (!others.some((o) => overlaps(c, o))) return { x: c.x, z: c.z, free: true };
+    }
+  return { x: fallback.x, z: fallback.z, free: false };
+}
+
+export function sanitizeItem(a) {
+  if (!a || !Object.hasOwn(TYPES, a.type)) throw Error('가구 종류가 올바르지 않아요.');
+  if (!Array.isArray(a.dims) || a.dims.length !== 3 || !a.dims.every(validDim))
+    throw Error('가구 치수는 1~1500cm로 입력해주세요.');
+  if (!validColor(a.color)) throw Error('가구 색상이 올바르지 않아요.');
+  return {
+    id: typeof a.id === 'string' && a.id ? a.id.slice(0, 100) : newId(),
+    type: a.type,
+    name: String(a.name || TYPES[a.type].name).slice(0, 100),
+    dims: a.dims.map((n) => Math.round(n * 10) / 10),
+    sources:
+      Array.isArray(a.sources) && a.sources.length === 3
+        ? a.sources.map((x) => (typeof x === 'string' ? x.slice(0, 120) : DEFAULT_SOURCE))
+        : [DEFAULT_SOURCE, DEFAULT_SOURCE, DEFAULT_SOURCE],
+    color: a.color.toLowerCase(),
+    x: Number.isFinite(a.x) ? a.x : 0,
+    z: Number.isFinite(a.z) ? a.z : 0,
+    angle: Number.isFinite(a.angle) ? ((a.angle % 360) + 360) % 360 : 0,
+  };
+}
+
+export function placeItem(state, draft) {
+  if (state.items.length >= MAX_ITEMS) throw Error('가구는 한 방에 100개까지 놓을 수 있어요.');
+  const item = sanitizeItem({ ...draft, id: newId(), angle: draft.angle || 0 });
+  const spot = findFreeSpot(state, item);
+  item.x = spot.x;
+  item.z = spot.z;
+  clampItem(item, state.room);
+  state.items.push(item);
+  return { item, free: spot.free };
+}
+
+export function updateItem(state, id, next) {
+  const i = state.items.findIndex((a) => a.id === id);
+  if (i < 0) throw Error('가구를 찾지 못했어요.');
+  const before = state.items[i],
+    after = sanitizeItem({ ...next, id });
+  clampItem(after, state.room);
+  state.items[i] = after;
+  return diffItem(before, after);
+}
+
+export function removeItem(state, id) {
+  const item = state.items.find((a) => a.id === id);
+  if (!item) throw Error('가구를 찾지 못했어요.');
+  state.items = state.items.filter((a) => a.id !== id);
+  return item;
+}
+
+export function rotateItem(state, id, deg = 90) {
+  const a = state.items.find((x) => x.id === id);
+  if (!a) throw Error('가구를 찾지 못했어요.');
+  const before = a.angle;
+  a.angle = (((a.angle + deg) % 360) + 360) % 360;
+  clampItem(a, state.room);
+  return [{ label: '회전', from: `${Math.round(before)}°`, to: `${Math.round(a.angle)}°` }];
+}
+
+export function duplicateItem(state, id) {
+  const a = state.items.find((x) => x.id === id);
+  if (!a) throw Error('가구를 찾지 못했어요.');
+  return placeItem(state, { ...structuredClone(a), name: `${a.name} 복사`.slice(0, 100) });
+}
+
+// 겹치거나 벽을 넘은 가구를 빈자리로 옮긴다. 방보다 큰 가구는 옮겨도 해결되지 않는다.
+export function relocateConflicts(state) {
+  let moved = 0;
+  for (const id of [...layoutWarnings(state).all]) {
+    if (!layoutWarnings(state).all.has(id)) continue;
+    const a = state.items.find((x) => x.id === id);
+    const spot = findFreeSpot({ ...state, items: state.items.filter((x) => x.id !== id) }, a);
+    if (spot.free) {
+      a.x = spot.x;
+      a.z = spot.z;
+      moved++;
+    }
+  }
+  return { moved, remaining: layoutWarnings(state).all.size };
+}
+
+export function addSpace(state, type = 'studio') {
+  if (!Object.hasOwn(ROOM_TYPES, type)) throw Error('알 수 없는 공간 유형이에요.');
+  return addRoom(state, type);
+}
+
+export function switchSpace(state, id) {
+  if (id === state.roomId) return true;
+  if (!switchRoom(state, id)) throw Error('공간을 찾지 못했어요.');
+  return true;
+}
+
+export function deleteSpace(state, id = state.roomId) {
+  if (!state.otherRooms.length) throw Error('마지막 공간은 삭제할 수 없어요.');
+  const order = spaces(state).map((r) => r.roomId),
+    index = order.indexOf(id);
+  if (index < 0) throw Error('공간을 찾지 못했어요.');
+  const name = spaces(state)[index].name;
+  if (id === state.roomId) switchRoom(state, order[index - 1] || order[index + 1]);
+  state.otherRooms = state.otherRooms.filter((r) => r.roomId !== id);
+  state.roomOrder = state.roomOrder.filter((x) => x !== id);
+  return name;
+}
+
+export function renameSpace(state, name) {
+  state.name = String(name).trim().slice(0, 100) || '나의 방';
+  return state.name;
+}
+
+export function clearItems(state) {
+  const n = state.items.length;
+  state.items = [];
+  return n;
+}
+
+export function loadExample(state) {
+  const ex = exampleState();
+  state.name = ex.name;
+  state.room = ex.room;
+  state.items = ex.items;
+}
+
+export function isExampleLike(state) {
+  const ex = exampleState();
+  return (
+    state.name === ex.name &&
+    state.items.length === ex.items.length &&
+    state.items.every((a, i) => a.type === ex.items[i].type)
+  );
+}
+
+// 가구 하나가 들어갈 수 있는지 미리 계산한다. 규격 비교 UI가 사용한다.
+export function fitStatus(state, item) {
+  const room = state.room;
+  if (oversizedAt(item, room)) return 'oversize';
+  const c = { ...item };
+  clampItem(c, room);
+  return state.items.some((o) => o.id !== item.id && overlaps(c, o)) ? 'overlap' : 'fits';
+}
+
+export function clearance(state, item) {
+  const f = footprint(item),
+    { w, d } = state.room;
+  return {
+    left: Math.max(0, Math.round((w / 2 + item.x - f.w / 2) * 100)),
+    right: Math.max(0, Math.round((w / 2 - item.x - f.w / 2) * 100)),
+    back: Math.max(0, Math.round((d / 2 + item.z - f.d / 2) * 100)),
+    front: Math.max(0, Math.round((d / 2 - item.z - f.d / 2) * 100)),
+  };
+}

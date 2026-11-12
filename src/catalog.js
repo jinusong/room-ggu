@@ -199,6 +199,19 @@ export const FLOOR_COLORS = [
   ['월넛', '#93785c'],
   ['그레이', '#babbb6'],
 ];
+// 가구 색상 초안. 앞의 6개는 기존 배치 파일의 COLORS와 같은 값이다.
+export const FURNITURE_COLORS = [
+  ['오크', '#b29a80'],
+  ['크림', '#e5ddcc'],
+  ['올리브', '#83917d'],
+  ['테라코타', '#bc8065'],
+  ['블루그레이', '#8495a5'],
+  ['차콜', '#575c58'],
+  ['월넛', '#7a5c43'],
+  ['화이트', '#efede7'],
+  ['네이비', '#3f4d63'],
+  ['머스터드', '#c99a3c'],
+];
 export function makeRoom(type = 'studio', size = 1) {
   const [w, d, h] = ROOM_TYPES[type].sizes[size];
   return {

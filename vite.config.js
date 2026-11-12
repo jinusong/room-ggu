@@ -4,7 +4,7 @@ export default defineConfig({
   plugins: [{
     name: 'build-version',
     generateBundle() {
-      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version: '4.0.0', commit: process.env.GITHUB_SHA || 'local' }) });
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version: '5.0.0', commit: process.env.GITHUB_SHA || 'local' }) });
     },
   }, {
     name: 'omit-unused-onnx-wasm',
@@ -16,6 +16,7 @@ export default defineConfig({
       }
     },
   }],
+  esbuild: { jsx: 'automatic', jsxImportSource: 'preact' },
   worker: { format: 'es' },
   build: { rollupOptions: { output: { manualChunks: { three: ['three'], icons: ['lucide'] } } } },
 });

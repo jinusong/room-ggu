@@ -1,85 +1,215 @@
 import { test, expect } from '@playwright/test';
-import { PerspectiveCamera, Vector3 } from 'three';
 const stored = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('room-ggu-v2')));
-
-test('상담 → 치수 확인 → 가구 배치 → 실행 취소 → 새로고침 복원', async ({ page }) => {
-  await page.goto('/');
-  await page.locator('[data-panel=consult]').first().click();
-  await page
-    .getByRole('textbox', { name: '공간 또는 가구 설명', exact: true })
-    .fill('두 명이 넉넉하게 앉는 소파야. 가로 200cm 깊이 85cm');
+const thread = (page) =>
+  page.evaluate(() => JSON.parse(localStorage.getItem('room-ggu-thread-v1')));
+const ready = (page) =>
+  page.waitForFunction(() => window.__roomggu?.ready(), null, { timeout: 20000 });
+async function say(page, text) {
+  await page.locator('#chat-input').fill(text);
   await page.getByRole('button', { name: '설명 보내기', exact: true }).click();
-  await expect(page.getByRole('spinbutton', { name: '등록 가구 가로', exact: true })).toHaveValue(
-    '200',
-  );
-  await expect(page.getByRole('spinbutton', { name: '등록 가구 깊이', exact: true })).toHaveValue(
-    '85',
-  );
-  await page.locator('#add-item').click();
-  await expect(page.locator('#chat-log')).toContainText('두 명이 넉넉하게 앉는 소파야');
-  await expect(page.locator('#chat-log')).toContainText('방에 놓았어요');
-  expect((await stored(page)).items).toHaveLength(5);
+}
+async function openTool(page, name) {
+  await page.getByRole('button', { name: '도구 열기' }).click();
+  await page.getByRole('menuitem', { name, exact: true }).click();
+}
+const noOverflow = (page) =>
+  page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
+
+test('첫 화면은 대화가 중심이고, 방 설명으로 크기 도구가 나타나 도면에 바로 반영된다', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await ready(page);
+  await expect(page.locator('#chat-input')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '어떤 방을 꾸밀까요?' })).toBeVisible();
+  await expect(page.locator('.surface')).toHaveCount(0);
+  const sheet = await page.locator('.sheet').boundingBox();
+  expect(sheet.width).toBeGreaterThan(380);
+  expect(sheet.height).toBeGreaterThan(800);
+  await expect(page.locator('#viewport-3d canvas')).toBeVisible();
+  await say(page, '거실 가로 5m 세로 4m 천장 2.6m로 바꿔줘');
+  await expect(page.locator('[data-surface=room-size]')).toBeVisible();
+  let s = await stored(page);
+  expect([s.room.type, s.room.w, s.room.d, s.room.h]).toEqual(['living', 5, 4, 2.6]);
+  await expect(page.locator('.receipt')).toContainText('4m');
+  await expect(page.locator('.receipt')).toContainText('5m');
+  await page.getByRole('textbox', { name: '방 가로', exact: true }).fill('5.5');
+  expect((await stored(page)).room.w).toBe(5.5);
+  await expect(page.locator('.space-button')).toContainText('5.5 × 4m');
+  await say(page, '벽은 세이지 바닥은 월넛');
+  await expect(page.locator('[data-surface=finishes]')).toBeVisible();
+  await expect(page.locator('[data-surface=room-size]')).toHaveCount(0);
+  await expect(page.locator('[data-surface-chip=room-size]')).toBeVisible();
+  await page.getByRole('button', { name: '벽 블루그레이', exact: true }).click();
+  await page.mouse.move(1300, 200);
+  s = await stored(page);
+  expect(s.room.wallColor).toBe('#bfcbd1');
+  expect(s.room.floorColor).toBe('#93785c');
+  await expect(page.locator('.corner figcaption').nth(1)).toHaveText('바꾸기 전');
+});
+
+test('가구 설명 → 방 안의 점선 초안 → 놓기 → 회전·삭제·되돌리기, 대화는 계속 남는다', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await ready(page);
+  await say(page, '두 명이 넉넉하게 앉는 소파야. 가로 200cm 깊이 85cm');
+  const tool = page.locator('[data-surface=furniture-dims]');
+  await expect(tool).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '가구 가로', exact: true })).toHaveValue('200');
+  await expect(page.getByRole('textbox', { name: '가구 깊이', exact: true })).toHaveValue('85');
+  await expect(tool.locator('.tape.is-set')).toHaveCount(2);
+  await expect(tool.locator('.tape.is-draft')).toHaveCount(1);
+  await expect(page.locator('.target.is-draft')).toContainText('초안');
+  await expect(page.locator('.draft-note')).toBeVisible();
+  expect(await page.evaluate(() => window.__roomggu.app.draft?.dims)).toEqual([200, 82, 85]);
+  await page.locator('.surface-foot .btn.primary').click();
+  let s = await stored(page);
+  expect(s.items).toHaveLength(5);
+  expect(s.items.at(-1).dims).toEqual([200, 82, 85]);
+  await expect(page.locator('.thread')).toContainText('두 명이 넉넉하게 앉는 소파야');
+  await expect(page.locator('.thread')).toContainText('방에 놓았어요');
+  await expect(page.locator('[data-surface=furniture-dims] .surface-meta')).toHaveText('방에 놓임');
+  await expect(page.locator('.target.is-item')).toContainText('선택한 가구');
   await page.locator('#rotate').click();
   expect((await stored(page)).items.at(-1).angle).toBe(90);
-  await page.locator('#delete').first().click();
+  await page.locator('#delete').click();
   expect((await stored(page)).items).toHaveLength(4);
+  await expect(page.locator('.event').last()).toContainText('뺐어요');
   await page.locator('#undo').click();
   expect((await stored(page)).items).toHaveLength(5);
   await page.reload();
-  await expect(page.locator('#room-meta')).toContainText('가구 5개');
+  await ready(page);
+  expect((await stored(page)).items).toHaveLength(5);
+  await expect(page.locator('.thread')).toContainText('방에 놓았어요');
   const file = page.waitForEvent('download');
+  await page.getByRole('button', { name: '파일과 설정' }).click();
   await page.locator('#export').click();
   expect((await file).suggestedFilename()).toMatch(/배치\.json$/);
 });
 
-test('2D로 복원한 후 3D에서 실제 가구를 드래그할 수 있다', async ({ page }) => {
+test('선택한 가구는 입력창의 대상이 되고, 다른 가구 이름은 새 초안을 만든다', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: '2D 평면', exact: true }).click();
-  await page.reload();
-  await page.getByRole('button', { name: '3D 공간', exact: true }).click();
-  await page.locator('#viewport-3d canvas').waitFor();
-  await page.evaluate(
-    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
-  );
-  const box = await page.locator('#viewport-3d canvas').boundingBox(),
-    s = await stored(page),
-    a = s.items[0];
-  const camera = new PerspectiveCamera(38, box.width / box.height, 0.05, 100);
-  const fit = Math.max(1, 0.9 / (box.width / box.height));
-  camera.position.set(6.6 * fit, 0.5 + (5.8 - 0.5) * fit, 7 * fit);
-  camera.lookAt(0, 0.5, 0);
-  camera.updateMatrixWorld();
-  const p = new Vector3(a.x, 0.5, a.z).project(camera),
-    x = box.x + ((p.x + 1) * box.width) / 2,
-    y = box.y + ((1 - p.y) * box.height) / 2;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x + 30, y + 15, { steps: 6 });
-  await page.mouse.up();
-  await expect(page.locator('#selection-tools')).toContainText('침대');
-  const next = (await stored(page)).items[0];
-  expect(Math.abs(next.x - a.x) + Math.abs(next.z - a.z)).toBeGreaterThan(0.1);
+  await ready(page);
+  const desk = (await stored(page)).items.find((a) => a.type === 'desk');
+  await page.evaluate((id) => {
+    const { app } = window.__roomggu;
+    app.scenes.three.cb.select(id);
+  }, desk.id);
+  await expect(page.locator('.target.is-item')).toContainText('책상');
+  await say(page, '가로 140cm로 바꿔줘');
+  let s = await stored(page);
+  expect(s.items.find((a) => a.id === desk.id).dims[0]).toBe(140);
+  expect(s.items.find((a) => a.id === desk.id).type).toBe('desk');
+  await say(page, '초록색으로 바꿔줘');
+  await expect(page.locator('[data-surface=furniture-color]')).toBeVisible();
+  expect((await stored(page)).items.find((a) => a.id === desk.id).color).toBe('#83917d');
+  await say(page, '침대도 하나 더 놓고 싶어');
+  await expect(page.locator('.target.is-draft')).toContainText('침대');
+  expect((await stored(page)).items.find((a) => a.id === desk.id).type).toBe('desk');
 });
 
-test('모바일에서 방 설정·목록·불러오기에 접근하고 가로 넘침이 없다', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+test('가구 20종을 고르고 규격을 비교해 배치한다', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('#chat-input')).toBeVisible();
-  await page.locator('.mobile-panel-nav [data-panel="room"]').click();
-  await page.locator('#room-form input[name=w]').fill('4.5');
-  await page.locator('#room-form button').click();
-  await expect(page.locator('#room-meta')).toContainText('4.5 × 4');
-  await page.locator('.mobile-panel-nav [data-panel="items"]').click();
-  await expect(page.locator('.item-list')).toBeVisible();
-  await page.locator('#mobile-close').click();
-  await expect(page.locator('#import')).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
-  await page.setViewportSize({ width: 320, height: 740 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  await ready(page);
+  await openTool(page, '가구 고르기');
+  await expect(page.locator('.catalog-card')).toHaveCount(20);
+  await expect(page.locator('.catalog-card img')).toHaveCount(20);
+  await page.getByRole('textbox', { name: '가구 검색' }).fill('식탁');
+  await expect(page.locator('.catalog-card')).toHaveCount(1);
+  await page.locator('.catalog-card').click();
+  await page.getByRole('button', { name: /6인 식탁/ }).click();
+  expect(await page.evaluate(() => window.__roomggu.app.draft.dims)).toEqual([180, 74, 90]);
+  await expect(page.locator('.size-card.is-active')).toContainText('6인 식탁');
+  await page.locator('.chip.is-primary').click();
+  const s = await stored(page);
+  expect(s.items.at(-1).type).toBe('dining');
+  expect(s.items.at(-1).dims).toEqual([180, 74, 90]);
+  await openTool(page, '가구 고르기');
+  await page.locator('.catalog-card[data-type=rug]').last().click();
+  await page.locator('.surface-foot .btn.primary').last().click();
+  expect((await stored(page)).items.at(-1).type).toBe('rug');
+});
+
+test('방 크기를 입력 도중 반영하고 한 번에 되돌리며, 유형·초안·마감을 바꾼다', async ({ page }) => {
+  await page.goto('/');
+  await ready(page);
+  await openTool(page, '방 크기');
+  const before = await stored(page);
+  const width = page.getByRole('textbox', { name: '방 가로', exact: true });
+  await width.fill('6.5');
+  expect((await stored(page)).room.w).toBe(6.5);
+  await expect(page.locator('[data-surface=room-size] .surface-meta')).toContainText('26.0m²');
+  await width.blur();
+  await page.locator('#undo').click();
+  expect((await stored(page)).room.w).toBe(before.room.w);
+  await page.getByRole('button', { name: '방 가로 늘리기' }).click();
+  expect((await stored(page)).room.w).toBe(before.room.w + 0.1);
+  await openTool(page, '공간 유형');
+  await page.locator('.type-tile', { hasText: '거실' }).click();
+  let s = await stored(page);
+  expect(s.room.type).toBe('living');
+  expect(s.room.w).toBe(before.room.w + 0.1);
+  await openTool(page, '방 크기');
+  await page.locator('[data-surface=room-size] .preset').first().click();
+  expect((await stored(page)).room.w).toBe(4);
+  await openTool(page, '벽과 바닥');
+  await page.getByRole('button', { name: '바닥 월넛', exact: true }).click();
+  expect((await stored(page)).room.floorColor).toBe('#93785c');
+});
+
+test('대화로 방을 바꾸고 새 공간을 만들어도 대화는 이어지고 공간마다 가구를 보존한다', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await ready(page);
+  const first = await stored(page);
+  await say(page, '거실 가로 5m 세로 4m 천장 2.6m로 바꿔줘. 소파 중심으로 꾸밀 거야.');
+  let s = await stored(page);
+  expect([s.room.type, s.room.w, s.items.length]).toEqual(['living', 5, 4]);
+  await say(page, '아담한 서재 하나 추가해줘');
+  s = await stored(page);
+  expect([s.room.type, s.room.w, s.items.length, s.otherRooms.length]).toEqual([
+    'office',
+    2.5,
+    0,
+    1,
+  ]);
+  await expect(page.locator('.thread')).toContainText('소파 중심으로 꾸밀 거야');
+  await say(page, '가로 120cm인 책상이야');
+  await page.locator('.chip.is-primary').click();
+  expect((await stored(page)).items).toHaveLength(1);
+  await page.locator('.space-button').click();
+  await page.locator(`[data-space="${first.roomId}"]`).click();
+  s = await stored(page);
+  expect([s.items.length, s.room.w]).toEqual([4, 5]);
+  await expect(page.locator('.surface-chip', { hasText: '다른 공간' })).toHaveCount(1);
+  await page.reload();
+  await ready(page);
+  expect((await stored(page)).otherRooms[0].items).toHaveLength(1);
+  await page.locator('.space-button').click();
+  await expect(page.locator('[data-space]')).toHaveCount(2);
+});
+
+test('공간을 추가·삭제하고 실행 취소로 공간 전체를 복원한다', async ({ page }) => {
+  await page.goto('/');
+  await ready(page);
+  await page.locator('.space-button').click();
+  await page.locator('[data-newspace=bedroom]').click();
+  expect((await stored(page)).room.type).toBe('bedroom');
+  await openTool(page, '내 공간');
+  await page.getByRole('button', { name: '나의 침실 삭제' }).click();
+  await page.locator('[data-surface=spaces] .btn.danger').click();
+  expect((await stored(page)).otherRooms).toHaveLength(0);
+  await page.locator('#undo').click();
+  const s = await stored(page);
+  expect(s.room.type).toBe('bedroom');
+  expect(s.otherRooms).toHaveLength(1);
 });
 
 test('잘못된 배치 파일을 거절하고 기존 데이터를 보존한다', async ({ page }) => {
   await page.goto('/');
+  await ready(page);
   const before = await stored(page);
   await page.locator('#layout-file').setInputFiles({
     name: 'invalid.json',
@@ -97,140 +227,64 @@ test('잘못된 배치 파일을 거절하고 기존 데이터를 보존한다',
   expect(await stored(page)).toEqual(before);
 });
 
-test('가구 20종을 검색하고 여러 크기 초안을 적용해 배치한다', async ({ page }) => {
+test('2D로 복원한 뒤 3D에서 실제 가구를 끌어 옮기고 2D에서도 옮긴다', async ({ page }) => {
   await page.goto('/');
-  await page.locator('[data-panel=catalog]').first().click();
-  await expect(page.locator('.catalog-card')).toHaveCount(20);
-  await expect(page.locator('.catalog-card img')).toHaveCount(20);
-  await page.locator('#catalog-search').fill('식탁');
-  await expect(page.locator('.catalog-card')).toHaveCount(1);
-  await page.locator('.catalog-card').click();
-  await page.getByRole('button', { name: '6인 식탁' }).click();
-  await expect(page.getByRole('spinbutton', { name: '등록 가구 가로', exact: true })).toHaveValue(
-    '180',
-  );
-  await page.locator('#add-item').click();
-  const s = await stored(page);
-  expect(s.items.at(-1).type).toBe('dining');
-  expect(s.items.at(-1).dims).toEqual([180, 74, 90]);
-  await page.locator('[data-panel=catalog]').first().click();
-  await page.locator('#catalog-search').fill('러그');
-  await page.locator('.catalog-card').click();
-  await page.locator('#add-item').click();
-  expect((await stored(page)).items.at(-1).dims[1]).toBe(1);
-});
-
-test('입력 도중 방 크기를 즉시 반영하며 한 번의 실행 취소로 복구한다', async ({ page }) => {
-  await page.goto('/');
-  await page.locator('[data-panel=room]').first().click();
-  const before = await stored(page);
-  const width = page.getByRole('spinbutton', { name: '방 가로', exact: true });
-  await width.fill('6.5');
-  await expect(page.locator('#room-meta')).toContainText('6.5 × 4');
-  expect((await stored(page)).room.w).toBe(6.5);
-  await expect(page.locator('#room-area')).toContainText('26.0');
-  await width.blur();
-  await page.locator('#undo').click();
-  expect((await stored(page)).room.w).toBe(before.room.w);
-  await page.locator('[data-room-type=living]').click();
-  await expect(page.locator('#room-meta')).toContainText('거실 · 5.5 × 4.5');
-  await page.locator('[data-room-size="0"]').click();
-  expect((await stored(page)).room.w).toBe(4);
-  await page.getByRole('button', { name: '바닥 색상 월넛', exact: true }).click();
-  expect((await stored(page)).room.floorColor).toBe('#93785c');
-});
-
-test('상담으로 방을 수정·추가하고 전환해도 각 방의 가구를 보존한다', async ({ page }) => {
-  await page.goto('/');
-  const first = await stored(page);
-  await page.locator('[data-panel=consult]').first().click();
-  await page
-    .locator('#chat-input')
-    .fill('거실 가로 5m 세로 4m 천장 2.6m로 바꿔줘. 소파 중심으로 꾸밀 거야.');
-  await page.getByRole('button', { name: '설명 보내기', exact: true }).click();
-  await expect(page.locator('#room-meta')).toContainText('거실 · 5 × 4');
-  let s = await stored(page);
-  expect(s.room.h).toBe(2.6);
-  expect(s.items).toHaveLength(4);
-  await expect(page.locator('.conversation-space')).toBeVisible();
-  await page.locator('#chat-input').fill('아담한 서재 하나 추가해줘');
-  await page.getByRole('button', { name: '설명 보내기', exact: true }).click();
-  s = await stored(page);
-  expect(s.room.type).toBe('office');
-  expect(s.room.w).toBe(2.5);
-  expect(s.items).toHaveLength(0);
-  expect(s.otherRooms).toHaveLength(1);
-  await page.locator('#chat-input').fill('가로 120cm인 책상이야');
-  await page.getByRole('button', { name: '설명 보내기', exact: true }).click();
-  await page.locator('#add-item').click();
-  expect((await stored(page)).items).toHaveLength(1);
-  await page.locator(`[data-space="${first.roomId}"]`).click();
-  expect((await stored(page)).items).toHaveLength(4);
-  expect((await stored(page)).room.w).toBe(5);
+  await ready(page);
+  await page.locator('[data-view="2d"]').click();
   await page.reload();
-  expect((await stored(page)).otherRooms[0].items).toHaveLength(1);
-  await expect(page.locator('[data-space]')).toHaveCount(2);
+  await ready(page);
+  await page.locator('[data-view="3d"]').click();
+  await page.evaluate(
+    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+  );
+  const a = (await stored(page)).items[0];
+  let p = await page.evaluate((id) => window.__roomggu.anchor(id, { center: true }), a.id);
+  await page.mouse.move(p.x, p.y);
+  await page.mouse.down();
+  await page.mouse.move(p.x + 40, p.y + 20, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.locator('#selection-tools')).toContainText('침대');
+  let next = (await stored(page)).items[0];
+  expect(Math.abs(next.x - a.x) + Math.abs(next.z - a.z)).toBeGreaterThan(0.1);
+  await page.locator('[data-view="2d"]').click();
+  const b = (await stored(page)).items[1];
+  p = await page.evaluate((id) => window.__roomggu.anchor(id, { center: true }), b.id);
+  await page.mouse.move(p.x, p.y);
+  await page.mouse.down();
+  await page.mouse.move(p.x - 30, p.y + 30, { steps: 6 });
+  await page.mouse.up();
+  next = (await stored(page)).items[1];
+  expect(Math.abs(next.x - b.x) + Math.abs(next.z - b.z)).toBeGreaterThan(0.1);
 });
 
-test('공간을 직접 추가·삭제하고 실행 취소로 방 전체를 복원한다', async ({ page }) => {
-  await page.goto('/');
-  await page.locator('#space-add').click();
-  await page.locator('[data-newspace=bedroom]').click();
-  expect((await stored(page)).room.type).toBe('bedroom');
-  await page.locator('[data-panel=room]').first().click();
-  await page.locator('#delete-room').click();
-  await page.locator('#delete-space-confirm').click();
-  expect((await stored(page)).otherRooms).toHaveLength(0);
-  await page.locator('#undo').click();
-  expect((await stored(page)).room.type).toBe('bedroom');
-  expect((await stored(page)).otherRooms).toHaveLength(1);
-});
-
-test('첫 화면에서 채팅 입력창을 쓰고 필요한 편집 도구를 대화로 생성한다', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.locator('.mobile-panel-nav button').first()).toHaveText('상담');
-  await expect(page.locator('#chat-input')).toBeVisible();
-  await expect(page.locator('.chat-welcome')).toBeVisible();
-  await expect(page.locator('.generated-surface')).toHaveCount(0);
-  const chat = await page.locator('#left-panel').boundingBox();
-  expect(chat.width).toBeGreaterThan(600);
-  await page.locator('#chat-input').fill('거실 가로 5m 세로 4m로 바꿔줘');
-  await page.getByRole('button', { name: '설명 보내기', exact: true }).click();
-  await expect(page.locator('[data-surface=dimensions]')).toBeVisible();
-  await page.getByRole('spinbutton', { name: '방 가로', exact: true }).fill('5.5');
-  await expect(page.locator('#room-meta')).toContainText('5.5 × 4');
-  await expect(page.locator('.surface-summary')).toContainText('5.5 × 4');
-  await page.locator('#chat-input').fill('벽은 세이지 바닥은 월넛');
-  await page.getByRole('button', { name: '설명 보내기', exact: true }).click();
-  await expect(page.locator('[data-surface=finishes]')).toBeVisible();
-  await page.getByRole('button', { name: '벽 색상 블루그레이', exact: true }).click();
-  expect((await stored(page)).room.wallColor).toBe('#bfcbd1');
-  await page.locator('#chat-input').fill('두 명이 앉는 소파야');
-  await page.getByRole('button', { name: '설명 보내기', exact: true }).click();
-  await expect(page.locator('[data-surface=sizes]')).toBeVisible();
-  await page.getByRole('button', { name: '넉넉한 3인' }).click();
-  await page.locator('#add-item').click();
-  expect((await stored(page)).items.at(-1).dims[0]).toBe(220);
-});
-
-test('모바일은 상담으로 시작하며 입력창을 유지하고 도면을 오갈 수 있다', async ({ page }) => {
+test('모바일은 대화로 시작하고 시트를 접고 펴도 입력창이 화면 안에 남는다', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
+  await ready(page);
   await expect(page.locator('#chat-input')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '어떤 방을 꾸밀까요?' })).toBeVisible();
+  await expect(page.locator('#viewport-3d canvas')).toBeVisible();
   await page.locator('#chat-input').fill('입력하던 설명');
-  await page.locator('[data-scope=room]').click();
+  await page.locator('.sheet-handle').click();
+  await expect(page.locator('.sheet')).toHaveAttribute('data-snap', 'full');
   await expect(page.locator('#chat-input')).toHaveValue('입력하던 설명');
-  await page.locator('#chat-input').fill('침실 가로 4m 세로 3m');
-  await page.getByRole('button', { name: '설명 보내기', exact: true }).click();
-  await expect(page.locator('.conversation-space')).toBeVisible();
-  const field = await page.locator('#chat-input').boundingBox();
-  expect(field.y + field.height).toBeLessThan(844);
-  await page.locator('.consult-heading [data-action=preview]').click();
-  await expect(page.locator('#chat-input')).not.toBeVisible();
-  await expect(page.locator('#viewport-3d')).toBeVisible();
-  await page.locator('#mobile-menu').click();
-  await expect(page.locator('#chat-input')).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
-  await page.setViewportSize({ width: 320, height: 740 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  await say(page, '침실 가로 4m 세로 3m');
+  await expect(page.locator('[data-surface=room-size]')).toBeVisible();
+  expect((await stored(page)).room.w).toBe(4);
+  for (const snap of ['peek', 'half']) {
+    await page.locator('.sheet-handle').click();
+    await expect(page.locator('.sheet')).toHaveAttribute('data-snap', snap);
+    await page.waitForTimeout(450);
+    const field = await page.locator('#chat-input').boundingBox();
+    expect(field.y + field.height).toBeLessThanOrEqual(844);
+    expect(field.y).toBeGreaterThan(400);
+  }
+  await say(page, '두 명이 앉는 소파야');
+  await page.locator('.chip.is-primary').click();
+  await expect(page.locator('#selection-tools')).toBeVisible();
+  await expect(page.locator('.thread')).toContainText('방에 놓았어요');
+  expect(await noOverflow(page)).toBe(true);
+  await page.setViewportSize({ width: 320, height: 640 });
+  expect(await noOverflow(page)).toBe(true);
+  await expect(page.locator('#chat-input')).toBeInViewport();
 });
