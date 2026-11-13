@@ -1,0 +1,361 @@
+{
+ "ai": {
+  "text": "ready",
+  "why": "",
+  "model": "gemma3-1b-it-q4f16_1-MLC",
+  "vision": "off",
+  "device": "webgpu",
+  "progress": 1,
+  "label": "이 기기에 맞게 상담 모델을 준비하는 중",
+  "error": ""
+ },
+ "results": [
+  {
+   "engine": "gemma",
+   "fixes": [
+    "문장의 명령(가구 비우기)을 따름"
+   ],
+   "text": "가구 1개를 비웠어요. 되돌리기로 다시 꺼낼 수 있어요.",
+   "surfaces": [],
+   "receipt": [
+    "가구 비우기:1개"
+   ],
+   "room": "나의 침실 living 5x4x2.5 wall #e0cfb9 floor #93785c",
+   "draft": null,
+   "items": 0,
+   "spaces": 2,
+   "target": "room",
+   "label": "Gemma가 해석 · 앱이 1곳 바로잡음문장의 명령(가구 비우기)을 따름",
+   "prompt": "빈 방으로 시작할래",
+   "ms": 2501
+  },
+  {
+   "engine": "gemma",
+   "fixes": [
+    "방 이야기로 처리"
+   ],
+   "text": "거실을 가로 5m, 세로 4m, 천장 2.5m로 반영했어요.",
+   "surfaces": [
+    "room-size"
+   ],
+   "receipt": [],
+   "room": "나의 침실 living 5x4x2.5 wall #e0cfb9 floor #93785c",
+   "draft": null,
+   "items": 0,
+   "spaces": 2,
+   "target": "room",
+   "label": "Gemma가 해석 · 앱이 1곳 바로잡음방 이야기로 처리",
+   "prompt": "거실 가로 5m 세로 4m",
+   "ms": 2073
+  },
+  {
+   "engine": "gemma",
+   "fixes": [
+    "말하지 않은 공간 유형 변경은 막음",
+    "벽 색은 문장에 적힌 색 유지"
+   ],
+   "text": "벽은 세이지로 바꿨어요.",
+   "surfaces": [
+    "finishes"
+   ],
+   "receipt": [
+    "벽:샌드→세이지"
+   ],
+   "room": "나의 침실 living 5x4x2.5 wall #c0cbbb floor #93785c",
+   "draft": null,
+   "items": 0,
+   "spaces": 2,
+   "target": "room",
+   "label": "Gemma가 해석 · 앱이 2곳 바로잡음말하지 않은 공간 유형 변경은 막음벽 색은 문장에 적힌 색 유지",
+   "prompt": "벽은 세이지, 바닥은 월넛",
+   "ms": 2660
+  },
+  {
+   "engine": "gemma",
+   "fixes": [],
+   "text": "벽은 샌드로 바꿨어요.",
+   "surfaces": [
+    "finishes"
+   ],
+   "receipt": [
+    "벽:세이지→샌드"
+   ],
+   "room": "나의 침실 living 5x4x2.5 wall #e0cfb9 floor #93785c",
+   "draft": null,
+   "items": 0,
+   "spaces": 2,
+   "target": "room",
+   "label": "Gemma가 해석 · 앱이 숫자·범위 확인",
+   "prompt": "벽은 좀 더 따뜻한 느낌이면 좋겠어",
+   "ms": 2051
+  },
+  {
+   "engine": "gemma",
+   "fixes": [],
+   "text": "소파 초안은 170 × 90 × 65cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+   "surfaces": [
+    "furniture-size"
+   ],
+   "receipt": [
+    "새 초안:소파 · 170 × 90 × 65cm"
+   ],
+   "room": "나의 침실 living 5x4x2.5 wall #e0cfb9 floor #93785c",
+   "draft": "sofa 170/65/90 #b29a80 [AI 단서 · 유형별 추정 | AI 단서 · 유형별 추정 | 유형 기본값]",
+   "items": 0,
+   "spaces": 2,
+   "target": "draft",
+   "label": "Gemma가 해석 · 앱이 숫자·범위 확인",
+   "prompt": "두 명이 앉는 낮은 소파",
+   "ms": 2039
+  },
+  {
+   "engine": "gemma",
+   "fixes": [],
+   "text": "소파 초안은 170 × 100 × 65cm예요. 아래 도구에서 더 조절할 수 있어요.",
+   "surfaces": [
+    "furniture-size"
+   ],
+   "receipt": [
+    "깊이:90cm→100cm [초안]"
+   ],
+   "room": "나의 침실 living 5x4x2.5 wall #e0cfb9 floor #93785c",
+   "draft": "sofa 170/65/100 #b29a80 [AI 단서 · 유형별 추정 | AI 단서 · 유형별 추정 | 대화 추정 · 깊은 좌석]",
+   "items": 0,
+   "spaces": 2,
+   "target": "draft",
+   "label": "Gemma가 해석 · 앱이 숫자·범위 확인",
+   "prompt": "앉는 부분이 깊었으면 좋겠어",
+   "ms": 2127
+  },
+  {
+   "engine": "gemma",
+   "fixes": [],
+   "text": "소파 초안은 170 × 100 × 65cm예요. 아래 도구에서 더 조절할 수 있어요.",
+   "surfaces": [
+    "furniture-size"
+   ],
+   "receipt": [
+    "색상:오크→네이비 [초안]"
+   ],
+   "room": "나의 침실 living 5x4x2.5 wall #e0cfb9 floor #93785c",
+   "draft": "sofa 170/65/100 #3f4d63 [AI 단서 · 유형별 추정 | AI 단서 · 유형별 추정 | 대화 추정 · 깊은 좌석]",
+   "items": 0,
+   "spaces": 2,
+   "target": "draft",
+   "label": "Gemma가 해석 · 앱이 숫자·범위 확인",
+   "prompt": "네이비로 바꿔줘",
+   "ms": 2417
+  },
+  {
+   "engine": "gemma",
+   "fixes": [],
+   "text": "나의 소파를 방에 놓았어요. 도면에서 끌어 옮기거나 회전할 수 있어요.",
+   "surfaces": [],
+   "receipt": [
+    "배치:나의 소파 · 170 × 100 × 65cm"
+   ],
+   "room": "나의 침실 living 5x4x2.5 wall #e0cfb9 floor #93785c",
+   "draft": null,
+   "items": 1,
+   "spaces": 2,
+   "target": "item",
+   "label": "Gemma가 해석 · 앱이 숫자·범위 확인",
+   "prompt": "방에 놓아줘",
+   "ms": 2314
+  },
+  {
+   "engine": "gemma",
+   "fixes": [],
+   "text": "나의 소파를 돌렸어요.",
+   "surfaces": [],
+   "receipt": [
+    "회전:0°→90°"
+   ],
+   "room": "나의 침실 living 5x4x2.5 wall #e0cfb9 floor #93785c",
+   "draft": null,
+   "items": 1,
+   "spaces": 2,
+   "target": "item",
+   "label": "Gemma가 해석 · 앱이 숫자·범위 확인",
+   "prompt": "90도 돌려줘",
+   "ms": 1841
+  },
+  {
+   "engine": "gemma",
+   "fixes": [],
+   "text": "소파 초안은 180 × 90 × 82cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+   "surfaces": [
+    "furniture-size"
+   ],
+   "receipt": [
+    "새 초안:소파 · 180 × 90 × 82cm"
+   ],
+   "room": "나의 침실 living 5x4x2.5 wall #e0cfb9 floor #93785c",
+   "draft": "sofa 180/82/90 #b29a80 [유형 기본값 | 유형 기본값 | 유형 기본값]",
+   "items": 1,
+   "spaces": 2,
+   "target": "draft",
+   "label": "Gemma가 해석 · 앱이 숫자·범위 확인",
+   "prompt": "책 읽을 때 푹 기대 앉을 만한 거 하나 놓고 싶어",
+   "ms": 2176
+  },
+  {
+   "engine": "gemma",
+   "fixes": [
+    "문장에 없는 동작(놓기)은 실행하지 않음",
+    "도구는 요청 단어에 맞춰 치수 직접 입력"
+   ],
+   "text": "책상 초안은 120 × 60 × 74cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+   "surfaces": [
+    "furniture-dims"
+   ],
+   "receipt": [
+    "새 초안:책상 · 120 × 60 × 74cm"
+   ],
+   "room": "나의 침실 living 5x4x2.5 wall #e0cfb9 floor #93785c",
+   "draft": "desk 120/74/60 #b29a80 [사용자 설정 | 유형 기본값 | 사용자 설정]",
+   "items": 1,
+   "spaces": 2,
+   "target": "draft",
+   "label": "Gemma가 해석 · 앱이 2곳 바로잡음문장에 없는 동작(놓기)은 실행하지 않음도구는 요청 단어에 맞춰 치수 직접 입력",
+   "prompt": "책상 가로 120cm 깊이 60cm",
+   "ms": 2625
+  },
+  {
+   "engine": "gemma",
+   "fixes": [
+    "방 이야기로 처리"
+   ],
+   "text": "거실을 가로 5m, 세로 4m, 천장 2.4m로 반영했어요.",
+   "surfaces": [
+    "room-type"
+   ],
+   "receipt": [
+    "천장:2.5m→2.4m"
+   ],
+   "room": "나의 침실 living 5x4x2.4 wall #e0cfb9 floor #93785c",
+   "draft": "desk 120/74/60 #b29a80 [사용자 설정 | 유형 기본값 | 사용자 설정]",
+   "items": 1,
+   "spaces": 2,
+   "target": "draft",
+   "label": "Gemma가 해석 · 앱이 1곳 바로잡음방 이야기로 처리",
+   "prompt": "책 읽는 아담한 방으로 꾸며줘",
+   "ms": 2449
+  },
+  {
+   "engine": "gemma",
+   "fixes": [
+    "방 이야기로 처리"
+   ],
+   "text": "침실을 가로 4m, 세로 3.5m, 천장 2.4m로 새로 만들었어요.",
+   "surfaces": [
+    "room-size"
+   ],
+   "receipt": [
+    "새 공간:나의 침실"
+   ],
+   "room": "나의 침실 bedroom 4x3.5x2.4 wall #faf9f5 floor #e0d4bf",
+   "draft": "desk 120/74/60 #b29a80 [사용자 설정 | 유형 기본값 | 사용자 설정]",
+   "items": 0,
+   "spaces": 3,
+   "target": "draft",
+   "label": "Gemma가 해석 · 앱이 1곳 바로잡음방 이야기로 처리",
+   "prompt": "침실 하나 추가해줘",
+   "ms": 2007
+  },
+  {
+   "engine": "gemma",
+   "fixes": [
+    "문장의 명령(공간 목록)을 따름"
+   ],
+   "text": "저장된 공간은 3개예요.",
+   "surfaces": [
+    "spaces"
+   ],
+   "receipt": [],
+   "room": "나의 침실 bedroom 4x3.5x2.4 wall #faf9f5 floor #e0d4bf",
+   "draft": "desk 120/74/60 #b29a80 [사용자 설정 | 유형 기본값 | 사용자 설정]",
+   "items": 0,
+   "spaces": 3,
+   "target": "draft",
+   "label": "Gemma가 해석 · 앱이 1곳 바로잡음문장의 명령(공간 목록)을 따름",
+   "prompt": "공간 목록 보여줘",
+   "ms": 2269
+  },
+  {
+   "engine": "gemma",
+   "fixes": [
+    "문장의 명령(사용법)을 따름"
+   ],
+   "text": "이렇게 쓰면 돼요.",
+   "surfaces": [
+    "help"
+   ],
+   "receipt": [],
+   "room": "나의 침실 bedroom 4x3.5x2.4 wall #faf9f5 floor #e0d4bf",
+   "draft": "desk 120/74/60 #b29a80 [사용자 설정 | 유형 기본값 | 사용자 설정]",
+   "items": 0,
+   "spaces": 3,
+   "target": "draft",
+   "label": "Gemma가 해석 · 앱이 1곳 바로잡음문장의 명령(사용법)을 따름",
+   "prompt": "안녕, 여기서 뭘 할 수 있어?",
+   "ms": 2385
+  },
+  {
+   "engine": "gemma",
+   "fixes": [
+    "문장의 명령(되돌리기)을 따름"
+   ],
+   "text": "방금 바꾼 내용을 되돌렸어요.",
+   "surfaces": [],
+   "receipt": [],
+   "room": "나의 침실 living 5x4x2.4 wall #e0cfb9 floor #93785c",
+   "draft": "desk 120/74/60 #b29a80 [사용자 설정 | 유형 기본값 | 사용자 설정]",
+   "items": 1,
+   "spaces": 2,
+   "target": "draft",
+   "label": "Gemma가 해석 · 앱이 1곳 바로잡음문장의 명령(되돌리기)을 따름",
+   "prompt": "되돌려줘",
+   "ms": 1866
+  },
+  {
+   "engine": "gemma",
+   "fixes": [
+    "문장의 명령(자리 정리)을 따름"
+   ],
+   "text": "겹치거나 벽을 넘은 가구가 없어요.",
+   "surfaces": [
+    "impact"
+   ],
+   "receipt": [],
+   "room": "나의 침실 living 5x4x2.4 wall #e0cfb9 floor #93785c",
+   "draft": "desk 120/74/60 #b29a80 [사용자 설정 | 유형 기본값 | 사용자 설정]",
+   "items": 1,
+   "spaces": 2,
+   "target": "draft",
+   "label": "Gemma가 해석 · 앱이 1곳 바로잡음문장의 명령(자리 정리)을 따름",
+   "prompt": "겹친 가구 있으면 정리해줘",
+   "ms": 1806
+  },
+  {
+   "engine": "gemma",
+   "fixes": [
+    "문장의 명령(저장·불러오기)을 따름"
+   ],
+   "text": "배치는 파일로 저장하거나 불러올 수 있어요. 지금 보이는 화면은 이미지로 저장돼요.",
+   "surfaces": [
+    "files"
+   ],
+   "receipt": [],
+   "room": "나의 침실 living 5x4x2.4 wall #e0cfb9 floor #93785c",
+   "draft": "desk 120/74/60 #b29a80 [사용자 설정 | 유형 기본값 | 사용자 설정]",
+   "items": 1,
+   "spaces": 2,
+   "target": "draft",
+   "label": "Gemma가 해석 · 앱이 1곳 바로잡음문장의 명령(저장·불러오기)을 따름",
+   "prompt": "배치를 파일로 저장하고 싶어",
+   "ms": 2355
+  }
+ ],
+ "errors": []
+}

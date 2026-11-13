@@ -18,7 +18,7 @@ const noOverflow = (page) =>
 test('첫 화면은 대화가 중심이고, 방 설명으로 크기 도구가 나타나 도면에 바로 반영된다', async ({
   page,
 }) => {
-  await page.goto('/');
+  await page.goto('/?model=off');
   await ready(page);
   await expect(page.locator('#chat-input')).toBeVisible();
   await expect(page.getByRole('heading', { name: '어떤 방을 꾸밀까요?' })).toBeVisible();
@@ -27,8 +27,12 @@ test('첫 화면은 대화가 중심이고, 방 설명으로 크기 도구가 �
   expect(sheet.width).toBeGreaterThan(380);
   expect(sheet.height).toBeGreaterThan(800);
   await expect(page.locator('#viewport-3d canvas')).toBeVisible();
+  await expect(page.locator('.status-line')).toContainText('모델 꺼 둠 · 규칙으로 답해요');
   await say(page, '거실 가로 5m 세로 4m 천장 2.6m로 바꿔줘');
   await expect(page.locator('[data-surface=room-size]')).toBeVisible();
+  await expect(page.locator('.msg.assistant .msg-meta').last()).toHaveText(
+    '상담 모델을 꺼 둬서 규칙으로 처리',
+  );
   let s = await stored(page);
   expect([s.room.type, s.room.w, s.room.d, s.room.h]).toEqual(['living', 5, 4, 2.6]);
   await expect(page.locator('.receipt')).toContainText('4m');
@@ -51,7 +55,7 @@ test('첫 화면은 대화가 중심이고, 방 설명으로 크기 도구가 �
 test('가구 설명 → 방 안의 점선 초안 → 놓기 → 회전·삭제·되돌리기, 대화는 계속 남는다', async ({
   page,
 }) => {
-  await page.goto('/');
+  await page.goto('/?model=off');
   await ready(page);
   await say(page, '두 명이 넉넉하게 앉는 소파야. 가로 200cm 깊이 85cm');
   const tool = page.locator('[data-surface=furniture-dims]');
@@ -91,7 +95,7 @@ test('가구 설명 → 방 안의 점선 초안 → 놓기 → 회전·삭제·
 });
 
 test('선택한 가구는 입력창의 대상이 되고, 다른 가구 이름은 새 초안을 만든다', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?model=off');
   await ready(page);
   const desk = (await stored(page)).items.find((a) => a.type === 'desk');
   await page.evaluate((id) => {
@@ -112,7 +116,7 @@ test('선택한 가구는 입력창의 대상이 되고, 다른 가구 이름은
 });
 
 test('가구 20종을 고르고 규격을 비교해 배치한다', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?model=off');
   await ready(page);
   await openTool(page, '가구 고르기');
   await expect(page.locator('.catalog-card')).toHaveCount(20);
@@ -134,7 +138,7 @@ test('가구 20종을 고르고 규격을 비교해 배치한다', async ({ page
 });
 
 test('방 크기를 입력 도중 반영하고 한 번에 되돌리며, 유형·초안·마감을 바꾼다', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?model=off');
   await ready(page);
   await openTool(page, '방 크기');
   const before = await stored(page);
@@ -163,7 +167,7 @@ test('방 크기를 입력 도중 반영하고 한 번에 되돌리며, 유형·
 test('대화로 방을 바꾸고 새 공간을 만들어도 대화는 이어지고 공간마다 가구를 보존한다', async ({
   page,
 }) => {
-  await page.goto('/');
+  await page.goto('/?model=off');
   await ready(page);
   const first = await stored(page);
   await say(page, '거실 가로 5m 세로 4m 천장 2.6m로 바꿔줘. 소파 중심으로 꾸밀 거야.');
@@ -194,7 +198,7 @@ test('대화로 방을 바꾸고 새 공간을 만들어도 대화는 이어지�
 });
 
 test('공간을 추가·삭제하고 실행 취소로 공간 전체를 복원한다', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?model=off');
   await ready(page);
   await page.locator('.space-button').click();
   await page.locator('[data-newspace=bedroom]').click();
@@ -210,7 +214,7 @@ test('공간을 추가·삭제하고 실행 취소로 공간 전체를 복원한
 });
 
 test('잘못된 배치 파일을 거절하고 기존 데이터를 보존한다', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?model=off');
   await ready(page);
   const before = await stored(page);
   await page.locator('#layout-file').setInputFiles({
@@ -230,7 +234,7 @@ test('잘못된 배치 파일을 거절하고 기존 데이터를 보존한다',
 });
 
 test('2D로 복원한 뒤 3D에서 실제 가구를 끌어 옮기고 2D에서도 옮긴다', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?model=off');
   await ready(page);
   await page.locator('[data-view="2d"]').click();
   await page.reload();
@@ -261,7 +265,7 @@ test('2D로 복원한 뒤 3D에서 실제 가구를 끌어 옮기고 2D에서도
 
 test('모바일은 대화로 시작하고 시트를 접고 펴도 입력창이 화면 안에 남는다', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/');
+  await page.goto('/?model=off');
   await ready(page);
   await expect(page.locator('#chat-input')).toBeVisible();
   await expect(page.getByRole('heading', { name: '어떤 방을 꾸밀까요?' })).toBeVisible();

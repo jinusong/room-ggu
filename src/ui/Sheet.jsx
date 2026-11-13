@@ -116,7 +116,7 @@ export function Sheet({ mobile, sheetRef }) {
           class="collapsed-last"
           onClick={() => (mobile ? store.setSheet('half') : store.setCollapsed(false))}
         >
-          <span>{lastAssistant.modelReply || lastAssistant.text}</span>
+          <span>{lastAssistant.text}</span>
           <Icon name="chevron-up" size={16} />
         </button>
       )}

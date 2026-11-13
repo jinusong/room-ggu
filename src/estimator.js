@@ -25,6 +25,19 @@ const aliases = {
 export function detectType(t) {
   return Object.entries(aliases).find(([, r]) => r.test(t))?.[0] || null;
 }
+// 문장에 이름이 나온 가구 유형을 모두 찾는다. "소파 테이블"처럼 긴 이름이 먼저 잡히면 그 부분은 지운다.
+export function mentionedTypes(t) {
+  let rest = String(t);
+  const found = [];
+  for (const [type, re] of Object.entries(aliases)) {
+    const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
+    if (g.test(rest)) {
+      found.push(type);
+      rest = rest.replace(g, ' ');
+    }
+  }
+  return found;
+}
 export function extractDimensions(t) {
   const out = {},
     axes = {
@@ -59,9 +72,9 @@ export function extractDimensions(t) {
   }
   return out;
 }
-export function consult(text, previous, caption = '') {
+export function consult(text, previous, caption = '', { keepType = false } = {}) {
   const a = structuredClone(previous || makeItem());
-  const type = detectType(text) || (!previous ? detectType(caption) : null);
+  const type = keepType ? null : detectType(text) || (!previous ? detectType(caption) : null);
   if (type && type !== a.type) {
     const id = a.id;
     Object.assign(a, makeItem(type), { id });
@@ -184,7 +197,7 @@ export function applyModelResult(raw, previous, options = {}) {
   }
   const proposals = {};
   if (a.type === 'sofa' && [1, 2, 3, 4].includes(v.seats))
-    proposals[0] = [0, 90, 180, 220, 270][v.seats];
+    proposals[0] = [0, 90, 170, 220, 270][v.seats];
   if (v.size === 'compact')
     proposals[0] = {
       sofa: 140,

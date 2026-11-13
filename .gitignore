@@ -7,3 +7,6 @@ work/
 playwright-report/
 test-results/
 .cache/
+
+# 사진 평가용 이미지(원본 라이선스는 eval/photo/manifest.json)
+eval/photo/images/

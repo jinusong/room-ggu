@@ -68,26 +68,43 @@ function placeholder() {
   return '방이나 가구를 말해 주세요';
 }
 
+const OFF_TEXT = {
+  user: '모델 꺼 둠',
+  url: '모델 꺼 둠',
+  'save-data': '데이터 절약 모드라 모델을 켜지 않음',
+  memory: '메모리가 작아 모델을 켜지 않음',
+};
 function Status() {
   const ai = app.ai;
   if (app.busy?.kind === 'model')
     return (
       <span class="status-line">
         <Icon name="loader-circle" size={14} className="spin" />
-        모델이 답을 쓰는 중
+        모델이 문장을 해석하는 중
+        <button type="button" class="link" onClick={() => store.cancelModel()}>
+          멈추기
+        </button>
+      </span>
+    );
+  if (app.busy?.kind === 'vision')
+    return (
+      <span class="status-line">
+        <Icon name="loader-circle" size={14} className="spin" />
+        {ai.label || '사진 판별 중'}
+        {ai.progress > 0 && ` · ${Math.round(ai.progress * 100)}%`}
         <button type="button" class="link" onClick={() => store.cancelModel()}>
           취소
         </button>
       </span>
     );
-  if (ai.text === 'loading' || app.busy?.kind === 'vision')
+  if (ai.text === 'loading')
     return (
       <span class="status-line">
         <Icon name="loader-circle" size={14} className="spin" />
-        {ai.label || '모델 준비 중'}
-        {ai.progress > 0 && ` · ${Math.round(ai.progress * 100)}%`}
-        <button type="button" class="link" onClick={() => store.cancelModel()}>
-          취소
+        {ai.label || '상담 모델 준비 중'}
+        {ai.progress > 0 && ` · ${Math.round(ai.progress * 100)}%`} · 그동안 규칙으로 답해요
+        <button type="button" class="link" onClick={() => store.setModelOn(false)}>
+          끄기
         </button>
       </span>
     );
@@ -95,18 +112,28 @@ function Status() {
     return (
       <span class="status-line">
         <span class="status-dot is-ready" />
-        {String(ai.model).startsWith('gemma') ? 'Gemma 3 1B' : 'Qwen3 0.6B'} · 이 기기에서 실행 중
+        {store.modelName(ai.model)}가 해석 · 이 기기에서 실행
         <button type="button" class="link" onClick={() => store.openTool('ai')}>
           설정
         </button>
       </span>
     );
+  const text =
+    ai.text === 'unsupported'
+      ? '이 브라우저는 모델을 못 써요'
+      : ai.text === 'error'
+        ? '모델 준비 실패'
+        : OFF_TEXT[ai.why] || '모델 꺼짐';
   return (
     <span class="status-line">
-      <span class="status-dot" />
-      기본 상담 · 규칙 기반
-      <button type="button" class="link" onClick={() => store.openTool('ai')}>
-        모델 켜기
+      <span class={`status-dot is-${ai.text}`} />
+      {text} · 규칙으로 답해요
+      <button
+        type="button"
+        class="link"
+        onClick={() => (ai.text === 'unsupported' ? store.openTool('ai') : store.setModelOn(true))}
+      >
+        {ai.text === 'unsupported' ? '자세히' : ai.text === 'error' ? '다시 시도' : '켜기'}
       </button>
     </span>
   );

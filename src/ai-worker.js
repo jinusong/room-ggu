@@ -1,35 +1,38 @@
-import { UI_SURFACES } from './ui-schema.js';
+// 브라우저 Worker에서 공개 가중치 모델을 실행한다. 대화와 사진은 이 기기 밖으로 보내지 않는다.
+// - 상담 모델: WebLLM의 Gemma 3 1B(또는 f16이 없는 GPU에서 Qwen3 0.6B)가 문장을 해석해 JSON으로 답한다.
+// - 사진 모델: Transformers.js의 SigLIP이 사진과 20가지 가구 이름을 비교해 점수를 낸다.
+import { TYPES, ROOM_TYPES, WALL_COLORS, FLOOR_COLORS, FURNITURE_COLORS } from './catalog.js';
+import { MODEL_ACTIONS, MODEL_UI } from './ui-schema.js';
+import { PHOTO_MODEL, PHOTO_LABELS } from './app/photo.js';
+
 let engine = null,
-  vision = null,
-  processor = null,
-  textId = null;
+  textId = null,
+  classifier = null,
+  classifierKey = '';
 const emit = (task, detail) => self.postMessage({ event: 'progress', task, ...detail });
+
 async function unloadText() {
-  if (engine) {
-    await engine.unload();
-    engine = null;
-    textId = null;
-    self.postMessage({ event: 'unloaded', task: 'text' });
-  }
+  if (!engine) return;
+  await engine.unload();
+  engine = null;
+  textId = null;
+  self.postMessage({ event: 'unloaded', task: 'text' });
 }
-async function unloadVision() {
-  if (vision) {
-    await vision.dispose();
-    vision = null;
-    processor = null;
-    self.postMessage({ event: 'unloaded', task: 'vision' });
-  }
+async function unloadClassifier() {
+  if (!classifier) return;
+  await classifier.dispose?.();
+  classifier = null;
+  classifierKey = '';
+  self.postMessage({ event: 'unloaded', task: 'vision' });
 }
+
 async function loadText() {
   if (engine) return textId;
   if (!self.navigator.gpu)
-    throw Error(
-      '이 브라우저는 WebGPU를 지원하지 않아요. 최신 데스크톱 Chrome 또는 Edge에서 AI를 준비해주세요. 기본 상담과 배치는 계속 사용할 수 있어요.',
-    );
+    throw Error('이 브라우저는 WebGPU를 지원하지 않아요. 상담은 규칙으로 계속할 수 있어요.');
   const adapter = await self.navigator.gpu.requestAdapter();
   if (!adapter)
-    throw Error('사용 가능한 GPU를 찾지 못했어요. 브라우저 하드웨어 가속을 확인해주세요.');
-  await unloadVision();
+    throw Error('사용할 수 있는 GPU를 찾지 못했어요. 브라우저 하드웨어 가속을 확인해 주세요.');
   const { MLCEngine, prebuiltAppConfig } = await import('@mlc-ai/web-llm');
   const preferred = adapter.features.has('shader-f16')
     ? 'gemma3-1b-it-q4f16_1-MLC'
@@ -48,163 +51,154 @@ async function loadText() {
     throw e;
   }
 }
-async function loadVision(device = 'webgpu') {
-  if (vision) return;
-  await unloadText();
-  const { AutoProcessor, AutoModelForVision2Seq, env } = await import('@huggingface/transformers');
-  env.allowLocalModels = false;
-  env.backends.onnx.wasm.numThreads = 1;
-  if (device === 'webgpu' && (!self.navigator.gpu || !(await self.navigator.gpu.requestAdapter())))
-    throw Error(
-      '사진 AI에 사용할 GPU가 없어요. AI 설정에서 사진 분석을 CPU 호환 모드로 바꿀 수 있어요.',
-    );
-  const modelId = 'HuggingFaceTB/SmolVLM-256M-Instruct';
-  const progress_callback = (r) =>
-    emit('vision', {
-      status: r.status,
-      file: r.file,
-      loaded: r.loaded,
-      total: r.total,
-      progress: typeof r.progress === 'number' ? r.progress / 100 : undefined,
-      text: r.status === 'progress' ? `${r.file || '모델'} 다운로드` : '사진 모델 준비 중',
-    });
-  processor = await AutoProcessor.from_pretrained(modelId, { progress_callback });
-  try {
-    vision = await AutoModelForVision2Seq.from_pretrained(modelId, {
-      dtype: 'q4',
-      device,
-      progress_callback,
-    });
-  } catch (e) {
-    processor = null;
-    throw e;
-  }
-}
-const schema = {
-  type: 'object',
-  properties: {
-    seats: { type: ['integer', 'null'], enum: [1, 2, 3, 4, null] },
-    size: { type: 'string', enum: ['unknown', 'compact', 'standard', 'large'] },
-    depth_profile: { type: 'string', enum: ['unknown', 'shallow', 'deep'] },
-    height_profile: { type: 'string', enum: ['unknown', 'low', 'tall'] },
-    ui: { type: 'string', enum: UI_SURFACES.furniture },
-    reply: { type: 'string' },
-  },
-  required: ['seats', 'size', 'depth_profile', 'height_profile', 'ui', 'reply'],
-  additionalProperties: false,
-};
-async function chat(payload) {
-  await loadText();
-  if (payload.scope === 'room') return roomChat(payload);
-  const a = payload.item;
-  const state = {
-    type: a.type,
-    width_cm: a.dims[0],
-    depth_cm: a.dims[2],
-    overall_height_cm: a.dims[1],
+
+const names = (list) => list.map(([n]) => n);
+const REQUIRED = [
+  'intent',
+  'action',
+  'furniture',
+  'room_type',
+  'space',
+  'seats',
+  'size',
+  'depth',
+  'height',
+  'color',
+  'wall',
+  'floor',
+  'ui',
+  'reply',
+];
+function interpretSchema(spaces) {
+  return {
+    type: 'object',
+    properties: {
+      intent: { type: 'string', enum: ['furniture', 'room', 'action', 'chat'] },
+      action: { type: 'string', enum: MODEL_ACTIONS },
+      furniture: { type: 'string', enum: [...Object.keys(TYPES), 'none'] },
+      room_type: { type: 'string', enum: [...Object.keys(ROOM_TYPES), 'none'] },
+      space: { type: 'string', enum: [...new Set(spaces), 'none'] },
+      seats: { type: ['integer', 'null'], enum: [1, 2, 3, 4, null] },
+      size: { type: 'string', enum: ['unknown', 'compact', 'standard', 'large'] },
+      depth: { type: 'string', enum: ['unknown', 'shallow', 'deep'] },
+      height: { type: 'string', enum: ['unknown', 'low', 'tall'] },
+      color: { type: 'string', enum: [...names(FURNITURE_COLORS), 'none'] },
+      wall: { type: 'string', enum: [...names(WALL_COLORS), 'none'] },
+      floor: { type: 'string', enum: [...names(FLOOR_COLORS), 'none'] },
+      ui: { type: 'string', enum: [...Object.keys(MODEL_UI), 'none'] },
+      reply: { type: 'string' },
+    },
+    required: REQUIRED,
+    additionalProperties: false,
   };
-  const prompt = `가구 상담 도우미입니다. 사용자의 설명에서 크기 단서만 추출하고, 한국어로 짧게 답하세요. 실측값은 모릅니다. 보이지 않는 크기를 지어내지 마세요. 출력은 JSON만 쓰세요.
-seats: 소파 인원수 1~4, 모르면 null.
-size: 작은 가구 compact, 보통 standard, 큰 가구 large, 단서 없으면 unknown.
-depth_profile: 얕으면 shallow, 깊으면 deep, 모르면 unknown.
-height_profile: 낮으면 low, 높으면 tall, 모르면 unknown.
-ui: 치수를 조절하려면 dimensions, 크기 규격을 고르려면 sizes, 색상을 고르려면 colors. 사용자에게 지금 필요한 UI 하나를 고르세요.
-reply: 크기 단서를 반영하고 필요한 질문 하나를 하는 한국어 문장. 사용자 문장을 반복하지 마세요.
-예시 사용자: 세 명이 앉는 낮은 소파야.
-예시 응답: {"seats":3,"size":"unknown","depth_profile":"unknown","height_profile":"low","ui":"sizes","reply":"3인용의 낮은 소파로 가늠해볼게요. 앉는 부분도 깊은 편인가요?"}
-예시 사용자: 작은 책상이야. 깊이는 잘 몰라.
-예시 응답: {"seats":null,"size":"compact","depth_profile":"unknown","height_profile":"unknown","ui":"sizes","reply":"작은 책상을 기준으로 잡을게요. 노트북 하나를 놓는 정도인가요?"}
-현재 가구: ${JSON.stringify(state)}
-직전 대화: ${JSON.stringify(payload.messages.slice(-5, -1))}
-사진 설명: ${JSON.stringify((payload.caption || '없음').slice(0, 300))}
-사용자: ${payload.messages.at(-1)?.content || ''}
-응답 JSON:`;
+}
+const example = (v) =>
+  JSON.stringify({
+    intent: 'furniture',
+    action: 'none',
+    furniture: 'none',
+    room_type: 'none',
+    space: 'none',
+    seats: null,
+    size: 'unknown',
+    depth: 'unknown',
+    height: 'unknown',
+    color: 'none',
+    wall: 'none',
+    floor: 'none',
+    ui: 'none',
+    ...v,
+  });
+const typeList = (obj) =>
+  Object.entries(obj)
+    .map(([k, v]) => `${k} ${v.name}`)
+    .join(', ');
+
+async function interpret(payload) {
+  await loadText();
+  const c = payload.context || {};
+  const spaces = (c.spaces || []).filter((s) => typeof s === 'string' && s).slice(0, 12);
+  const prompt = `방 꾸미기 앱의 해석기입니다. 사용자 문장을 읽고 앱이 할 일을 JSON으로 정하세요.
+intent: 가구 이야기는 furniture, 방 크기·유형·벽·바닥 이야기는 room, 아래 동작 요청은 action, 그 밖의 질문이나 인사는 chat.
+action: place 초안을 방에 놓기, undo 되돌리기, redo 다시 실행, rotate 선택한 가구 돌리기, duplicate 선택한 가구 복제, delete 선택한 가구 빼기, relocate 겹친 가구를 빈자리로, clear 가구 모두 비우기, example 예시 방, catalog 가구 고르기 열기, spaces 공간 목록, items 놓인 가구 목록, files 저장·불러오기, help 사용법, ai 모델 설정, new_space 새 공간 추가, switch_space 다른 공간으로 이동. 해당 없으면 none.
+furniture: ${typeList(TYPES)}. 가구 이야기가 아니면 none.
+room_type: ${typeList(ROOM_TYPES)}. 방 유형이나 용도를 말했을 때만 고르고 아니면 none.
+space: 이동할 공간 이름. 없으면 none.
+seats: 소파에 앉는 사람 수 1~4, 모르면 null. size: compact 작게, standard 보통, large 크게, 모르면 unknown. depth: shallow 얕게, deep 깊게. height: low 낮게, tall 높게.
+color: 가구 색 ${names(FURNITURE_COLORS).join(', ')}. wall: 벽 색 ${names(WALL_COLORS).join(', ')}. floor: 바닥 ${names(FLOOR_COLORS).join(', ')}. 색을 말하지 않았으면 none.
+ui: 다음에 보여줄 도구. room_size 방 치수, room_type 공간 유형, finishes 벽·바닥, furniture_sizes 가구 규격 비교, furniture_dims 가구 치수 입력, furniture_color 가구 색, 필요 없으면 none.
+reply: 한국어 한두 문장. 숫자와 단위를 쓰지 말고, 사용자 문장을 되풀이하지 말고, 다음에 정할 것 하나를 물어보세요.
+숫자 치수는 앱이 문장에서 직접 읽습니다. 사용자가 말하지 않은 속성은 none이나 unknown으로 두세요.
+예시) 대상: 방 / 사용자: 두 명이 앉는 낮은 소파
+${example({ furniture: 'sofa', seats: 2, height: 'low', ui: 'furniture_sizes', reply: '둘이 앉는 낮은 소파로 잡았어요. 앉는 깊이도 중요한가요?' })}
+예시) 대상: 방 / 사용자: 벽은 따뜻한 느낌으로 하고 바닥은 어둡게
+${example({ intent: 'room', wall: '샌드', floor: '월넛', ui: 'finishes', reply: '벽은 따뜻한 샌드, 바닥은 짙은 월넛으로 맞췄어요. 가구 색도 맞춰 볼까요?' })}
+예시) 대상: 선택한 가구 의자 / 사용자: 이거 빼줘
+${example({ intent: 'action', action: 'delete', furniture: 'chair', reply: '의자를 뺐어요.' })}
+지금 대상: ${c.target || '방'}
+지금 공간: ${c.room || '알 수 없음'}
+다른 공간: ${spaces.join(', ') || '없음'}
+직전 대화: ${JSON.stringify((payload.history || []).slice(-4))}
+사용자: ${String(payload.text || '').slice(0, 600)}
+JSON:`;
   const r = await engine.chat.completions.create({
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 280,
     temperature: 0.1,
-    response_format: { type: 'json_object', schema: JSON.stringify(schema) },
+    response_format: { type: 'json_object', schema: JSON.stringify(interpretSchema(spaces)) },
     ...(textId.startsWith('Qwen3') ? { extra_body: { enable_thinking: false } } : {}),
   });
-  if (r.choices[0]?.finish_reason === 'length')
-    throw Error('AI 응답이 길어져 중단했어요. 문장을 짧게 해서 다시 시도해주세요.');
+  if (r.choices[0]?.finish_reason === 'length') throw Error('모델 답이 길어져 중단했어요.');
   return r.choices[0]?.message?.content || '';
 }
-const roomSchema = {
-  type: 'object',
-  properties: {
-    room_type: {
-      type: 'string',
-      enum: ['unknown', 'studio', 'living', 'bedroom', 'office', 'dining', 'kitchen', 'kids'],
-    },
-    size: { type: 'string', enum: ['unknown', 'compact', 'standard', 'large'] },
-    ui: { type: 'string', enum: UI_SURFACES.room },
-    reply: { type: 'string' },
-  },
-  required: ['room_type', 'size', 'ui', 'reply'],
-  additionalProperties: false,
-};
-async function roomChat(payload) {
-  const prompt = `한국어 인테리어 상담 도우미입니다. 사용자가 말한 방 유형과 크기 느낌만 추출하세요. 숫자 치수는 앱에서 이미 반영했습니다. 새 숫자를 만들지 마세요. 모르면 unknown으로 답하세요.
-room_type: 원룸 studio, 거실 living, 침실 bedroom, 서재 office, 식사공간 dining, 주방 kitchen, 아이방 kids, 모르면 unknown.
-size: 작고 아담하면 compact, 보통 standard, 넓고 크면 large, 모르면 unknown.
-ui: 방 치수 입력은 dimensions, 방 종류 선택은 types, 벽과 바닥 색상 선택은 finishes. 지금 필요한 UI 하나를 고르세요.
-reply: 한국어 한두 문장. 알려진 치수를 반복하지 말고 가구 배치에 도움이 되는 질문 하나를 하세요.
-예시 사용자: 책을 읽는 아담한 방으로 꾸미고 싶어.
-예시 JSON: {"room_type":"office","size":"compact","ui":"types","reply":"작은 서재로 시작해볼게요. 책상과 책장 중 어느 가구가 중심인가요?"}
-현재 공간: ${JSON.stringify(payload.room)}
-직전 대화: ${JSON.stringify(payload.messages.slice(-5, -1))}
-사용자: ${payload.messages.at(-1)?.content || ''}
-응답 JSON:`;
-  const r = await engine.chat.completions.create({
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 240,
-    temperature: 0.1,
-    response_format: { type: 'json_object', schema: JSON.stringify(roomSchema) },
-    ...(textId.startsWith('Qwen3') ? { extra_body: { enable_thinking: false } } : {}),
-  });
-  if (r.choices[0]?.finish_reason === 'length') throw Error('방 상담 응답이 길어져 중단했어요.');
-  return r.choices[0]?.message?.content || '';
-}
-async function caption(payload) {
-  await loadVision(payload.device);
-  const { load_image, TextStreamer } = await import('@huggingface/transformers');
-  const messages = [
-    {
-      role: 'user',
-      content: [
-        { type: 'image', image: payload.image },
-        {
-          type: 'text',
-          text: 'Describe the main piece of furniture: its category, shape, color, and visible seating. Do not estimate centimeters or physical dimensions. Be concise.',
-        },
-      ],
-    },
-  ];
-  const prompt = processor.apply_chat_template(messages, { add_generation_prompt: true });
-  const image = await load_image(payload.image);
-  const inputs = await processor(prompt, [image], { do_image_splitting: false });
-  let text = '';
-  const result = await vision.generate({
-    ...inputs,
-    max_new_tokens: 96,
-    do_sample: false,
-    streamer: new TextStreamer(processor.tokenizer, {
-      skip_prompt: true,
-      skip_special_tokens: true,
-      callback_function: (s) => {
-        text += s;
-      },
-    }),
-  });
-  if (!text.trim()) {
-    const ids = result.slice(null, [inputs.input_ids.dims[1], null]);
-    text = processor.batch_decode(ids, { skip_special_tokens: true })[0];
+
+// 사진 분류. f16을 지원하는 GPU는 4비트 가중치(약 150MB), 아니면 CPU용 8비트(약 210MB)를 쓴다.
+async function classify(payload) {
+  let device = payload.device === 'wasm' ? 'wasm' : 'webgpu',
+    dtype = 'q8';
+  if (device === 'webgpu') {
+    const adapter = self.navigator.gpu ? await self.navigator.gpu.requestAdapter() : null;
+    if (adapter?.features.has('shader-f16')) dtype = 'q4f16';
+    else device = 'wasm';
   }
-  return text.trim();
+  const key = `${device}|${dtype}`;
+  if (classifierKey !== key) {
+    await unloadClassifier();
+    const { pipeline, env } = await import('@huggingface/transformers');
+    env.allowLocalModels = false;
+    env.backends.onnx.wasm.numThreads = 1;
+    classifier = await pipeline('zero-shot-image-classification', PHOTO_MODEL, {
+      device,
+      dtype,
+      progress_callback: (r) =>
+        emit('vision', {
+          status: r.status,
+          progress: typeof r.progress === 'number' ? r.progress / 100 : undefined,
+        }),
+    });
+    classifierKey = key;
+  }
+  const out = await classifier(
+    payload.image,
+    PHOTO_LABELS.map(([, label]) => label),
+    { hypothesis_template: 'a photo of {}' },
+  );
+  return {
+    device,
+    scores: out.map((r) => ({
+      type: PHOTO_LABELS.find(([, label]) => label === r.label)?.[0],
+      score: r.score,
+    })),
+  };
 }
+
 let queue = Promise.resolve();
 self.onmessage = ({ data }) => {
+  // 진행 중인 답 생성을 멈추는 요청은 줄을 서지 않고 바로 처리한다.
+  if (data.task === 'interrupt') {
+    engine?.interruptGenerate();
+    return;
+  }
   queue = queue.then(async () => {
     try {
       let result;
@@ -212,15 +206,15 @@ self.onmessage = ({ data }) => {
         case 'load-text':
           result = await loadText();
           break;
-        case 'chat':
-          result = await chat(data.payload);
+        case 'interpret':
+          result = await interpret(data.payload);
           break;
-        case 'caption':
-          result = await caption(data.payload);
+        case 'classify':
+          result = await classify(data.payload);
           break;
         case 'unload':
           await unloadText();
-          await unloadVision();
+          await unloadClassifier();
           result = true;
           break;
         default:

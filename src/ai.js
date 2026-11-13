@@ -29,6 +29,10 @@ export function runAI(task, payload = {}) {
     getWorker().postMessage({ id, task, payload });
   });
 }
+// 진행 중인 답 생성만 멈춘다. 모델은 메모리에 남는다.
+export function interruptAI() {
+  worker?.postMessage({ task: 'interrupt' });
+}
 export function stopAI(message = 'AI 작업을 취소했어요.') {
   worker?.terminate();
   worker = null;

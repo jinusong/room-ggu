@@ -1,4 +1,34 @@
-// 모델은 이 목록의 UI만 선택할 수 있다. 값과 동작은 앱의 검증된 상태에 연결한다.
+// 상담 모델이 고를 수 있는 동작과 도구. 앱이 이 목록으로 검증한 뒤 실제 상태에 연결한다.
+export const MODEL_ACTIONS = [
+  'none',
+  'place',
+  'undo',
+  'redo',
+  'rotate',
+  'duplicate',
+  'delete',
+  'relocate',
+  'clear',
+  'example',
+  'catalog',
+  'spaces',
+  'items',
+  'files',
+  'help',
+  'ai',
+  'new_space',
+  'switch_space',
+];
+export const MODEL_UI = {
+  room_size: 'room-size',
+  room_type: 'room-type',
+  finishes: 'finishes',
+  furniture_sizes: 'furniture-size',
+  furniture_dims: 'furniture-dims',
+  furniture_color: 'furniture-color',
+};
+
+// 규칙 기반 대체 경로가 고르는 UI 값.
 export const UI_SURFACES = {
   room: ['dimensions', 'types', 'finishes'],
   furniture: ['dimensions', 'sizes', 'colors'],

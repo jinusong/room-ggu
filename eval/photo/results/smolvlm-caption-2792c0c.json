@@ -1,0 +1,474 @@
+{
+ "sofa-1.jpg": {
+  "raw": "Couch, 3-Pillow reclining sofa, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white,",
+  "ms": 796
+ },
+ "sofa-2.jpg": {
+  "raw": "Porch.",
+  "ms": 265
+ },
+ "sofa-3.jpg": {
+  "raw": "Couch, white, flat, cushioned, white, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed, closed,",
+  "ms": 772
+ },
+ "sofa-4.jpg": {
+  "raw": "White sofa with white and light green pillows, black and white, and a black and white table.",
+  "ms": 398
+ },
+ "sofa-5.jpg": {
+  "raw": "Brown sofa with two matching pillows, a vase with a branch in it, a book, and a towel on top of a tray.",
+  "ms": 375
+ },
+ "sofa-6.jpg": {
+  "raw": "Furniture: \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n- \n-",
+  "ms": 698
+ },
+ "armchair-1.jpg": {
+  "raw": "Chair, couch, box, and other objects.",
+  "ms": 336
+ },
+ "armchair-2.jpg": {
+  "raw": "Bottle Bank.",
+  "ms": 306
+ },
+ "armchair-3.jpg": {
+  "raw": "Wicker furniture, brown and white, and a chair.",
+  "ms": 330
+ },
+ "armchair-4.jpg": {
+  "raw": "Chair.",
+  "ms": 283
+ },
+ "armchair-5.jpg": {
+  "raw": "Chair.",
+  "ms": 285
+ },
+ "armchair-6.jpg": {
+  "raw": "Chair, top, buttoned, floral, possibly antique.",
+  "ms": 377
+ },
+ "bed-1.jpg": {
+  "raw": "Bed.",
+  "ms": 293
+ },
+ "bed-2.jpg": {
+  "raw": "Black metal frame, black and white bed, pillows, and a small table.",
+  "ms": 363
+ },
+ "bed-3.jpg": {
+  "raw": "Bunk bed.",
+  "ms": 325
+ },
+ "bed-4.jpg": {
+  "raw": "Frame.",
+  "ms": 332
+ },
+ "bed-5.jpg": {
+  "raw": "Bed.",
+  "ms": 252
+ },
+ "bed-6.jpg": {
+  "raw": "Bed.",
+  "ms": 290
+ },
+ "desk-1.jpg": {
+  "raw": "Desk.",
+  "ms": 296
+ },
+ "desk-2.jpg": {
+  "raw": "Counter.",
+  "ms": 326
+ },
+ "desk-3.jpg": {
+  "raw": "The chair is a light brown, and the table has a white background and a small white square on the top.",
+  "ms": 362
+ },
+ "desk-4.jpg": {
+  "raw": "Shape: desk, 1. Color: white, black, and silver.\n\nThe question is: What is the name of the desk?",
+  "ms": 436
+ },
+ "desk-5.jpg": {
+  "raw": "I can see a desk and a keyboard on it.",
+  "ms": 330
+ },
+ "dining-1.jpg": {
+  "raw": "Table.",
+  "ms": 288
+ },
+ "dining-2.jpg": {
+  "raw": "Oak table, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood, wood",
+  "ms": 762
+ },
+ "dining-3.jpg": {
+  "raw": "Chandel.",
+  "ms": 292
+ },
+ "dining-4.jpg": {
+  "raw": "White table.",
+  "ms": 280
+ },
+ "dining-5.jpg": {
+  "raw": "The dining table is rectangular and has a dark top.",
+  "ms": 316
+ },
+ "dining-6.jpg": {
+  "raw": "Furniture\n\nThe image shows a dining table with chairs, a dog, a vase, a lamp, a picture, a window, and a path leading to a garden. The table has a dark top and a light-colored surface, and the chairs are of different types, including a long, dark wooden chair, a medium-sized wooden chair, and a medium-sized wooden chair. The lamp has a beige shade and a long neck, and the vase is",
+  "ms": 730
+ },
+ "chair-1.jpg": {
+  "raw": "Chair.",
+  "ms": 289
+ },
+ "chair-2.jpg": {
+  "raw": "Chair, table, and a coffee cup.",
+  "ms": 294
+ },
+ "chair-3.jpg": {
+  "raw": "Chair.",
+  "ms": 248
+ },
+ "chair-4.jpg": {
+  "raw": "Stool, 3-1/2\" tall, light brown, wood, 1-1/2\" wide, 1-1/2\" high, 1-1/2\" wide, 1-1/2\" wide, 1-1/2\" wide, 1-1/2\" wide, 1-1/2\" wide, 1-1/2\" wide, 1-1/2\"",
+  "ms": 832
+ },
+ "chair-5.jpg": {
+  "raw": "Chair.",
+  "ms": 275
+ },
+ "chair-6.jpg": {
+  "raw": "Chair.",
+  "ms": 274
+ },
+ "coffee-1.jpg": {
+  "raw": "Colorful table.",
+  "ms": 267
+ },
+ "coffee-2.jpg": {
+  "raw": "Square table.",
+  "ms": 259
+ },
+ "coffee-3.jpg": {
+  "raw": "Brown, wooden, and dark.",
+  "ms": 322
+ },
+ "coffee-4.jpg": {
+  "raw": "White sofa, white coffee table, white chairs, white and light colored throw blanket, white and light colored pillows, white and light colored throw towel, white and light colored candle, white and light colored floor, white and light colored floor, white and light colored chair, white and light colored throw blanket, white and light colored candle, white and light colored floor, white and light colored chair, white and light and light colored pillows, white and light colored throw towel, white",
+  "ms": 910
+ },
+ "coffee-5.jpg": {
+  "raw": "The room is a dining room.",
+  "ms": 391
+ },
+ "coffee-6.jpg": {
+  "raw": "Wicker, square, brown, and gray, outdoor, patio, 2 people, 1 wicker, 1 gray, 1 gray, 1 gray, 1 gray, 1 gray, 1 gray, 1 gray, 1 gray, 1 gray, 1 gray, 1 gray, 1 gray, 1 gray, 1 gray, 1 gray, 1 gray, 1 gray, 1 gray,",
+  "ms": 849
+ },
+ "side-1.jpg": {
+  "raw": "Cabinet.",
+  "ms": 274
+ },
+ "side-2.jpg": {
+  "raw": "Black and silver table.",
+  "ms": 276
+ },
+ "side-3.jpg": {
+  "raw": "Cat sitting on a table, lamp, and couch.",
+  "ms": 316
+ },
+ "side-4.jpg": {
+  "raw": "Wooden box with carved design.",
+  "ms": 282
+ },
+ "side-5.jpg": {
+  "raw": "Wooden box.",
+  "ms": 272
+ },
+ "side-6.jpg": {
+  "raw": "The furniture is a small table with a telephone, a clock, a remote, and a book on it.",
+  "ms": 349
+ },
+ "tvstand-1.jpg": {
+  "raw": "The furniture is modern and has a modern shape.",
+  "ms": 298
+ },
+ "tvstand-2.jpg": {
+  "raw": "Black and white TV, black and white decor.",
+  "ms": 297
+ },
+ "tvstand-3.jpg": {
+  "raw": "White and white.",
+  "ms": 274
+ },
+ "tvstand-4.jpg": {
+  "raw": "Television\n\nThe image shows a flat-screen TV on a stand with a magazine and books inside the stand. The TV is turned on and displaying a colorful screen with a blue background. The TV has a black and white screen and a few buttons on the top. The stand has a blue and white cover. The magazine and books are visible inside the stand.",
+  "ms": 598
+ },
+ "tvstand-5.jpg": {
+  "raw": "Speaker.",
+  "ms": 260
+ },
+ "tvstand-6.jpg": {
+  "raw": "Tv.",
+  "ms": 287
+ },
+ "wardrobe-1.jpg": {
+  "raw": "Shape: Square, Color: Brown, Visible: 5 doors, 5 windows, 5 chairs, 5 tables, 5 chairs, 5 tables, 5 chairs, 5 tables, 5 chairs, 5 tables, 5 chairs, 5 tables, 5 chairs, 5 tables, 5 chairs, 5 tables, 5 chairs, 5 tables, 5 chairs, 5 tables, 5 chairs,",
+  "ms": 664
+ },
+ "wardrobe-2.jpg": {
+  "raw": "Wooden wardrobe.",
+  "ms": 283
+ },
+ "wardrobe-3.jpg": {
+  "raw": "Wooden box, shape, color, visible seating.",
+  "ms": 286
+ },
+ "wardrobe-4.jpg": {
+  "raw": "Frame.",
+  "ms": 258
+ },
+ "wardrobe-5.jpg": {
+  "raw": "The white cabinetry has a white fabric-lined top. The white cabinet has a white fabric-lined top. The white cabinet has a white fabric-lined top. The white cabinet has a white fabric-lined top. The white cabinet has a white fabric-lined top. The white cabinet has a white fabric-lined top. The white cabinet has a white fabric-lined top. The white cabinet has a white fabric-lined top. The white cabinet has a white fabric",
+  "ms": 711
+ },
+ "wardrobe-6.jpg": {
+  "raw": "The main piece of furniture in the room is a white cabinet with its doors closed. The cabinet has four black doors with silver handles. The cabinet is white with a white top. The cabinet has a white top with a white base. The cabinet has a white base with a white top. The cabinet has a white top with a white base. The cabinet has a white top with a white base. The cabinet has a white top with a white base. The cabinet has a white",
+  "ms": 687
+ },
+ "dresser-1.jpg": {
+  "raw": "The top of the table is ornate with decorative elements.",
+  "ms": 317
+ },
+ "dresser-2.jpg": {
+  "raw": "Dining Cabinet.",
+  "ms": 272
+ },
+ "dresser-3.jpg": {
+  "raw": "The chair is a small antique wooden chest with six drawers.",
+  "ms": 307
+ },
+ "dresser-4.jpg": {
+  "raw": "The ornate chest of draw has 12 visible knobs, with a glass globe in the center. The glass globe is a little more than 1 foot in diameter. The cabinet has a dark finish. Behind the cabinet is a green and red wall with a picture of a man in a white wig and a black and white dress. To the right of the cabinet is a large, light brown, round ball. To the left of the cabinet is a dark red chair",
+  "ms": 696
+ },
+ "dresser-5.jpg": {
+  "raw": "Furniture\nThe image shows a collection of antique antique furniture, including a chest of drawers, a chest of drawers, and a chest of drawers, all in a room with white walls. The furniture is arranged in a somewhat disorganized manner, with some of the pieces stacked on top of each other, and some of the pieces are placed on top of each other, with some of the drawers in front of each piece. The furniture is made of wood,",
+  "ms": 752
+ },
+ "dresser-6.jpg": {
+  "raw": "Wooden dresser with 4 drawers.",
+  "ms": 300
+ },
+ "cabinet-1.jpg": {
+  "raw": "Wooden cabinet with two doors, brown color.",
+  "ms": 396
+ },
+ "cabinet-2.jpg": {
+  "raw": "The box is a long, narrow, wooden box with a top and bottom. The top has a carving of a bird on it. The bottom has a carving of a fish. There are two drawers in the top.",
+  "ms": 512
+ },
+ "cabinet-3.jpg": {
+  "raw": "Table.",
+  "ms": 272
+ },
+ "cabinet-4.jpg": {
+  "raw": "A modern, minimalist, and minimalist, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern, modern,",
+  "ms": 880
+ },
+ "cabinet-5.jpg": {
+  "raw": "The furniture is a modern, wooden, rectangular cabinet with a light brown color.",
+  "ms": 345
+ },
+ "cabinet-6.jpg": {
+  "raw": "Cabinet.",
+  "ms": 276
+ },
+ "shelf-1.jpg": {
+  "raw": "Bookshelf.",
+  "ms": 314
+ },
+ "shelf-2.jpg": {
+  "raw": "Black wall with bookshelves.",
+  "ms": 297
+ },
+ "shelf-3.jpg": {
+  "raw": "Shelf.",
+  "ms": 317
+ },
+ "shelf-4.jpg": {
+  "raw": "Cabinet.",
+  "ms": 323
+ },
+ "shelf-5.jpg": {
+  "raw": "Chair.",
+  "ms": 294
+ },
+ "shelf-6.jpg": {
+  "raw": "Couch.",
+  "ms": 329
+ },
+ "shoe_cabinet-1.jpg": {
+  "raw": "Shelf.",
+  "ms": 299
+ },
+ "shoe_cabinet-2.jpg": {
+  "raw": "Furniture: 1. Shape: Square, light brown, light pink, light blue, light green, light green, light blue, light pink, light green, light blue, light green, light blue, light pink, light green, light blue, light green, light blue, light pink, light green, light blue, light green, light blue, light pink, light green, light blue, light green, light blue, light pink, light green, light blue",
+  "ms": 716
+ },
+ "shoe_cabinet-3.jpg": {
+  "raw": "Shape: 2-1/2\" tall, 1-1/2\" wide, 1-1/2\" tall, 1-1/2\" wide, 1-1/2\" tall, 1-1/2\" wide, 1-1/2\" tall, 1-1/2\" tall, 1-1/2\" tall, 1-1/2\" tall, 1-1",
+  "ms": 775
+ },
+ "shoe_cabinet-4.jpg": {
+  "raw": "House.",
+  "ms": 327
+ },
+ "shoe_cabinet-5.jpg": {
+  "raw": "The question is answering the question in the image.",
+  "ms": 335
+ },
+ "shoe_cabinet-6.jpg": {
+  "raw": "The question I would like to ask is: What is this?",
+  "ms": 364
+ },
+ "bench-1.jpg": {
+  "raw": "Furniture.",
+  "ms": 269
+ },
+ "bench-2.jpg": {
+  "raw": "Colorful bench.",
+  "ms": 268
+ },
+ "bench-3.jpg": {
+  "raw": "Bench.",
+  "ms": 253
+ },
+ "bench-4.jpg": {
+  "raw": "Green bench.",
+  "ms": 277
+ },
+ "bench-5.jpg": {
+  "raw": "Bench.",
+  "ms": 270
+ },
+ "bench-6.jpg": {
+  "raw": "Bench.",
+  "ms": 268
+ },
+ "rug-1.jpg": {
+  "raw": "The corner of a rug with a blue background and a floral pattern in the center.",
+  "ms": 335
+ },
+ "rug-2.jpg": {
+  "raw": "Kitchen.",
+  "ms": 253
+ },
+ "rug-3.jpg": {
+  "raw": "The furniture is a chair.",
+  "ms": 330
+ },
+ "rug-4.jpg": {
+  "raw": "The rug is a long, narrow, rectangular rug with a fringe along the top.",
+  "ms": 323
+ },
+ "rug-5.jpg": {
+  "raw": "The corner of a table is the focus of this image.",
+  "ms": 307
+ },
+ "rug-6.jpg": {
+  "raw": "Shape: Oriental rug. Color: Red, beige, white, blue, black, red, beige, white, blue, black, red, beige, white, blue, black, red, beige, white, blue, black, red, beige, white, blue, black, red, beige, white, blue, black, red, beige, white, blue, black, red, beige, white, blue, black, red",
+  "ms": 755
+ },
+ "lamp-1.jpg": {
+  "raw": "Furniture: 1. Shape: Diamond, Color: Yellow. Visible: Light.",
+  "ms": 361
+ },
+ "lamp-2.jpg": {
+  "raw": "Table.",
+  "ms": 218
+ },
+ "lamp-3.jpg": {
+  "raw": "Furniture: 1. Shape: Lamp. Color: White. Visible seating: 1. 1.1.",
+  "ms": 364
+ },
+ "lamp-4.jpg": {
+  "raw": "Tiled shade.",
+  "ms": 278
+ },
+ "lamp-5.jpg": {
+  "raw": "White desk.",
+  "ms": 258
+ },
+ "lamp-6.jpg": {
+  "raw": "White, closed, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white, white,",
+  "ms": 654
+ },
+ "plant-1.jpg": {
+  "raw": "Furniture: 1. Shape: 2. Color: Black with green birdcage.",
+  "ms": 359
+ },
+ "plant-2.jpg": {
+  "raw": "White pot with green plant.",
+  "ms": 300
+ },
+ "plant-3.jpg": {
+  "raw": "Red pot with green plant in it.",
+  "ms": 321
+ },
+ "plant-4.jpg": {
+  "raw": "White sofa, white pot, white book, white chair.",
+  "ms": 300
+ },
+ "plant-5.jpg": {
+  "raw": "The brown clay pot in the foreground holds a bunch of beige-colored brush heads, which are likely to be for a dry garden.",
+  "ms": 393
+ },
+ "plant-6.jpg": {
+  "raw": "The furniture is a small potted plant sitting in a brown pot with a white and red floral pattern.",
+  "ms": 407
+ },
+ "fridge-1.jpg": {
+  "raw": "White refrigerator.",
+  "ms": 312
+ },
+ "fridge-2.jpg": {
+  "raw": "Refrigerator.",
+  "ms": 394
+ },
+ "fridge-3.jpg": {
+  "raw": "The display of the refrigerators is full of them.",
+  "ms": 354
+ },
+ "fridge-4.jpg": {
+  "raw": "Refrigerator.",
+  "ms": 284
+ },
+ "fridge-5.jpg": {
+  "raw": "White refrigerator, white cabinetry, black counter.",
+  "ms": 318
+ },
+ "washer-1.jpg": {
+  "raw": "Laundry washing machine.",
+  "ms": 449
+ },
+ "washer-2.jpg": {
+  "raw": "Furniture\nThe image does not contain a table, chair, or any other furniture.",
+  "ms": 375
+ },
+ "washer-3.jpg": {
+  "raw": "Furniture: 1. Shape: metallic, 2. Color: red, black, white, blue, green, yellow, orange, red, black, white, blue, green, yellow, orange, red, black, white, blue, green, yellow, orange, red, black, white, blue, green, yellow, orange, red, black, white, blue, green, yellow, orange, red, black, white, blue, green, yellow",
+  "ms": 734
+ },
+ "washer-4.jpg": {
+  "raw": "Dustbin.",
+  "ms": 320
+ },
+ "washer-5.jpg": {
+  "raw": "The coffee table has a white and blue top.",
+  "ms": 320
+ },
+ "washer-6.jpg": {
+  "raw": "Lid.",
+  "ms": 297
+ }
+}

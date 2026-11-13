@@ -1,4 +1,5 @@
-// 규칙 기반 대화 계획기. 사용자 문장 하나를 읽고 "무엇을 바꿀지, 어떤 도구를 보여줄지"를 정한다.
+// 규칙 기반 대화 계획기. 상담 모델을 쓸 수 없을 때(준비 중·꺼짐·미지원·실패) 쓰는 대체 경로다.
+// 사용자 문장 하나를 읽고 "무엇을 바꿀지, 어떤 도구를 보여줄지"를 정한다.
 // 상태를 직접 바꾸지 않는다. 적용과 실행 취소 기록은 store가 맡는다.
 import { TYPES, ROOM_TYPES } from '../catalog.js';
 import { makeItem, layoutWarnings, clampItem, spaces } from '../data.js';
@@ -9,7 +10,7 @@ import { chooseSurface, surfaceKind } from '../ui-schema.js';
 // 규칙이 기본값으로 물러난 경우(방: 유형, 가구: 규격)가 아니면 요청 단어로 도구를 확신한 것이다.
 const confidentPick = (scope, pick) => pick !== (scope === 'room' ? 'types' : 'sizes');
 
-const ROOM_REFERENCE =
+export const ROOM_REFERENCE =
   /(?:방|공간)(?:을|를|은|는|이|가|의)?\s*(?:가로|세로|크기|치수|넓이|면적)|천장|\d\s*평|평수|m²|제곱미터|벽|바닥/;
 
 const COLOR_WORDS = [
@@ -31,7 +32,7 @@ export function parseFurnitureColor(text) {
 }
 
 // 선택한 가구가 있으면 방 단어가 분명할 때만 방 상담으로 본다.
-const ROOM_TALK =
+export const ROOM_TALK =
   /(?:방|공간|룸)(?:으로|을|를|은|는|이|가)?\s*(?:꾸미|꾸며|바꿔|만들|정리|채우)|(?:아담한|작은|좁은|넓은|큰|밝은)\s*(?:방|공간)/;
 
 export function resolveScope(text, target = { type: 'room' }) {
@@ -51,14 +52,14 @@ const surface = (kind, target = roomTarget) => ({ kind, target });
 const say = (label, text) => ({ label, text });
 const act = (label, action, extra = {}) => ({ label, action, ...extra });
 
-function metaPlan(action, reply, extra = {}) {
+export function metaPlan(action, reply, extra = {}) {
   return { intent: 'meta', scope: null, action, reply, surfaces: [], suggestions: [], ...extra };
 }
-function surfacePlan(kind, reply, suggestions = []) {
+export function surfacePlan(kind, reply, suggestions = []) {
   return { intent: 'meta', scope: null, reply, surfaces: [surface(kind)], suggestions };
 }
 
-function matchSpace(text, state) {
+export function matchSpace(text, state) {
   if (!/(?:이동|전환|열어|보여|가자|넘어가|바꿔)/.test(text)) return null;
   return (
     spaces(state)
@@ -86,7 +87,11 @@ function planMeta(t, ctx, item) {
       'ai',
       '이 기기에서 실행하는 모델을 준비하거나 끌 수 있어요. 준비하지 않아도 기본 상담은 계속 돼요.',
     );
-  if (/(?:사용법|도움말|어떻게\s*(?:써|사용|하면\s*돼))/.test(t))
+  if (
+    /(?:사용법|도움말|어떻게\s*(?:써|사용|하면\s*돼)|(?:뭘|뭐|무엇을)\s*할\s*수|할\s*수\s*있는\s*(?:게|것|일))/.test(
+      t,
+    )
+  )
     return surfacePlan('help', '이렇게 쓰면 돼요.');
   if (/(?:가구\s*목록|배치된\s*가구|어떤\s*가구가\s*있|뭐가\s*(?:있|놓여))/.test(t))
     return surfacePlan('items', `이 방에 놓인 가구는 ${state.items.length}개예요.`);
@@ -131,7 +136,7 @@ function planMeta(t, ctx, item) {
   return null;
 }
 
-function furnitureChips(item, mode) {
+export function furnitureChips(item, mode) {
   const chips = [];
   if (mode !== 'item') chips.push(act('방에 놓기', 'place', { primary: true }));
   if (item.type === 'sofa' && !item.sources[0].startsWith('사용자'))
@@ -143,7 +148,7 @@ function furnitureChips(item, mode) {
   return chips;
 }
 
-function planRoom(t, ctx) {
+export function planRoom(t, ctx) {
   const { state } = ctx;
   let r;
   try {

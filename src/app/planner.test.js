@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { exampleState, freshState, makeItem } from '../data.js';
 import { planTurn, resolveScope, parseFurnitureColor } from './planner.js';
-import { mergeFurnitureModel, mergeRoomModel, usableReply, usableCaption } from './model-turn.js';
+import { usableReply } from './model-turn.js';
 
 const room = { type: 'room' };
 test('방 설명은 방 크기 도구와 변경 계획을 만든다', () => {
@@ -80,29 +80,12 @@ test('가구 색 이름을 해석한다', () => {
   assert.equal(parseFurnitureColor('네이비 소파'), '#3f4d63');
   assert.equal(parseFurnitureColor('그냥 소파'), null);
 });
-test('모델 응답의 숫자 문장과 마크업은 쓰지 않고 UI 선택만 허용 목록으로 바꾼다', () => {
+test('모델 답의 숫자 문장과 마크업은 쓰지 않는다', () => {
   assert.equal(usableReply('가로 200cm가 좋아요', '소파'), null);
   assert.equal(usableReply('<b>좋아요</b>', '소파'), null);
   assert.equal(usableReply('팔걸이가 있는 편인가요?', '소파'), '팔걸이가 있는 편인가요?');
-  const sofa = { ...makeItem('sofa'), sources: ['사용자 설정', '유형 기본값', '유형 기본값'] };
-  const m = mergeFurnitureModel(
-    '{"seats":3,"size":"unknown","depth_profile":"deep","height_profile":"unknown","ui":"colors","reply":"깊은 소파로 볼게요."}',
-    sofa,
-    '세 명이 앉는 깊은 소파',
-  );
-  assert.equal(m.item.dims[0], sofa.dims[0]);
-  assert.equal(m.item.dims[2], 100);
-  assert.equal(m.kind, 'furniture-color');
-  const r = mergeRoomModel(
-    '{"room_type":"kitchen","size":"large","ui":"finishes","reply":"벽은 세이지가 어울려요."}',
-    freshState().room,
-    '벽은 세이지로 바꿔줘',
-  );
-  assert.equal(r.room.type, 'studio');
-  assert.equal(r.room.w, 4);
-  assert.equal(r.kind, 'finishes');
 });
-test('실제 모델 확인에서 찾은 경우: 깊은 좌석·초안 중 방 이야기·분명한 도구', () => {
+test('규칙 경로: 깊은 좌석·초안 중 방 이야기·분명한 도구', () => {
   const s = freshState();
   const sofa = planTurn('세 명이 앉는 낮은 소파야', { state: s, target: room });
   assert.equal(sofa.confident, false);
@@ -140,16 +123,11 @@ test('모델 답이 프롬프트 예시를 베끼거나 말하지 않은 인원�
     '두 명이 쓰기 좋은 크기예요. 팔걸이가 있나요?',
   );
 });
-test('예시 방 요청은 파일 불러오기보다 먼저 해석하고, 읽을 수 없는 사진 설명은 버린다', () => {
+test('예시 방 요청은 파일 불러오기보다 먼저 해석한다', () => {
   const s = freshState();
   assert.equal(planTurn('예시 방 불러오기', { state: s, target: room }).action, 'example');
   assert.equal(
     planTurn('배치 파일 불러오기', { state: s, target: room }).surfaces[0].kind,
     'files',
-  );
-  assert.equal(usableCaption('1. 1.111111111111111111111111'), '');
-  assert.equal(
-    usableCaption('Couch, shape, color, visible seating.'),
-    'Couch, shape, color, visible seating.',
   );
 });

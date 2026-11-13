@@ -56,13 +56,26 @@ function Welcome({ mobile }) {
   );
 }
 
+const FALLBACK = {
+  loading: '상담 모델 준비 중이라',
+  off: '상담 모델을 꺼 둬서',
+  unsupported: '이 브라우저에서 상담 모델을 쓸 수 없어',
+  error: '상담 모델 준비에 실패해서',
+  timeout: '모델 답이 늦어서',
+  invalid: '모델 답을 쓸 수 없어서',
+  cancelled: '모델 답을 취소해서',
+  'model-chat': '모델이 바꿀 내용을 찾지 못해서',
+};
+// 답마다 무엇이 해석했는지 밝힌다. 모델이 기본이고 규칙은 대체 경로다.
 function engineLabel(turn) {
   if (turn.uiBy === 'user') return '직접 연 도구';
+  if (turn.engine === 'siglip') return 'SigLIP 사진 판별 · 이 기기에서 실행';
   const model = turn.engine === 'gemma' ? 'Gemma' : turn.engine === 'qwen' ? 'Qwen' : null;
-  if (!model) return '기본 상담 · 규칙 기반';
-  if (turn.uiBy === 'model') return `${model} 답변 · 도구도 ${model}가 고름`;
-  if (turn.uiBy === 'rule-kept') return `${model} 답변 · 요청 단어가 분명해 도구는 규칙대로 유지`;
-  return `${model} 답변 · 도구는 규칙으로 고름`;
+  if (model)
+    return turn.fixes?.length
+      ? `${model}가 해석 · 앱이 ${turn.fixes.length}곳 바로잡음`
+      : `${model}가 해석 · 앱이 숫자·범위 확인`;
+  return turn.fallback ? `${FALLBACK[turn.fallback]} 규칙으로 처리` : '규칙으로 처리';
 }
 
 function Receipt({ turn, canUndo }) {
@@ -92,11 +105,13 @@ function Receipt({ turn, canUndo }) {
   );
 }
 
-function Thinking({ turn }) {
+function Thinking() {
   return (
     <div class="thinking" role="status">
       <Icon name="loader-circle" size={16} className="spin" />
-      <span>{app.ai.model?.startsWith('gemma') ? 'Gemma' : '모델'}가 이 기기에서 답을 쓰는 중</span>
+      <span>
+        {app.ai.model?.startsWith('gemma') ? 'Gemma' : '모델'}가 이 기기에서 문장을 해석하는 중
+      </span>
       <button class="link" onClick={() => store.cancelModel()}>
         취소
       </button>
@@ -127,19 +142,14 @@ function Turn({ turn, live, latest, canUndo }) {
   return (
     <article class={`msg assistant ${turn.tone === 'error' ? 'is-error' : ''}`} data-turn={turn.id}>
       {turn.text && <p class="msg-text">{turn.text}</p>}
-      {turn.modelReply && (
-        <p class="model-reply">
-          <span class="engine-tag">{turn.engine === 'qwen' ? 'Qwen' : 'Gemma'}</span>
-          {turn.modelReply}
-        </p>
-      )}
-      {turn.visionCaption && (
+      {turn.note && <p class="msg-note">{turn.note}</p>}
+      {turn.photoScores && (
         <p class="vision-caption">
-          <span>SmolVLM 원문</span>
-          {turn.visionCaption}
+          <span>SigLIP 후보</span>
+          {turn.photoScores}
         </p>
       )}
-      {turn.status === 'thinking' && <Thinking turn={turn} />}
+      {turn.status === 'thinking' && <Thinking />}
       {turn.surfaces?.map((s) => (
         <Surface
           key={s.id}
@@ -167,7 +177,18 @@ function Turn({ turn, live, latest, canUndo }) {
         </div>
       )}
       {turn.note && <p class="msg-note">{turn.note}</p>}
-      <span class="msg-meta">{engineLabel(turn)}</span>
+      {turn.engine === 'app' ? null : turn.fixes?.length > 0 ? (
+        <details class="msg-meta">
+          <summary>{engineLabel(turn)}</summary>
+          <ul>
+            {turn.fixes.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+        </details>
+      ) : (
+        <span class="msg-meta">{engineLabel(turn)}</span>
+      )}
     </article>
   );
 }

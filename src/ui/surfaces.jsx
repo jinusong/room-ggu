@@ -694,7 +694,7 @@ function Photo({ spec }) {
   const loading = app.busy?.kind === 'vision';
   return (
     <>
-      <Head icon="image" title="가구 사진" meta={p.analyzed ? '분석함' : '분석 전'} />
+      <Head icon="image" title="가구 사진" meta={p.analyzed ? '판별함' : '판별 전'} />
       <div class="photo-surface">
         <img src={p.data} alt="첨부한 가구 사진" />
         <div class="photo-side">
@@ -703,22 +703,37 @@ function Photo({ spec }) {
               <p class="photo-result">
                 {p.type
                   ? `${josa(TYPES[p.type].name, '으로/로')} 보여요.`
-                  : '종류를 확실히 찾지 못했어요.'}
+                  : p.candidates?.length
+                    ? '종류를 확신하지 못했어요. 후보를 골라 주세요.'
+                    : '종류를 읽지 못했어요.'}
               </p>
-              {p.caption && (
-                <p class="vision-caption">
-                  <span>SmolVLM 원문</span>
-                  {p.caption}
-                </p>
+              {p.candidates?.length > 0 && (
+                <ul class="photo-candidates">
+                  {p.candidates.map((c) => (
+                    <li key={c.type}>
+                      <button
+                        class="link"
+                        onClick={() => store.createDraft(c.type, { via: 'photo' })}
+                      >
+                        {TYPES[c.type].name}
+                      </button>
+                      <span class="mono">{Math.round(c.p * 100)}%</span>
+                    </li>
+                  ))}
+                </ul>
               )}
+              <p class="surface-hint">
+                SigLIP · {p.device === 'wasm' ? 'CPU' : 'GPU'}에서 실행. 사진만으로는 cm를 잴 수
+                없어 크기는 유형 기본값이에요.
+              </p>
             </>
           ) : (
             <>
               <p class="surface-hint">
-                사진 모델이 가구 종류와 모양을 읽어요. 처음 한 번 약 270MB를 내려받고, 사진은 이
-                기기 밖으로 보내지 않아요.
+                사진 판별 모델이 20가지 가구 중 가까운 종류를 골라요. 처음 한 번 GPU는 약 150MB,
+                CPU는 약 210MB를 내려받고, 사진은 이 기기 밖으로 보내지 않아요.
               </p>
-              <div class="segmented" role="group" aria-label="사진 분석 방식">
+              <div class="segmented" role="group" aria-label="사진 판별 방식">
                 {[
                   ['webgpu', 'GPU'],
                   ['wasm', 'CPU 호환'],
@@ -743,16 +758,13 @@ function Photo({ spec }) {
                   size={16}
                   className={loading ? 'spin' : ''}
                 />
-                {loading ? app.ai.label || '사진 읽는 중' : '사진 AI로 종류 확인'}
+                {loading ? app.ai.label || '사진 판별 중' : '사진으로 종류 확인'}
               </button>
               {loading && (
                 <progress max="1" value={app.ai.progress} aria-label="사진 모델 진행률" />
               )}
             </>
           )}
-          <p class="surface-hint">
-            사진만으로는 실제 cm를 알 수 없어요. 종류를 잡은 뒤 아는 치수를 알려주세요.
-          </p>
         </div>
       </div>
       <div class="chips-row is-wrap" aria-label="직접 종류 고르기">
@@ -771,50 +783,55 @@ function Photo({ spec }) {
 }
 
 function AIPanel() {
-  const ai = app.ai,
-    loading = app.busy?.kind === 'load';
+  const ai = app.ai;
+  const loading = ai.text === 'loading';
   const textState = {
-    off: '준비 안 함',
+    off: ai.why === 'user' || ai.why === 'url' ? '꺼 둠' : '켜지 않음',
     loading: ai.label || '준비 중',
-    ready: `${String(ai.model).startsWith('gemma') ? 'Gemma 3 1B' : 'Qwen3 0.6B'} 실행 중`,
+    ready: `${store.modelName(ai.model)} 실행 중`,
     error: '준비 실패',
+    unsupported: 'WebGPU 없음',
   }[ai.text];
   return (
     <>
       <Head
         icon="cpu"
         title="이 기기의 AI"
-        meta={ai.text === 'ready' ? '모델 상담' : '기본 상담'}
+        meta={ai.text === 'ready' ? '모델이 해석' : '규칙으로 처리'}
       />
       <div class="model-row">
         <span class={`status-dot is-${ai.text}`} />
         <div class="row-main">
           <strong>상담 모델 · Gemma 3 1B</strong>
-          <small>{textState} · 처음 한 번 내려받기 · WebGPU 필요</small>
-          {ai.text === 'error' && <small class="field-error">{ai.error}</small>}
+          <small>{textState} · 기본으로 켜짐 · 처음 한 번 약 700MB · WebGPU 필요</small>
+          {(ai.text === 'error' || ai.text === 'unsupported') && ai.error && (
+            <small class="field-error">{ai.error}</small>
+          )}
           {loading && <progress max="1" value={ai.progress} aria-label="상담 모델 진행률" />}
         </div>
-        {ai.text === 'ready' ? (
-          <button class="btn small" onClick={() => store.unloadAI()}>
+        {ai.text === 'ready' || loading ? (
+          <button class="btn small" onClick={() => store.setModelOn(false)}>
             끄기
           </button>
-        ) : (
-          <button class="btn small primary" disabled={!!app.busy} onClick={() => store.loadText()}>
-            {loading ? '준비 중' : '준비하기'}
+        ) : ai.text === 'unsupported' ? null : (
+          <button class="btn small primary" onClick={() => store.setModelOn(true)}>
+            {ai.text === 'error' ? '다시 시도' : '켜기'}
           </button>
         )}
       </div>
       <div class="model-row">
         <span class={`status-dot is-${ai.vision}`} />
         <div class="row-main">
-          <strong>사진 모델 · SmolVLM 256M</strong>
-          <small>{ai.vision === 'ready' ? '준비됨' : '사진을 분석할 때 준비'} · 약 270MB</small>
+          <strong>사진 판별 · SigLIP base</strong>
+          <small>
+            {ai.vision === 'ready' ? '준비됨' : '사진을 보내면 준비'} · GPU 약 150MB, CPU 약 210MB
+          </small>
         </div>
       </div>
       <p class="surface-hint">
-        모델 파일은 공개 저장소에서 내려받아 브라우저에 보관될 수 있어요. 대화와 사진은 추론 서버로
-        보내지 않아요. 메모리를 아끼려고 두 모델을 번갈아 올려요. 모델이 없어도 규칙 기반 상담과
-        배치는 그대로 돼요.
+        켜 두면 모델이 문장을 해석하고, 앱은 숫자·범위·말하지 않은 속성만 확인해요. 모델이 준비되기
+        전이나 쓸 수 없는 기기에서는 규칙으로 답해요. 모델 파일은 공개 저장소에서 한 번 내려받아
+        브라우저에 보관될 수 있고, 대화와 사진은 추론 서버로 보내지 않아요.
       </p>
     </>
   );

@@ -106,6 +106,8 @@ export function App() {
     store.registerPhotoInput(photoRef.current);
     store.persist();
     if (app.readError) store.toast('이전 배치를 읽지 못해 예시 방으로 열었어요.');
+    // 상담 모델은 기본으로 켠다. 준비되는 동안과 쓸 수 없는 기기에서는 규칙으로 답한다.
+    store.bootModel();
     window.__roomggu = {
       app,
       anchor: (id, opts) =>
