@@ -51,6 +51,8 @@ export function validateSurface(value, scope, fallback = 'dimensions') {
 // 앱이 렌더링할 수 있는 전체 컴포넌트 목록. `model` 값이 있는 컴포넌트만 모델이 고를 수 있다.
 // 나머지는 규칙 기반 상담이나 사용자의 직접 호출로만 열린다.
 export const SURFACE_KINDS = {
+  avatar: { scope: 'app', title: '내 키로 크기 비교', icon: 'person-standing' },
+  floorplan: { scope: 'app', title: '집 전체 평면도', icon: 'house' },
   'room-size': { scope: 'room', model: 'dimensions', title: '방 크기', icon: 'ruler' },
   'room-type': { scope: 'room', model: 'types', title: '공간 유형', icon: 'layout-grid' },
   finishes: { scope: 'room', model: 'finishes', title: '벽과 바닥', icon: 'paint-roller' },

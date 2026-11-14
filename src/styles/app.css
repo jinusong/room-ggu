@@ -2100,3 +2100,58 @@ button.row:hover,
     transition-duration: 0.01ms !important;
   }
 }
+/* 키 비교와 집 평면도 도구. 기존 대화 시트의 간격과 중립색을 따른다. */
+.comparison-poses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.comparison-select {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  font-size: 12px;
+}
+.comparison-select select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px;
+  color: inherit;
+  background: var(--paper, #fbfaf7);
+  border: 1px solid #d8d5cc;
+  border-radius: 8px;
+  font: inherit;
+}
+.house-rooms {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
+.house-room {
+  padding: 12px;
+  border: 1px solid #dedbd2;
+  border-radius: 10px;
+}
+.house-room.is-active {
+  border-color: #8c927f;
+}
+.house-room-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.house-room-head strong {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+.house-position {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}

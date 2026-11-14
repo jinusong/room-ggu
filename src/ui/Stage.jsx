@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { TYPES, ROOM_TYPES } from '../catalog.js';
 import { layoutWarnings, spaces } from '../data.js';
 import { PlanScene } from '../plan.js';
+import { HouseScene } from '../house.js';
 import { clearTapes } from '../tape.js';
 import * as store from '../app/store.js';
 import { app } from '../app/store.js';
@@ -32,12 +33,13 @@ let last = {};
 const known = new WeakSet();
 function syncScenes(force = false) {
   const s = app.state;
-  const room = JSON.stringify([s.room, s.grid, s.dimensions]),
+  const room = JSON.stringify([s.roomId, s.room, s.grid, s.dimensions]),
     items = JSON.stringify(s.items),
     warn = layoutWarnings(s),
     warnSig = [...warn.all].join(),
     ghost = ghostItem(),
-    ghostSig = JSON.stringify(ghost);
+    ghostSig = JSON.stringify(ghost),
+    avatar = JSON.stringify(s.avatar);
   for (const sc of [app.scenes.three, app.scenes.plan]) {
     if (!sc) continue;
     const fresh = force || !known.has(sc);
@@ -47,8 +49,11 @@ function syncScenes(force = false) {
     if (fresh || items !== last.items || app.selected !== last.sel || warnSig !== last.warn)
       sc.decorate(app.selected, warn.all);
     if (fresh || ghostSig !== last.ghost) sc.setGhost(ghost);
+    if (fresh || avatar !== last.avatar || items !== last.items || room !== last.room)
+      sc.setAvatar();
   }
-  last = { room, items, sel: app.selected, warn: warnSig, ghost: ghostSig };
+  app.scenes.house?.draw();
+  last = { room, items, sel: app.selected, warn: warnSig, ghost: ghostSig, avatar };
 }
 
 function SpaceSwitcher() {
@@ -66,14 +71,26 @@ function SpaceSwitcher() {
         onClick={() => setOpen(!open)}
       >
         <Icon name={ROOM_TYPES[r.type].icon} size={16} />
-        <span class="space-name">{app.state.name}</span>
+        <span class="space-name">{app.state.scope === 'house' ? '집 전체' : app.state.name}</span>
         <span class="space-dims mono">
-          {r.w} × {r.d}m
+          {app.state.scope === 'house' ? `${list.length}개 공간` : `${r.w} × ${r.d}m`}
         </span>
         <Icon name="chevron-down" size={16} />
       </button>
       {open && (
         <div class="popover space-pop" role="menu">
+          <button
+            class="pop-row"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              store.openTool('floorplan');
+            }}
+          >
+            <Icon name="house" size={16} />
+            <span>집 전체 평면도</span>
+          </button>
+          <hr />
           <span class="pop-label">공간 {list.length} / 12</span>
           {list.map((x) => (
             <button
@@ -260,12 +277,13 @@ function ObjectBar({ barRef, mobile }) {
 export function Stage({ mobile, sheetRef }) {
   const host3d = useRef(null),
     host2d = useRef(null),
+    hostHouse = useRef(null),
     stageRef = useRef(null),
     barRef = useRef(null);
   const placeBar = () => {
     const bar = barRef.current,
       stage = stageRef.current;
-    if (!bar || !stage || !app.selected) return;
+    if (!bar || !stage || !app.selected || app.state.scope === 'house') return;
     const sc = app.state.view === '2d' ? app.scenes.plan : app.scenes.three;
     const p = sc?.anchor(app.selected);
     if (!p || !p.visible) {
@@ -287,6 +305,19 @@ export function Stage({ mobile, sheetRef }) {
   };
   useEffect(() => {
     app.scenes.plan = new PlanScene(host2d.current, app.state, store.sceneCallbacks);
+    app.scenes.house = new HouseScene(hostHouse.current, app.state, {
+      start: store.snapshot,
+      selectSpace: store.switchSpace,
+      editSpace: (id) => {
+        store.switchSpace(id);
+        store.setScope('room');
+      },
+      moveSpace: (id, x, z) => store.moveSpace(id, x, z, { live: true }),
+      commit: () => {
+        store.persist();
+        store.emit();
+      },
+    });
     let disposed = false;
     const fontsReady = document.fonts?.ready || Promise.resolve();
     import('../scene.js')
@@ -336,6 +367,7 @@ export function Stage({ mobile, sheetRef }) {
       );
       app.scenes.three?.setInsets(insets);
       app.scenes.plan?.setInsets(insets);
+      app.scenes.house?.setInsets(insets);
       placeBar();
     };
     const ro = new ResizeObserver(applyInsets);
@@ -348,20 +380,26 @@ export function Stage({ mobile, sheetRef }) {
       ro.disconnect();
       clearTimeout(t);
       window.removeEventListener('resize', applyInsets);
+      app.scenes.plan?.dispose();
+      app.scenes.house?.dispose();
+      app.scenes.three?.dispose();
     };
   }, []);
   useEffect(() => {
     app.scenes.plan?.draw();
+    app.scenes.house?.draw();
     app.scenes.three?.invalidate();
     requestAnimationFrame(placeBar);
-  }, [app.state.view, app.view.collapsed, app.view.sheet, mobile]);
+  }, [app.state.view, app.state.scope, app.view.collapsed, app.view.sheet, mobile]);
   const s = app.state,
     warn = layoutWarnings(s);
-  const empty = !s.items.length && !app.draft;
+  const house = s.scope === 'house';
+  const empty = !house && !s.items.length && !app.draft;
   return (
     <main class="stage" ref={stageRef} aria-label="방 미리보기">
-      <div id="viewport-3d" class="viewport" ref={host3d} hidden={s.view !== '3d'} />
-      <div id="viewport-2d" class="viewport" ref={host2d} hidden={s.view !== '2d'} />
+      <div id="viewport-3d" class="viewport" ref={host3d} hidden={house || s.view !== '3d'} />
+      <div id="viewport-2d" class="viewport" ref={host2d} hidden={house || s.view !== '2d'} />
+      <div id="viewport-house" class="viewport" ref={hostHouse} hidden={!house} />
       <div class="stage-top">
         <SpaceSwitcher />
         <div class="stage-tools">
@@ -387,26 +425,32 @@ export function Stage({ mobile, sheetRef }) {
               <Icon name="redo-2" />
             </button>
           </div>
-          <div class="segmented on-stage" role="group" aria-label="보기 방식">
-            {[
-              ['2d', '2D'],
-              ['3d', '3D'],
-            ].map(([k, l]) => (
-              <button
-                key={k}
-                data-view={k}
-                class={s.view === k ? 'is-active' : ''}
-                aria-pressed={s.view === k}
-                onClick={() => store.setView(k)}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
+          {house ? (
+            <button class="btn small on-stage" onClick={() => store.setScope('room')}>
+              선택한 방 편집
+            </button>
+          ) : (
+            <div class="segmented on-stage" role="group" aria-label="보기 방식">
+              {[
+                ['2d', '2D'],
+                ['3d', '3D'],
+              ].map(([k, l]) => (
+                <button
+                  key={k}
+                  data-view={k}
+                  class={s.view === k ? 'is-active' : ''}
+                  aria-pressed={s.view === k}
+                  onClick={() => store.setView(k)}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          )}
           <MoreMenu />
         </div>
       </div>
-      {warn.all.size > 0 && (
+      {!house && warn.all.size > 0 && (
         <div class="stage-warning" id="warning" role="status">
           <Icon name="triangle-alert" size={16} />
           <span>
@@ -428,7 +472,7 @@ export function Stage({ mobile, sheetRef }) {
           </button>
         </div>
       )}
-      {app.draft && !app.selected && (
+      {!house && app.draft && !app.selected && (
         <div class="draft-note" role="status">
           <span class="tape is-draft">점선</span>
           {TYPES[app.draft.type].name} 초안 · 아직 놓지 않았어요
@@ -437,12 +481,14 @@ export function Stage({ mobile, sheetRef }) {
           </button>
         </div>
       )}
-      <ObjectBar barRef={barRef} mobile={mobile} />
+      {!house && <ObjectBar barRef={barRef} mobile={mobile} />}
       <div class="stage-bottom">
         <span class="stage-hint">
-          {s.view === '2d'
-            ? '가구를 끌어 옮기기 · 방향키로 5cm씩'
-            : '빈 곳을 끌어 돌리기 · 휠로 확대 · 가구 끌어 옮기기'}
+          {house
+            ? '공간을 끌어 배치 · 더블클릭으로 방 편집 · 문은 연결 초안'
+            : s.view === '2d'
+              ? '가구를 끌어 옮기기 · 방향키로 5cm씩'
+              : '빈 곳을 끌어 돌리기 · 휠로 확대 · 가구 끌어 옮기기'}
         </span>
         <div class="tool-group">
           <button
@@ -482,11 +528,15 @@ export function Stage({ mobile, sheetRef }) {
             id="home"
             aria-label="방 전체 보기"
             title="방 전체 보기"
-            onClick={() => (app.scenes.three?.home(), app.scenes.plan?.draw())}
+            onClick={() => (
+              app.scenes.three?.home(),
+              app.scenes.plan?.draw(),
+              app.scenes.house?.draw()
+            )}
           >
             <Icon name="maximize-2" />
           </button>
-          {s.view === '3d' && (
+          {!house && s.view === '3d' && (
             <>
               <button
                 class="icon-btn on-stage zoom-btn"

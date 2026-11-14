@@ -1,5 +1,6 @@
 import { TYPES, footprint } from './data.js';
 import { tapeCanvas, PAPER } from './tape.js';
+import { avatarLayout, LIMBS } from './avatar.js';
 
 // 건축 평면도 방식의 2D 도면. 벽은 먹색 단면, 가구는 위에서 본 기호와 이름으로 그린다.
 const INK = '#2a2824';
@@ -24,6 +25,12 @@ export class PlanScene {
     this.resize = new ResizeObserver(() => this.draw());
     this.resize.observe(host);
     this.hit = (p) => {
+      const avatar = avatarLayout(this.state);
+      if (
+        avatar?.pose === 'standing' &&
+        Math.hypot(p.x - avatar.x, p.z - avatar.z) < avatar.h * 0.18
+      )
+        return { id: 'avatar', x: avatar.x, z: avatar.z };
       for (const a of [...this.state.items].sort(
         (a, b) => (a.type === 'rug') - (b.type === 'rug'),
       )) {
@@ -40,7 +47,7 @@ export class PlanScene {
       if (e.button !== 0) return;
       const p = this.point(e),
         hit = this.hit(p);
-      this.cb.select(hit?.id || null);
+      if (hit?.id !== 'avatar') this.cb.select(hit?.id || null);
       if (hit) {
         this.drag = { id: hit.id, dx: hit.x - p.x, dz: hit.z - p.z, started: false };
         this.canvas.setPointerCapture(e.pointerId);
@@ -57,7 +64,8 @@ export class PlanScene {
         this.cb.start?.();
       }
       this.canvas.style.cursor = 'grabbing';
-      this.cb.move(this.drag.id, p.x + this.drag.dx, p.z + this.drag.dz);
+      if (this.drag.id === 'avatar') this.cb.moveAvatar?.(p.x + this.drag.dx, p.z + this.drag.dz);
+      else this.cb.move(this.drag.id, p.x + this.drag.dx, p.z + this.drag.dz);
     };
     this.up = () => {
       if (this.drag) {
@@ -103,6 +111,9 @@ export class PlanScene {
   }
   setGhost(item) {
     this.ghostItem = item || null;
+    this.draw();
+  }
+  setAvatar() {
     this.draw();
   }
   anchor(id, { center = false } = {}) {
@@ -219,6 +230,38 @@ export class PlanScene {
     for (const a of items)
       this.item(c, a, { warn: this.warnings.has(a.id), selected: a.id === this.selected });
     if (this.ghostItem) this.item(c, this.ghostItem, { ghost: true });
+    this.drawAvatar(c);
+  }
+  drawAvatar(c) {
+    const a = avatarLayout(this.state);
+    if (!a) return;
+    const s = this.scale;
+    c.save();
+    c.translate(this.ox + a.x * s, this.oy + a.z * s);
+    c.rotate((-a.angle * Math.PI) / 180);
+    c.strokeStyle = '#526354';
+    c.fillStyle = '#667669';
+    c.lineCap = 'round';
+    for (const [from, to] of [...LIMBS, ['hip', 'shoulder']]) {
+      c.lineWidth = Math.max(3, a.h * (from === 'hip' ? 0.2 : 0.05) * s);
+      c.beginPath();
+      c.moveTo(a.joints[from][0] * s, a.joints[from][2] * s);
+      c.lineTo(a.joints[to][0] * s, a.joints[to][2] * s);
+      c.stroke();
+    }
+    const head = a.joints.head;
+    c.beginPath();
+    c.arc(head[0] * s, head[2] * s, Math.max(3, a.h * 0.06 * s), 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+    this.tape(
+      c,
+      `키 ${a.height} cm`,
+      this.ox + a.x * s,
+      this.oy + (a.z + (a.pose === 'lying' ? a.h / 2 : a.h * 0.25)) * s + 20,
+      0,
+      { fill: '#fbfaf7' },
+    );
   }
   item(c, a, { warn = false, selected = false, ghost = false }) {
     const s = this.scale,

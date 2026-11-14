@@ -1,4 +1,6 @@
 import { TYPES, ROOM_TYPES, makeRoom } from './catalog.js';
+import { defaultAvatar, validateAvatar } from './avatar.js';
+import { normalizeFloorplan } from './floorplan.js';
 export { TYPES, ROOM_TYPES, makeRoom } from './catalog.js';
 export const COLORS = ['#b29a80', '#e5ddcc', '#83917d', '#bc8065', '#8495a5', '#575c58'];
 export const DEFAULT_SOURCE = '유형 기본값';
@@ -21,7 +23,7 @@ export function freshState() {
   const roomId = newId();
   return {
     roomOrder: [roomId],
-    version: 3,
+    version: 4,
     roomId,
     otherRooms: [],
     name: '나의 첫 번째 방',
@@ -31,6 +33,9 @@ export function freshState() {
     dimensions: true,
     snap: true,
     view: '3d',
+    scope: 'room',
+    avatar: defaultAvatar(),
+    floorplan: { positions: { [roomId]: { x: 0, z: 0 } } },
   };
 }
 export function exampleState() {
@@ -107,7 +112,7 @@ function validateSpace(v, roomIds) {
   };
 }
 export function validateState(v) {
-  if (!v || ![1, 2, 3].includes(v.version)) throw Error('룸꾸 배치 파일인지 확인해주세요.');
+  if (!v || ![1, 2, 3, 4].includes(v.version)) throw Error('룸꾸 배치 파일인지 확인해주세요.');
   if (v.otherRooms !== undefined && (!Array.isArray(v.otherRooms) || v.otherRooms.length > 11))
     throw Error('공간은 최대 12개까지 저장할 수 있어요.');
   const ids = new Set(),
@@ -117,6 +122,9 @@ export function validateState(v) {
     ? v.roomOrder.filter((id, i, a) => ids.has(id) && a.indexOf(id) === i)
     : [];
   for (const id of ids) if (!order.includes(id)) order.push(id);
+  const list = [active, ...others].sort(
+    (a, b) => order.indexOf(a.roomId) - order.indexOf(b.roomId),
+  );
   return {
     ...freshState(),
     ...active,
@@ -126,6 +134,9 @@ export function validateState(v) {
     dimensions: v.dimensions !== false,
     snap: v.snap !== false,
     view: v.view === '2d' ? '2d' : '3d',
+    scope: v.scope === 'house' ? 'house' : 'room',
+    avatar: validateAvatar(v.avatar, list),
+    floorplan: normalizeFloorplan(v.floorplan, list),
   };
 }
 export function spaces(s) {
@@ -154,6 +165,7 @@ export function addRoom(s, type = 'studio') {
     items: [],
   });
   s.roomOrder.push(roomId);
+  s.floorplan = normalizeFloorplan(s.floorplan, spaces(s));
   switchRoom(s, roomId);
   return roomId;
 }

@@ -3,6 +3,7 @@ import { detectType } from './estimator.js';
 import { ROOM_TYPES, makeRoom } from './catalog.js';
 const roomAliases = {
   studio: /원룸|스튜디오/,
+  bathroom: /화장실|욕실/,
   living: /거실|리빙룸/,
   bedroom: /침실|안방/,
   office: /서재|작업실|홈\s*오피스/,

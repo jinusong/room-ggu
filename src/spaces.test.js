@@ -49,14 +49,14 @@ test('공간 전환·저장·복원 시 방별 치수와 가구를 보존한다'
 });
 test('이전 배치 파일을 이동하고 손상된 공간 모음과 13번째 공간을 거절한다', () => {
   const old = { version: 2, name: '이전 방', room: { w: 4, d: 3, h: 2.4 }, items: [] };
-  assert.equal(validateState(old).version, 3);
+  assert.equal(validateState(old).version, 4);
   assert.equal(validateState(old).room.d, 3);
   const s = freshState();
   assert.throws(() => validateState({ ...s, otherRooms: [{ ...s }] }));
   for (let i = 0; i < 11; i++) addRoom(s, 'bedroom');
   assert.throws(() => addRoom(s, 'office'));
   assert.equal(spaces(validateState(s)).length, 12);
-  assert.equal(Object.keys(ROOM_TYPES).length, 7);
+  assert.equal(Object.keys(ROOM_TYPES).length, 8);
 });
 test('러그 위 가구는 충돌에서 제외하고 방 밖 위치는 경고한다', () => {
   const s = freshState();

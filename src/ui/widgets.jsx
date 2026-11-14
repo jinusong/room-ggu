@@ -12,6 +12,7 @@ export function Tape({ children, source = '', title }) {
   );
 }
 export function sourceLabel(source = '') {
+  if (source === '비교용 기본값') return source;
   if (source.startsWith('사용자')) return '직접 정한 값';
   if (source.startsWith('AI') || source.includes('모델')) return '모델 단서로 고친 초안';
   if (source.startsWith('대화')) return '대화로 가늠한 초안';
@@ -110,13 +111,15 @@ export function Stepper({
           <Icon name="plus" size={16} />
         </button>
       </div>
-      <span class="stepper-source">
-        {error ? (
-          <em class="field-error">{error} 범위로 입력해 주세요</em>
-        ) : (
-          <Tape source={source}>{sourceLabel(source)}</Tape>
-        )}
-      </span>
+      {(error || source !== false) && (
+        <span class="stepper-source">
+          {error ? (
+            <em class="field-error">{error} 범위로 입력해 주세요</em>
+          ) : (
+            <Tape source={source}>{sourceLabel(source)}</Tape>
+          )}
+        </span>
+      )}
     </div>
   );
 }

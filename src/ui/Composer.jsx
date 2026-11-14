@@ -13,6 +13,8 @@ const TOOLS = [
   ['room-type', '공간 유형', 'layout-grid'],
   ['finishes', '벽과 바닥', 'paint-roller'],
   ['spaces', '내 공간', 'layers'],
+  ['floorplan', '집 전체 평면도', 'house'],
+  ['avatar', '내 키로 크기 비교', 'person-standing'],
   ['items', '이 방의 가구', 'list'],
   ['files', '저장과 불러오기', 'folder-open'],
   ['ai', '이 기기의 AI', 'cpu'],

@@ -3,6 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { furniture, disposeGroup } from './furniture.js';
 import { tapeCanvas, PAPER } from './tape.js';
+import { avatarModel } from './avatar-three.js';
+import { avatarLayout } from './avatar.js';
 export { PAPER };
 
 // 종이 위에 놓인 1:50 실내 모형처럼 보이는 3D 장면.
@@ -160,7 +162,8 @@ export class RoomScene {
     this.objects = new T.Group();
     this.overlay = new T.Group();
     this.ghost = new T.Group();
-    this.scene.add(this.room, this.objects, this.ghost, this.overlay);
+    this.comparison = new T.Group();
+    this.scene.add(this.room, this.objects, this.ghost, this.overlay, this.comparison);
     this.ray = new T.Raycaster();
     this.pointer = new T.Vector2();
     this.plane = new T.Plane(new T.Vector3(0, 1, 0), 0);
@@ -170,11 +173,32 @@ export class RoomScene {
       if (e.button !== 0) return;
       this.point(e);
       const hit = this.ray
-        .intersectObjects(this.objects.children, true)
+        .intersectObjects(
+          [
+            ...this.objects.children,
+            ...(avatarLayout(this.state)?.pose === 'standing'
+              ? this.comparison.children.filter((o) => o.userData.avatar)
+              : []),
+          ],
+          true,
+        )
         .find((h) => h.object.isMesh);
       this.press = { x: e.clientX, y: e.clientY, hit: !!hit };
       if (!hit) return;
       let obj = hit.object;
+      let root = obj;
+      while (root.parent && root.parent !== this.comparison && root.parent !== this.objects)
+        root = root.parent;
+      if (root.userData.avatar) {
+        const p = new T.Vector3(),
+          a = avatarLayout(this.state);
+        if (this.ray.ray.intersectPlane(this.plane, p)) {
+          this.drag = { id: 'avatar', dx: a.x - p.x, dz: a.z - p.z, started: false };
+          this.controls.enabled = false;
+          this.renderer.domElement.setPointerCapture(e.pointerId);
+        }
+        return;
+      }
       while (obj.parent !== this.objects) obj = obj.parent;
       this.cb.select(obj.userData.id);
       const p = new T.Vector3();
@@ -204,7 +228,8 @@ export class RoomScene {
         this.cb.start?.();
       }
       this.renderer.domElement.style.cursor = 'grabbing';
-      this.cb.move(this.drag.id, p.x + this.drag.dx, p.z + this.drag.dz);
+      if (this.drag.id === 'avatar') this.cb.moveAvatar?.(p.x + this.drag.dx, p.z + this.drag.dz);
+      else this.cb.move(this.drag.id, p.x + this.drag.dx, p.z + this.drag.dz);
     };
     this.up = (e) => {
       if (this.drag) {
@@ -272,7 +297,7 @@ export class RoomScene {
     this.camera.aspect = W / H;
     this.camera.setViewOffset(W, H, -(left - right) / 2, -(top - bottom) / 2, W, H);
     this.camera.updateProjectionMatrix();
-    for (const g of [this.room, this.overlay])
+    for (const g of [this.room, this.overlay, this.comparison])
       g?.traverse((o) => o.userData.tape && tapeScale(o, H));
     this.dirty = true;
   }
@@ -438,6 +463,18 @@ export class RoomScene {
     for (const i of this.state.items) this.objects.add(furniture(i));
     this.decorate(this.selected, this.warnings || new Set());
   }
+  setAvatar() {
+    this.clear(this.comparison);
+    const a = avatarLayout(this.state);
+    if (a) {
+      this.comparison.add(avatarModel(this.state));
+      const top = Math.max(...Object.values(a.joints).map((p) => p[1])) + a.h * 0.06;
+      const label = tapeSprite(`키 ${a.height} cm`, { fill: '#fbfaf7' }, this.height);
+      label.position.set(a.x, top + 0.16, a.z);
+      this.comparison.add(label);
+    }
+    this.dirty = true;
+  }
   moveObject(id, x, z) {
     const o = this.objects.children.find((c) => c.userData.id === id);
     if (o) o.position.set(x, 0, z);
@@ -510,7 +547,8 @@ export class RoomScene {
       ['pointercancel', this.up],
     ])
       this.renderer.domElement.removeEventListener(e, f);
-    for (const g of [this.room, this.objects, this.overlay, this.ghost]) this.clear(g);
+    for (const g of [this.room, this.objects, this.overlay, this.ghost, this.comparison])
+      this.clear(g);
     this.envMap.dispose();
     this.renderer.dispose();
   }

@@ -122,6 +122,15 @@ export const TYPES = {
   ]),
 };
 export const ROOM_TYPES = {
+  bathroom: {
+    name: '화장실',
+    icon: 'bath',
+    sizes: [
+      [1.5, 1.8, 2.4],
+      [1.8, 2.2, 2.4],
+      [2.4, 2.6, 2.4],
+    ],
+  },
   studio: {
     name: '원룸',
     icon: 'house',

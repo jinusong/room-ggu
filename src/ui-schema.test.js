@@ -56,7 +56,7 @@ test('모델 선택값을 앱 컴포넌트로 바꾸고 저장된 명세는 허�
     'draft',
   );
   const state = freshState();
-  assert.equal(state.version, 3);
+  assert.equal(state.version, 4);
 });
 
 test('마감 요청에 방 유형·크기를 지어내거나 소파의 요청하지 않은 높이를 바꾸지 않는다', () => {

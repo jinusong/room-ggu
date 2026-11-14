@@ -1,4 +1,4 @@
-// 상태 변경 연산. 모든 함수는 앱 상태(v3)를 직접 바꾸고, 대화에 보여줄 변경 내역을 돌려준다.
+// 상태 변경 연산. 모든 함수는 앱 상태(v4)를 직접 바꾸고, 대화에 보여줄 변경 내역을 돌려준다.
 // 숫자 범위·경계·충돌 검사는 여기서 끝낸다. AI와 UI는 이 함수만 호출한다.
 import {
   TYPES,
@@ -20,6 +20,8 @@ import {
   exampleState,
   DEFAULT_SOURCE,
 } from '../data.js';
+import { defaultAvatar, POSES, SEATS } from '../avatar.js';
+import { normalizeFloorplan, roomBounds, rectanglesOverlap } from '../floorplan.js';
 
 export const round2 = (n) => Math.round(n * 100) / 100;
 export const fmtM = (n) => `${round2(n)}m`;
@@ -316,7 +318,109 @@ export function deleteSpace(state, id = state.roomId) {
   if (id === state.roomId) switchRoom(state, order[index - 1] || order[index + 1]);
   state.otherRooms = state.otherRooms.filter((r) => r.roomId !== id);
   state.roomOrder = state.roomOrder.filter((x) => x !== id);
+  state.floorplan = normalizeFloorplan(state.floorplan, spaces(state));
+  if (state.avatar?.roomId === id)
+    state.avatar = { ...state.avatar, roomId: state.roomId, pose: 'standing', itemId: null };
   return name;
+}
+
+export function setAvatar(state, patch = {}, selectedId = null) {
+  const next = { ...defaultAvatar(), ...state.avatar, ...patch, roomId: state.roomId };
+  if (!Number.isFinite(next.height) || next.height < 80 || next.height > 230)
+    throw Error('키는 80~230cm로 입력해주세요.');
+  if (!Object.hasOwn(POSES, next.pose)) throw Error('아바타 자세를 골라 주세요.');
+  if (
+    ![next.x, next.z].every((n) => Number.isFinite(n) && Math.abs(n) <= 15) ||
+    !Number.isFinite(next.angle)
+  )
+    throw Error('아바타 위치는 -15~15m로 입력해주세요.');
+  next.height = Math.round(next.height * 10) / 10;
+  if (patch.height !== undefined) next.source = '사용자 설정';
+  if (patch.pose && patch.pose !== 'standing') {
+    const id = selectedId || next.itemId;
+    const item = state.items.find((a) => a.id === id);
+    if (!item || (patch.pose === 'lying' ? item.type !== 'bed' : !SEATS.has(item.type)))
+      throw Error(
+        patch.pose === 'lying'
+          ? '먼저 이 방의 침대를 골라 주세요.'
+          : '먼저 이 방의 의자·소파·라운지체어·벤치를 골라 주세요.',
+      );
+    next.itemId = item.id;
+  }
+  if (next.pose !== 'standing' && !state.items.some((a) => a.id === next.itemId))
+    next.pose = 'standing';
+  if (next.pose === 'standing') next.itemId = null;
+  next.angle = ((next.angle % 360) + 360) % 360;
+  state.avatar = next;
+  return next;
+}
+
+export function moveSpace(state, id, x, z, { snap = true } = {}) {
+  if (![x, z].every((n) => Number.isFinite(n) && Math.abs(n) <= 200))
+    throw Error('공간 위치는 -200~200m로 입력해주세요.');
+  const list = spaces(state),
+    current = list.find((r) => r.roomId === id);
+  if (!current) throw Error('공간을 찾지 못했어요.');
+  const plan = normalizeFloorplan(state.floorplan, list);
+  if (snap) {
+    x = Math.round(x * 20) / 20;
+    z = Math.round(z * 20) / 20;
+    // 인접 공간의 벽에 15cm 이내로 접근하면 맞붙인다.
+    for (const r of list.filter((r) => r.roomId !== id)) {
+      const b = roomBounds(r, plan.positions[r.roomId]);
+      const dx = [b.left - current.room.w / 2, b.right + current.room.w / 2];
+      const dz = [b.top - current.room.d / 2, b.bottom + current.room.d / 2];
+      for (const n of dx) if (Math.abs(x - n) < 0.15) x = n;
+      for (const n of dz) if (Math.abs(z - n) < 0.15) z = n;
+    }
+  }
+  const p = { x: round2(x), z: round2(z) };
+  if (Math.abs(p.x) > 200 || Math.abs(p.z) > 200)
+    throw Error('공간 위치는 -200~200m로 입력해주세요.');
+  if (
+    list.some(
+      (r) =>
+        r.roomId !== id &&
+        rectanglesOverlap(roomBounds(current, p), roomBounds(r, plan.positions[r.roomId])),
+    )
+  )
+    throw Error('공간이 겹쳐요. 빈 곳으로 옮겨 주세요.');
+  plan.positions[id] = p;
+  state.floorplan = plan;
+  return p;
+}
+
+export function attachBathroom(state) {
+  if (spaces(state).length >= 12) throw Error('공간은 최대 12개까지 저장할 수 있어요.');
+  const original = state.roomId,
+    list = spaces(state);
+  const origin = normalizeFloorplan(state.floorplan, list).positions[original];
+  const bath = makeRoom('bathroom');
+  const candidates = [
+    { x: origin.x + (state.room.w + bath.w) / 2, z: origin.z + (state.room.d - bath.d) / 2 },
+    { x: origin.x - (state.room.w + bath.w) / 2, z: origin.z + (state.room.d - bath.d) / 2 },
+    { x: origin.x, z: origin.z + (state.room.d + bath.d) / 2 },
+    { x: origin.x, z: origin.z - (state.room.d + bath.d) / 2 },
+  ];
+  const position = candidates.find(
+    (p) =>
+      Math.abs(p.x) <= 200 &&
+      Math.abs(p.z) <= 200 &&
+      list.every(
+        (r) =>
+          !rectanglesOverlap(
+            roomBounds({ room: bath }, p),
+            roomBounds(r, state.floorplan.positions[r.roomId]),
+          ),
+      ),
+  );
+  if (!position)
+    throw Error('방 옆에 화장실을 붙일 자리가 없어요. 집 전체에서 공간 위치를 먼저 조정해 주세요.');
+  const id = addSpace(state, 'bathroom');
+  state.floorplan.positions[id] = position;
+  switchSpace(state, original);
+  state.scope = 'house';
+  return id;
 }
 
 export function renameSpace(state, name) {

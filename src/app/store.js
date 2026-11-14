@@ -17,6 +17,7 @@ import { planTurn } from './planner.js';
 import { planFromModel } from './interpret.js';
 import { photoCandidates, PHOTO_CONFIDENT } from './photo.js';
 import { josa, dimsText } from './text.js';
+import { parseComparisonCommand } from '../avatar.js';
 
 export const KEY = 'room-ggu-v2';
 export const THREAD_KEY = 'room-ggu-thread-v1';
@@ -74,7 +75,7 @@ export const app = {
   },
   history: [],
   future: [],
-  scenes: { three: null, plan: null },
+  scenes: { three: null, plan: null, house: null },
   rev: 0,
   readError,
 };
@@ -524,6 +525,37 @@ export async function send(raw) {
     if (auto) analyzePhoto();
     return;
   }
+  const comparison = parseComparisonCommand(text);
+  if (comparison) {
+    try {
+      if (comparison.kind === 'floorplan') setScope('house');
+      else {
+        const id = comparison.furniture
+          ? app.state.items.find((i) => i.type === comparison.furniture)?.id
+          : app.selected;
+        const error = updateAvatar(comparison.patch, id);
+        if (error) throw Error(error);
+      }
+      finishTurn(
+        turn,
+        {
+          reply:
+            comparison.kind === 'floorplan'
+              ? '집 전체 평면도를 열었어요. 방 옆에 화장실을 붙이거나 공간을 끌어 위치를 맞춰 보세요.'
+              : `키 ${app.state.avatar.height}cm 아바타를 ${app.state.avatar.enabled ? '반영했어요' : '숨겼어요'}.`,
+          surfaces: [{ kind: comparison.kind, target: { type: 'room' } }],
+        },
+        { engine: 'app' },
+      );
+    } catch (e) {
+      finishTurn(
+        turn,
+        { reply: e.message, surfaces: [{ kind: comparison.kind, target: { type: 'room' } }] },
+        { engine: 'app' },
+      );
+    }
+    return;
+  }
   if (app.ai.text !== 'ready') {
     finishTurn(turn, withPhoto(planTurn(text, context()), extra), {
       engine: 'rule',
@@ -607,6 +639,9 @@ export function cancelModel() {
 
 // ---------- 직접 연 도구와 버튼 동작 ----------
 const TOOL_TEXT = {
+  avatar:
+    '키에 맞춘 아바타로 가구 크기를 비교해 보세요. 의자·소파·침대를 고르면 앉거나 누워 볼 수 있어요.',
+  floorplan: '방과 화장실을 한 도면에서 배치해 보세요. 공간을 끌면 맞닿는 벽에 붙어요.',
   'room-size': '방 크기를 정해 볼까요? 숫자를 바로 고치거나 “가로 4m 세로 3m”처럼 말해도 돼요.',
   'room-type': '어떤 공간인가요? 유형을 바꾸면 직접 정한 치수는 그대로 두고 나머지만 바꿔요.',
   finishes: '벽과 바닥을 골라 보세요. 바꾸기 전과 후를 나란히 보여드려요.',
@@ -623,6 +658,8 @@ const TOOL_TEXT = {
   photo: '가구 사진을 올려 주세요.',
 };
 const TOOL_LABEL = {
+  avatar: '내 키로 크기 비교',
+  floorplan: '집 전체 평면도',
   'room-size': '방 크기 열기',
   'room-type': '공간 유형 열기',
   finishes: '벽·바닥 열기',
@@ -639,6 +676,8 @@ const TOOL_LABEL = {
 };
 export function openTool(kind, { echo = true, target } = {}) {
   if (!Object.hasOwn(SURFACE_KINDS, kind)) return;
+  if (kind === 'floorplan') app.state.scope = 'house';
+  if (kind === 'avatar') app.state.scope = 'room';
   const scope = SURFACE_KINDS[kind].scope;
   let t = target || (scope === 'furniture' ? app.target : roomTarget());
   if (scope === 'furniture' && !subject(t)) {
@@ -656,7 +695,47 @@ export function openTool(kind, { echo = true, target } = {}) {
     uiBy: 'user',
   });
   saveThread();
+  persist();
   emit();
+}
+
+function comparisonEdit(change, { live = false } = {}) {
+  const next = structuredClone(app.state);
+  change(next);
+  if (!live) snapshot();
+  Object.assign(app.state, next);
+  commit();
+}
+export function updateAvatar(patch, id = app.selected, opts = {}) {
+  try {
+    comparisonEdit((s) => ops.setAvatar(s, patch, id), opts);
+  } catch (e) {
+    toast(e.message);
+    return e.message;
+  }
+}
+export function setScope(scope) {
+  app.state.scope = scope === 'house' ? 'house' : 'room';
+  app.selected = null;
+  app.target = { type: 'room' };
+  commit();
+}
+export function moveSpace(id, x, z, opts = {}) {
+  try {
+    comparisonEdit((s) => ops.moveSpace(s, id, x, z, { snap: !opts.exact }), opts);
+  } catch (e) {
+    if (!opts.live) toast(e.message);
+  }
+}
+export function attachBathroom() {
+  try {
+    comparisonEdit((s) => ops.attachBathroom(s));
+    event('화장실을 방 옆에 붙였어요 · 연결 문과 설비는 위치를 가늠하기 위한 초안이에요');
+    persist();
+    emit();
+  } catch (e) {
+    toast(e.message);
+  }
 }
 
 export function runSuggestion(sug) {
@@ -970,7 +1049,12 @@ export async function importJSON(file) {
 }
 export function exportPNG() {
   try {
-    const sc = app.state.view === '2d' ? app.scenes.plan : app.scenes.three;
+    const sc =
+      app.state.scope === 'house'
+        ? app.scenes.house
+        : app.state.view === '2d'
+          ? app.scenes.plan
+          : app.scenes.three;
     const url = sc?.png();
     if (!url) throw Error('현재 화면을 저장하지 못했어요.');
     download(url, `${app.state.name}-배치.png`);
@@ -1197,6 +1281,15 @@ onAIStatus((data) => {
 
 // ---------- 도면 콜백 ----------
 export const sceneCallbacks = {
+  moveAvatar: (x, z) => {
+    const mx = app.state.room.w / 2,
+      mz = app.state.room.d / 2;
+    ops.setAvatar(app.state, {
+      x: Math.max(-mx, Math.min(mx, x)),
+      z: Math.max(-mz, Math.min(mz, z)),
+    });
+    emit();
+  },
   select: (id) => select(id),
   start: () => snapshot(),
   move: (id, x, z) => {
@@ -1211,6 +1304,7 @@ export const sceneCallbacks = {
     ops.updateItem(app.state, id, a);
     const moved = app.state.items.find((i) => i.id === id);
     app.scenes.three?.moveObject(id, moved.x, moved.z);
+    app.scenes.three?.setAvatar();
     app.scenes.plan?.draw();
     app.rev++;
     for (const fn of subs) fn('move');

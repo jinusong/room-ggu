@@ -14,6 +14,8 @@ import * as store from '../app/store.js';
 import { app } from '../app/store.js';
 import { findFreeSpot, fitStatus, clearance, pyeong, wallName, floorName } from '../app/ops.js';
 import { josa } from '../app/text.js';
+import { avatarLayout, POSES, SEATS } from '../avatar.js';
+import { floorplanWarnings } from '../floorplan.js';
 import { Icon } from './icons.js';
 import { Stepper, MiniPlan, Corner, Silhouette, FitBadge, Tape, sourceLabel } from './widgets.jsx';
 
@@ -30,6 +32,189 @@ function Head({ icon, title, meta, children }) {
   );
 }
 const SIZE_NAMES = ['아담하게', '기본', '넉넉하게'];
+
+function Avatar() {
+  const s = app.state,
+    a = s.avatar,
+    layout = avatarLayout(s);
+  const candidates = s.items.filter((i) => i.type === 'bed' || SEATS.has(i.type));
+  const targetFor = (pose) => {
+    const accepts = (i) => (pose === 'lying' ? i.type === 'bed' : SEATS.has(i.type));
+    return (
+      candidates.find((i) => i.id === app.selected && accepts(i)) ||
+      candidates.find((i) => i.id === a.itemId && accepts(i)) ||
+      candidates.find(accepts)
+    );
+  };
+  return (
+    <>
+      <Head
+        icon="person-standing"
+        title="내 키로 크기 비교"
+        meta={layout ? `${a.height}cm · ${POSES[layout.pose]}` : '선택 기능'}
+      />
+      <p class="surface-hint">
+        가구와 같은 축척의 아바타예요. 키를 입력하거나 “내 키 175cm야”라고 말해 보세요.
+      </p>
+      <Stepper
+        label="내 키"
+        ariaLabel="아바타 키"
+        value={a.height}
+        unit="cm"
+        min={80}
+        max={230}
+        step={1}
+        source={a.source}
+        onFocus={() => store.beginEdit('avatar-height')}
+        onBlur={store.endEdit}
+        onLive={(height) => store.updateAvatar({ height, enabled: true }, null, { live: true })}
+        onCommit={(height) => store.updateAvatar({ height, enabled: true })}
+      />
+      <div class="comparison-poses" role="group" aria-label="아바타 자세">
+        {Object.entries(POSES).map(([pose, label]) => (
+          <button
+            class={`btn small ${layout?.pose === pose ? 'primary' : ''}`}
+            aria-pressed={layout?.pose === pose}
+            disabled={pose !== 'standing' && !targetFor(pose)}
+            onClick={() => store.updateAvatar({ pose, enabled: true }, targetFor(pose)?.id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <label class="comparison-select">
+        비교할 가구
+        <select
+          aria-label="아바타와 비교할 가구"
+          value={layout?.item?.id || ''}
+          onChange={(e) => {
+            const item = candidates.find((i) => i.id === e.currentTarget.value);
+            store.updateAvatar(
+              {
+                pose: item ? (item.type === 'bed' ? 'lying' : 'sitting') : 'standing',
+                enabled: true,
+              },
+              item?.id,
+            );
+          }}
+        >
+          <option value="">바닥에 서 있기</option>
+          {candidates.map((i) => (
+            <option value={i.id}>
+              {i.name} · {i.dims[0]} × {i.dims[2]}cm
+            </option>
+          ))}
+        </select>
+      </label>
+      {!candidates.length && (
+        <p class="surface-hint">의자·소파·침대를 방에 놓으면 앉거나 누울 수 있어요.</p>
+      )}
+      {layout?.warnings.map((w) => (
+        <p class="warn-text" role="status">
+          {w}
+        </p>
+      ))}
+      <footer class="surface-foot">
+        <span class="foot-note">서 있는 아바타는 끌어 옮길 수 있어요</span>
+        <button class="btn small" onClick={() => store.updateAvatar({ enabled: !layout })}>
+          {layout ? '아바타 숨기기' : '이 방에 표시'}
+        </button>
+      </footer>
+      <p class="surface-hint">
+        신체 비율과 착석 높이를 단순화했어요. 실제 착석감과 침대의 사용 가능 길이는 제품에서 확인해
+        주세요.
+      </p>
+    </>
+  );
+}
+
+function Floorplan() {
+  const s = app.state,
+    list = spaces(s),
+    conflicts = floorplanWarnings(list, s.floorplan);
+  return (
+    <>
+      <Head
+        icon="house"
+        title="집 전체 평면도"
+        meta={`${list.length}개 공간 · ${list.reduce((sum, r) => sum + r.room.w * r.room.d, 0).toFixed(1)}m²`}
+      />
+      <p class="surface-hint">
+        공간을 끌어 옮겨 집 모양을 맞춰 보세요. 맞닿은 벽의 문과 화장실 설비는 배치 초안이에요.
+      </p>
+      <div class="comparison-poses">
+        <button class="btn small primary" onClick={() => store.setScope('house')}>
+          집 전체 보기
+        </button>
+        <button class="btn small" disabled={list.length >= 12} onClick={store.attachBathroom}>
+          이 방 옆에 화장실 붙이기
+        </button>
+      </div>
+      {conflicts.size > 0 && (
+        <p class="warn-text" role="status">
+          공간 {conflicts.size}개가 겹쳐요. 크기나 위치를 조정해 주세요.
+        </p>
+      )}
+      <div class="house-rooms">
+        {list.map((r) => {
+          const p = s.floorplan.positions[r.roomId];
+          return (
+            <div class={`house-room ${r.roomId === s.roomId ? 'is-active' : ''}`} key={r.roomId}>
+              <div class="house-room-head">
+                <Icon name={ROOM_TYPES[r.room.type].icon} size={16} />
+                <strong>{r.name}</strong>
+                <button
+                  class="link"
+                  aria-label={`${r.name} 편집`}
+                  onClick={() => {
+                    store.switchSpace(r.roomId);
+                    store.setScope('room');
+                  }}
+                >
+                  방 편집
+                </button>
+              </div>
+              <small class="mono">
+                {r.room.w} × {r.room.d}m · 가구 {r.items.length}개
+              </small>
+              <div class="house-position">
+                {['x', 'z'].map((k) => (
+                  <Stepper
+                    key={k}
+                    label={k === 'x' ? '좌우' : '위아래'}
+                    ariaLabel={`${r.name} ${k === 'x' ? '좌우' : '위아래'} 위치`}
+                    value={p[k]}
+                    unit="m"
+                    source={false}
+                    step={0.1}
+                    min={-200}
+                    max={200}
+                    onFocus={() => store.beginEdit(`position-${r.roomId}-${k}`)}
+                    onBlur={store.endEdit}
+                    onLive={(v) =>
+                      store.moveSpace(r.roomId, k === 'x' ? v : p.x, k === 'z' ? v : p.z, {
+                        live: true,
+                        exact: true,
+                      })
+                    }
+                    onCommit={(v) =>
+                      store.moveSpace(r.roomId, k === 'x' ? v : p.x, k === 'z' ? v : p.z, {
+                        exact: true,
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p class="surface-hint">
+        좌표는 공간의 중심이에요. 방별 2D·3D에서 가구와 크기를 편집하면 집 전체에도 반영돼요.
+      </p>
+    </>
+  );
+}
 
 function RoomSize() {
   const s = app.state,
@@ -915,6 +1100,8 @@ function OtherSpace({ roomId }) {
 }
 
 const BODIES = {
+  avatar: Avatar,
+  floorplan: Floorplan,
   'room-size': RoomSize,
   'room-type': RoomType,
   finishes: Finishes,
@@ -935,6 +1122,10 @@ export function surfaceSummary(spec) {
   const s = app.state;
   const item = store.subject(spec.target);
   switch (spec.kind) {
+    case 'avatar':
+      return `${s.avatar.height}cm · ${POSES[s.avatar.pose]}`;
+    case 'floorplan':
+      return `${spaces(s).length}개 공간`;
     case 'room-size':
       return `${s.room.w} × ${s.room.d} × ${s.room.h}m`;
     case 'room-type':

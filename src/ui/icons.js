@@ -67,8 +67,12 @@ import {
   ChevronRight,
   CornerDownRight,
   Pencil,
+  Bath,
+  PersonStanding,
 } from 'lucide';
 const MAP = {
+  bath: Bath,
+  'person-standing': PersonStanding,
   ruler: Ruler,
   'layout-grid': LayoutGrid,
   'paint-roller': PaintRoller,
