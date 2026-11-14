@@ -4,7 +4,7 @@ export default defineConfig({
   plugins: [{
     name: 'build-version',
     generateBundle() {
-      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version: '5.2.0', commit: process.env.GITHUB_SHA || 'local' }) });
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version: '5.3.0', commit: process.env.GITHUB_SHA || 'local' }) });
     },
   }, {
     name: 'omit-unused-onnx-wasm',

@@ -140,12 +140,22 @@ function Floorplan() {
         meta={`${list.length}개 공간 · ${list.reduce((sum, r) => sum + r.room.w * r.room.d, 0).toFixed(1)}m²`}
       />
       <p class="surface-hint">
-        공간을 끌어 옮겨 집 모양을 맞춰 보세요. 맞닿은 벽의 문과 화장실 설비는 배치 초안이에요.
+        2D에서 공간을 끌어 집 모양을 맞추고, 3D에서 함께 둘러보세요. 벽은 내부가 보이도록 낮췄고
+        문·화장실 설비는 배치 초안이에요.
       </p>
       <div class="comparison-poses">
-        <button class="btn small primary" onClick={() => store.setScope('house')}>
-          집 전체 보기
-        </button>
+        {['2d', '3d'].map((view) => (
+          <button
+            class={`btn small ${s.scope === 'house' && s.view === view ? 'primary' : ''}`}
+            aria-pressed={s.scope === 'house' && s.view === view}
+            onClick={() => {
+              store.setScope('house');
+              store.setView(view);
+            }}
+          >
+            {view === '2d' ? '2D 평면도' : '3D 모형'}
+          </button>
+        ))}
         <button class="btn small" disabled={list.length >= 12} onClick={store.attachBathroom}>
           이 방 옆에 화장실 붙이기
         </button>

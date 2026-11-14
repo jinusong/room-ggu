@@ -5,6 +5,9 @@ import { furniture, disposeGroup } from './furniture.js';
 import { tapeCanvas, PAPER } from './tape.js';
 import { avatarModel } from './avatar-three.js';
 import { avatarLayout } from './avatar.js';
+import { spaces } from './data.js';
+import { houseLayout } from './house-geometry.js';
+import { houseStructure, houseFurniture, bathroomModel } from './house-three.js';
 export { PAPER };
 
 // 종이 위에 놓인 1:50 실내 모형처럼 보이는 3D 장면.
@@ -157,6 +160,7 @@ export class RoomScene {
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.081;
     ground.receiveShadow = true;
+    this.ground = ground;
     this.scene.add(ground);
     this.room = new T.Group();
     this.objects = new T.Group();
@@ -171,6 +175,10 @@ export class RoomScene {
     this.press = null;
     this.down = (e) => {
       if (e.button !== 0) return;
+      if (this.state.scope === 'house') {
+        this.press = { x: e.clientX, y: e.clientY, house: true };
+        return;
+      }
       this.point(e);
       const hit = this.ray
         .intersectObjects(
@@ -211,6 +219,10 @@ export class RoomScene {
       }
     };
     this.move = (e) => {
+      if (this.state.scope === 'house') {
+        if (!e.buttons) this.renderer.domElement.style.cursor = this.pickRoom(e) ? 'pointer' : '';
+        return;
+      }
       if (!this.drag) {
         if (e.buttons) return;
         this.point(e);
@@ -232,6 +244,14 @@ export class RoomScene {
       else this.cb.move(this.drag.id, p.x + this.drag.dx, p.z + this.drag.dz);
     };
     this.up = (e) => {
+      if (this.press?.house) {
+        if (Math.hypot(e.clientX - this.press.x, e.clientY - this.press.y) < 5) {
+          const id = this.pickRoom(e);
+          if (id) this.cb.selectSpace?.(id);
+        }
+        this.press = null;
+        return;
+      }
       if (this.drag) {
         const started = this.drag.started;
         this.drag = null;
@@ -246,11 +266,18 @@ export class RoomScene {
         this.cb.select(null);
       this.press = null;
     };
+    this.double = (e) => {
+      if (this.state.scope === 'house') {
+        const id = this.pickRoom(e);
+        if (id) this.cb.editSpace?.(id);
+      }
+    };
     const canvas = this.renderer.domElement;
     canvas.addEventListener('pointerdown', this.down);
     canvas.addEventListener('pointermove', this.move);
     canvas.addEventListener('pointerup', this.up);
     canvas.addEventListener('pointercancel', this.up);
+    canvas.addEventListener('dblclick', this.double);
     this.resize = new ResizeObserver(() => {
       const { width, height } = host.getBoundingClientRect();
       if (width < 1 || height < 1) return;
@@ -275,12 +302,32 @@ export class RoomScene {
     });
   }
   point(e) {
+    this.camera.updateMatrixWorld();
     const r = this.renderer.domElement.getBoundingClientRect();
     this.pointer.set(
       ((e.clientX - r.left) / r.width) * 2 - 1,
       (-(e.clientY - r.top) / r.height) * 2 + 1,
     );
     this.ray.setFromCamera(this.pointer, this.camera);
+  }
+  pickRoom(e) {
+    this.room.updateMatrixWorld(true);
+    this.objects.updateMatrixWorld(true);
+    this.point(e);
+    for (const hit of this.ray.intersectObjects(
+      [...this.room.children, ...this.objects.children],
+      true,
+    )) {
+      let o = hit.object;
+      while (o && !o.userData.roomId) o = o.parent;
+      if (o?.userData.roomId) return o.userData.roomId;
+    }
+    return null;
+  }
+  extent() {
+    return this.state.scope === 'house'
+      ? houseLayout(this.state)
+      : { ...this.state.room, x: 0, z: 0 };
   }
   setInsets(insets) {
     const next = { left: 0, right: 0, top: 0, bottom: 0, ...insets };
@@ -309,6 +356,46 @@ export class RoomScene {
   }
   renderRoom() {
     this.clear(this.room);
+    if (this.state.scope === 'house') {
+      this.renderer.domElement.setAttribute(
+        'aria-label',
+        '집 전체 3D 모형. 끌어 시점을 돌리고 공간을 두 번 누르면 방을 편집해요.',
+      );
+      const layout = this.extent(),
+        span = Math.max(layout.w, layout.d, 4);
+      this.room.add(houseStructure(this.state, { tapeSprite, plankTexture, height: this.height }));
+      this.roomTapes = [];
+      Object.assign(this.sun.shadow.camera, {
+        left: -span,
+        right: span,
+        top: span,
+        bottom: -span,
+        near: 0.5,
+        far: span * 4 + 40,
+      });
+      this.sun.shadow.camera.updateProjectionMatrix();
+      this.sun.position.set(
+        layout.x + span * 0.5 + 2,
+        Math.max(9, span),
+        layout.z + span * 0.7 + 3,
+      );
+      this.sun.target.position.set(layout.x, 0, layout.z);
+      this.ground.position.set(layout.x, -0.081, layout.z);
+      this.ground.scale.setScalar(Math.max(1, span / 40));
+      this.camera.far = Math.max(200, span * 20);
+      this.camera.updateProjectionMatrix();
+      this.dirty = true;
+      return;
+    }
+    this.renderer.domElement.setAttribute(
+      'aria-label',
+      '3D 방 모형. 가구를 끌어 옮기고, 빈 곳을 끌어 시점을 돌려요.',
+    );
+    this.sun.target.position.set(0, 0, 0);
+    this.ground.position.set(0, -0.081, 0);
+    this.ground.scale.setScalar(1);
+    this.camera.far = 200;
+    this.camera.updateProjectionMatrix();
     const { w, d, h, wallColor, floorColor } = this.state.room;
     const span = Math.max(w, d);
     if (this.lastSpan && Math.abs(this.lastSpan - span) > 0.01 && !this.userMoved) this.home();
@@ -326,6 +413,7 @@ export class RoomScene {
     const edge = new T.MeshStandardMaterial({ color: '#d8d2c5', roughness: 1 });
     const cap = new T.MeshStandardMaterial({ color: INK, roughness: 0.9 });
     const map = plankTexture(floorColor).clone();
+    map.userData.shared = false;
     map.repeat.set(w / 1.6, d / 1.6);
     map.needsUpdate = true;
     const top = new T.MeshStandardMaterial({ color: '#ffffff', map, roughness: 0.82 });
@@ -424,10 +512,11 @@ export class RoomScene {
       for (const t of this.roomTapes) t.visible = !this.selected;
       this.room.add(wl, dl, hl);
     }
+    if (this.state.room.type === 'bathroom') this.room.add(bathroomModel(this.state.room));
     this.dirty = true;
   }
   fitDistance() {
-    const { w, d, h } = this.state.room;
+    const { w, d, h } = this.extent();
     const { left, right, top, bottom } = this.insets;
     const W = this.width,
       H = this.height;
@@ -439,8 +528,8 @@ export class RoomScene {
   }
   home() {
     this.userMoved = false;
-    const h = this.state.room.h;
-    this.controls.target.set(0, h * 0.28, 0);
+    const { h, x, z } = this.extent();
+    this.controls.target.set(x, h * 0.28, z);
     const dir = new T.Vector3(0.66, 0.62, 0.8).normalize();
     this.camera.position.copy(this.controls.target).addScaledVector(dir, this.fitDistance());
     this.controls.maxDistance = Math.max(30, this.fitDistance() * 3);
@@ -449,8 +538,9 @@ export class RoomScene {
   }
   top() {
     this.userMoved = true;
-    this.controls.target.set(0, 0, 0);
-    this.camera.position.set(0, this.fitDistance() * 1.1, 0.001);
+    const { x, z } = this.extent();
+    this.controls.target.set(x, 0, z);
+    this.camera.position.set(x, this.fitDistance() * 1.1, z + 0.001);
     this.dirty = true;
   }
   zoom(f) {
@@ -460,17 +550,27 @@ export class RoomScene {
   }
   sync() {
     this.clear(this.objects);
-    for (const i of this.state.items) this.objects.add(furniture(i));
+    if (this.state.scope === 'house') this.objects.add(houseFurniture(this.state));
+    else for (const i of this.state.items) this.objects.add(furniture(i));
     this.decorate(this.selected, this.warnings || new Set());
   }
   setAvatar() {
     this.clear(this.comparison);
-    const a = avatarLayout(this.state);
+    const house = this.state.scope === 'house';
+    const space =
+      house &&
+      spaces(this.state).find((r) => r.roomId === (this.state.avatar?.roomId || this.state.roomId));
+    const context = space ? { ...this.state, ...space } : this.state;
+    const offset = space ? this.state.floorplan.positions[space.roomId] : { x: 0, z: 0 };
+    const a = avatarLayout(context);
     if (a) {
-      this.comparison.add(avatarModel(this.state));
+      const model = avatarModel(context);
+      model.position.x += offset.x;
+      model.position.z += offset.z;
+      this.comparison.add(model);
       const top = Math.max(...Object.values(a.joints).map((p) => p[1])) + a.h * 0.06;
       const label = tapeSprite(`키 ${a.height} cm`, { fill: '#fbfaf7' }, this.height);
-      label.position.set(a.x, top + 0.16, a.z);
+      label.position.set(a.x + offset.x, top + 0.16, a.z + offset.z);
       this.comparison.add(label);
     }
     this.dirty = true;
@@ -482,7 +582,8 @@ export class RoomScene {
   }
   setGhost(item) {
     this.clear(this.ghost);
-    this.ghostItem = item || null;
+    this.ghostItem = this.state.scope === 'house' ? null : item || null;
+    item = this.ghostItem;
     if (item) {
       this.ghost.add(furniture(item, { ghost: true }));
       this.ghost.add(frame(item, INK, 0.05, true));
@@ -495,6 +596,10 @@ export class RoomScene {
     // 가구를 고르면 방 치수 라벨을 숨겨 가구 치수와 겹치지 않게 한다.
     for (const t of this.roomTapes || []) t.visible = !id;
     this.clear(this.overlay);
+    if (this.state.scope === 'house') {
+      this.dirty = true;
+      return;
+    }
     for (const a of this.state.items) {
       const warn = warnings.has(a.id);
       if (a.id === id || warn)
@@ -529,6 +634,18 @@ export class RoomScene {
       visible: v.z < 1 && Math.abs(v.x) <= 1.05 && Math.abs(v.y) <= 1.05,
     };
   }
+  roomAnchor(id) {
+    this.camera.updateMatrixWorld();
+    const p = this.state.floorplan.positions[id];
+    if (!p) return null;
+    const v = new T.Vector3(p.x, 0.15, p.z).project(this.camera),
+      r = this.renderer.domElement.getBoundingClientRect();
+    return {
+      x: r.left + ((v.x + 1) / 2) * r.width,
+      y: r.top + ((1 - v.y) / 2) * r.height,
+      visible: v.z < 1 && Math.abs(v.x) < 1 && Math.abs(v.y) < 1,
+    };
+  }
   invalidate() {
     this.dirty = true;
   }
@@ -545,6 +662,7 @@ export class RoomScene {
       ['pointermove', this.move],
       ['pointerup', this.up],
       ['pointercancel', this.up],
+      ['dblclick', this.double],
     ])
       this.renderer.domElement.removeEventListener(e, f);
     for (const g of [this.room, this.objects, this.overlay, this.ghost, this.comparison])

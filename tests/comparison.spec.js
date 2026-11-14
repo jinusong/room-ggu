@@ -31,6 +31,7 @@ test('3D와 자동 저장이 막혀도 키 비교·집 도면·대화가 동작�
   await page.getByRole('button', { name: '눕기', exact: true }).click();
   await expect(page.locator('[data-surface=avatar]')).toContainText('175cm');
   await say(page, '집 전체 평면도');
+  await page.locator('[data-view="2d"]').click();
   await page.getByRole('button', { name: '이 방 옆에 화장실 붙이기' }).click();
   await expect(page.locator('#viewport-house canvas')).toBeVisible();
   await expect(page.locator('.save-state')).toContainText('자동 저장 불가');
@@ -50,6 +51,7 @@ test('새 도구를 1440·390·320px에서 조작해 화면을 기록한다', as
   await page.waitForTimeout(200);
   await page.screenshot({ path: 'test-results/avatar-lying.png' });
   await say(page, '집 전체 평면도');
+  await page.locator('[data-view="2d"]').click();
   await page.getByRole('button', { name: '이 방 옆에 화장실 붙이기' }).click();
   await page.waitForTimeout(350);
   await page.screenshot({ path: 'test-results/whole-house.png' });
@@ -142,6 +144,7 @@ test('집 전체에 화장실을 붙이고 실제 드래그·편집·파일 왕�
   await ready(page);
   const before = await stored(page);
   await say(page, '집 전체 평면도 보여줘');
+  await page.locator('[data-view="2d"]').click();
   await expect(page.locator('#viewport-house canvas')).toBeVisible();
   await page.getByRole('button', { name: '이 방 옆에 화장실 붙이기' }).click();
   let s = await stored(page);
@@ -167,6 +170,7 @@ test('집 전체에 화장실을 붙이고 실제 드래그·편집·파일 왕�
   });
   expect(await stored(page)).toEqual(current);
   await page.getByRole('button', { name: '선택한 방 편집' }).click();
+  await page.locator('[data-view="3d"]').click();
   await expect(page.locator('#viewport-3d canvas')).toBeVisible();
   expect((await stored(page)).room.type).toBe('bathroom');
 });
@@ -183,6 +187,7 @@ for (const size of [
     await expect(page.locator('[data-surface=avatar]')).toBeVisible();
     await page.getByRole('button', { name: '눕기', exact: true }).click();
     await say(page, '집 전체 평면도');
+    await page.locator('[data-view="2d"]').click();
     await page.getByRole('button', { name: '이 방 옆에 화장실 붙이기' }).click();
     await expect(page.locator('#viewport-house canvas')).toBeVisible();
     await expect(page.locator('#chat-input')).toBeInViewport();

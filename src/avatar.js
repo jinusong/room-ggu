@@ -148,6 +148,10 @@ export function parseComparisonCommand(text) {
             : null,
     };
   }
-  if (/(집\s*전체|전체\s*평면도|집\s*평면도)/.test(text)) return { kind: 'floorplan' };
+  if (/(집\s*전체|전체\s*평면도|집\s*평면도)/.test(text))
+    return {
+      kind: 'floorplan',
+      ...(/3d|입체/i.test(text) ? { view: '3d' } : /2d/i.test(text) ? { view: '2d' } : {}),
+    };
   return null;
 }

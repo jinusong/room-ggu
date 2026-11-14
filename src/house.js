@@ -2,6 +2,7 @@ import { PlanScene } from './plan.js';
 import { spaces } from './data.js';
 import { floorplanWarnings, normalizeFloorplan, roomBounds, sharedOpening } from './floorplan.js';
 import { PAPER } from './tape.js';
+import { bathroomFixtures } from './house-geometry.js';
 
 const INK = '#2a2824';
 export class HouseScene extends PlanScene {
@@ -212,22 +213,17 @@ export class HouseScene extends PlanScene {
     c.fillStyle = '#fbfaf7';
     c.lineWidth = 1.5;
     const scale = this.scale;
-    c.beginPath();
-    c.roundRect(
-      x + w * 0.15,
-      y + d * 0.25,
-      Math.min(0.4 * scale, w * 0.25),
-      Math.min(0.65 * scale, d * 0.3),
-      6,
-    );
-    c.fill();
-    c.stroke();
-    c.beginPath();
-    c.ellipse(x + w * 0.72, y + d * 0.4, w * 0.12, d * 0.08, 0, 0, Math.PI * 2);
-    c.fill();
-    c.stroke();
-    c.setLineDash([3, 3]);
-    c.strokeRect(x + w * 0.52, y + d * 0.62, w * 0.36, d * 0.23);
+    for (const f of bathroomFixtures({ w: w / scale, d: d / scale })) {
+      const cx = x + w / 2 + f.x * scale,
+        cy = y + d / 2 + f.z * scale;
+      c.beginPath();
+      if (f.type === 'basin')
+        c.ellipse(cx, cy, (f.w * scale) / 2, (f.d * scale) / 2, 0, 0, Math.PI * 2);
+      else c.roundRect(cx - (f.w * scale) / 2, cy - (f.d * scale) / 2, f.w * scale, f.d * scale, 4);
+      c.setLineDash(f.type === 'shower' ? [3, 3] : []);
+      c.fill();
+      c.stroke();
+    }
     c.restore();
   }
   anchor(id) {

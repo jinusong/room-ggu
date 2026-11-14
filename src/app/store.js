@@ -528,8 +528,10 @@ export async function send(raw) {
   const comparison = parseComparisonCommand(text);
   if (comparison) {
     try {
-      if (comparison.kind === 'floorplan') setScope('house');
-      else {
+      if (comparison.kind === 'floorplan') {
+        setScope('house');
+        if (comparison.view) setView(comparison.view);
+      } else {
         const id = comparison.furniture
           ? app.state.items.find((i) => i.type === comparison.furniture)?.id
           : app.selected;
@@ -541,7 +543,7 @@ export async function send(raw) {
         {
           reply:
             comparison.kind === 'floorplan'
-              ? '집 전체 평면도를 열었어요. 방 옆에 화장실을 붙이거나 공간을 끌어 위치를 맞춰 보세요.'
+              ? '집 전체를 열었어요. 2D에서 공간을 배치하고, 3D에서 화장실과 가구를 함께 둘러보세요.'
               : `키 ${app.state.avatar.height}cm 아바타를 ${app.state.avatar.enabled ? '반영했어요' : '숨겼어요'}.`,
           surfaces: [{ kind: comparison.kind, target: { type: 'room' } }],
         },
@@ -641,7 +643,7 @@ export function cancelModel() {
 const TOOL_TEXT = {
   avatar:
     '키에 맞춘 아바타로 가구 크기를 비교해 보세요. 의자·소파·침대를 고르면 앉거나 누워 볼 수 있어요.',
-  floorplan: '방과 화장실을 한 도면에서 배치해 보세요. 공간을 끌면 맞닿는 벽에 붙어요.',
+  floorplan: '방과 화장실을 2D·3D로 함께 보세요. 공간 위치는 2D에서 끌어 맞출 수 있어요.',
   'room-size': '방 크기를 정해 볼까요? 숫자를 바로 고치거나 “가로 4m 세로 3m”처럼 말해도 돼요.',
   'room-type': '어떤 공간인가요? 유형을 바꾸면 직접 정한 치수는 그대로 두고 나머지만 바꿔요.',
   finishes: '벽과 바닥을 골라 보세요. 바꾸기 전과 후를 나란히 보여드려요.',
@@ -1050,11 +1052,11 @@ export async function importJSON(file) {
 export function exportPNG() {
   try {
     const sc =
-      app.state.scope === 'house'
-        ? app.scenes.house
-        : app.state.view === '2d'
-          ? app.scenes.plan
-          : app.scenes.three;
+      app.state.view === '3d'
+        ? app.scenes.three
+        : app.state.scope === 'house'
+          ? app.scenes.house
+          : app.scenes.plan;
     const url = sc?.png();
     if (!url) throw Error('현재 화면을 저장하지 못했어요.');
     download(url, `${app.state.name}-배치.png`);
