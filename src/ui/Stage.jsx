@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { TYPES, ROOM_TYPES } from '../catalog.js';
 import { layoutWarnings, spaces } from '../data.js';
+import { roomOpenings } from '../floorplan.js';
 import { avatarLayout, avatarSpace, poseAccepts, POSES } from '../avatar.js';
 import { PlanScene } from '../plan.js';
 import { HouseScene } from '../house.js';
@@ -345,7 +346,8 @@ function AvatarTag({ mobile }) {
           return home ? avatarLayout({ ...s, ...home }) : null;
         })()
       : avatarLayout(s);
-  if (!layout) return null;
+  // 아바타가 올라간 가구를 고른 동안에는 가구 도구 막대가 그 자리를 쓰므로 이름표를 숨긴다.
+  if (!layout || (!house && app.selected && layout.item?.id === app.selected)) return null;
   const set = a.source === '사용자 설정',
     text = `키 ${a.height}cm`;
   const data = { 'data-tag-kind': set ? 'set' : 'draft', 'data-tag-text': text };
@@ -432,6 +434,27 @@ function AvatarTag({ mobile }) {
   );
 }
 const POSE_SHORT = { standing: '서기', sitting: '앉기', lying: '눕기' };
+
+// 방 편집 화면의 문 이름표. 문 너머가 어느 공간인지 알리고, 누르면 그 공간으로 간다.
+function DoorTags() {
+  const s = app.state;
+  return roomOpenings(spaces(s), s.floorplan, s.roomId).map((o) => (
+    <button
+      key={o.roomId}
+      class="stage-tag door-tag"
+      data-door-tag={o.roomId}
+      data-tag-kind="room"
+      data-tag-text={`${o.name} 문`}
+      aria-label={`${o.name}(으)로 가는 문 · 그 공간 편집`}
+      title="문 위치는 초안이에요 · 누르면 그 공간으로 가요"
+      onClick={() => store.editSpace(o.roomId)}
+    >
+      <Icon name={ROOM_TYPES[o.type].icon} size={14} />
+      <span class="tag-name">{o.name}</span>
+      <Icon name="arrow-right" size={14} />
+    </button>
+  ));
+}
 
 // 집 전체에서 공간마다 붙는 이름표. 고른 공간의 이름표에서 바로 방 편집으로 들어간다.
 function RoomTags() {
@@ -546,12 +569,19 @@ export function Stage({ mobile, sheetRef }) {
         el.style.visibility = 'hidden';
         continue;
       }
-      // 좁은 공간에서는 이름을 남기고 크기 표시를 먼저 접는다.
-      const room = p.corner && !el.classList.contains('is-selected') ? p.width - 16 : Infinity;
+      // 좁은 공간에서는 이름을 남기고 크기 표시를 먼저 접는다. 글자 수로 어림해 매 프레임 바뀌지 않게 한다.
+      const room = p.corner && !el.classList.contains('is-selected') ? p.width - 16 : Infinity,
+        name = el.querySelector('.tag-name')?.textContent.length || 0;
       el.style.maxWidth = Number.isFinite(room) ? `${Math.max(44, Math.round(room))}px` : '';
-      el.classList.toggle('is-narrow', room < 150);
+      el.classList.toggle('is-narrow', room < name * 12 + 112);
       if (p.corner) put(el, p.x - r.left + 8, p.y - r.top + 8);
-      else put(el, p.x - r.left - el.offsetWidth / 2, p.y - r.top + 8);
+      else put(el, p.x - r.left - el.offsetWidth / 2, p.y - r.top - el.offsetHeight - 4);
+    }
+    const doors = sc.doorAnchors?.() || [];
+    for (const el of layer.querySelectorAll('[data-door-tag]')) {
+      const p = doors.find((d) => d.roomId === el.dataset.doorTag);
+      if (!p || !p.visible) el.style.visibility = 'hidden';
+      else put(el, p.x - r.left - el.offsetWidth / 2, p.y - r.top - el.offsetHeight / 2);
     }
     const tag = layer.querySelector('[data-avatar-tag]'),
       p = tag && sc.avatarAnchor?.();
@@ -711,7 +741,7 @@ export function Stage({ mobile, sheetRef }) {
         hidden={!house || s.view !== '2d'}
       />
       <div class="stage-tags" ref={tagsRef}>
-        {house && <RoomTags />}
+        {house ? <RoomTags /> : <DoorTags />}
         <AvatarTag mobile={mobile} />
       </div>
       <div class="stage-top">

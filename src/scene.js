@@ -529,12 +529,6 @@ export class RoomScene {
       arc.computeLineDistances();
       arc.userData.door = true;
       this.room.add(arc);
-      if (this.state.dimensions) {
-        const name = o.name.length > 9 ? o.name.slice(0, 8) + '…' : o.name,
-          label = tapeSprite(`${name} 문`, { fill: '#fbfaf7' }, this.height);
-        label.position.set(o.x, o.wall === 'back' || o.wall === 'left' ? 1.1 : 0.34, o.z);
-        this.room.add(label);
-      }
     }
     if (this.state.grid) {
       const fine = [],
@@ -732,7 +726,8 @@ export class RoomScene {
     const p = this.state.floorplan.positions[id];
     return p ? this.project(new T.Vector3(p.x, 0.15, p.z)) : null;
   }
-  // 이름표 자리: 화면에서 가장 아래로 내려오는 바닥 모서리 변의 가운데. 시점을 돌려도 모형 바깥쪽에 온다.
+  // 이름표 자리: 화면에서 가장 아래로 내려오는 바닥 변에서 방 안쪽으로 조금 들어온 점.
+  // 시점을 돌려도 이름표가 자기 공간의 바닥 위에 놓여 어느 공간의 이름인지 헷갈리지 않는다.
   tagAnchor(id) {
     const r = spaces(this.state).find((r) => r.roomId === id),
       p = this.state.floorplan.positions[id];
@@ -743,9 +738,27 @@ export class RoomScene {
       [0, -d / 2],
       [w / 2, 0],
       [-w / 2, 0],
-    ].map(([x, z]) => this.project(new T.Vector3(p.x + x, 0, p.z + z)));
-    const low = edges.reduce((a, b) => (b.y > a.y ? b : a));
-    return { ...low, visible: edges.some((e) => e.visible) };
+    ].map(([x, z]) => ({ x, z, at: this.project(new T.Vector3(p.x + x, 0, p.z + z)) }));
+    const low = edges.reduce((a, b) => (b.at.y > a.at.y ? b : a)),
+      pull = (n, half) => n - Math.sign(n) * Math.min(0.5, half * 0.45);
+    return {
+      ...this.project(new T.Vector3(p.x + pull(low.x, w / 2), 0, p.z + pull(low.z, d / 2))),
+      inside: true,
+      visible: edges.some((e) => e.at.visible),
+    };
+  }
+  doorAnchors() {
+    if (this.state.scope === 'house') return [];
+    return roomOpenings(spaces(this.state), this.state.floorplan, this.state.roomId).map((o) => ({
+      roomId: o.roomId,
+      ...this.project(
+        new T.Vector3(
+          o.x + (o.wall === 'right' ? -0.35 : o.wall === 'left' ? 0.35 : 0),
+          o.wall === 'back' || o.wall === 'left' ? 1.0 : 0.05,
+          o.z + (o.wall === 'front' ? -0.35 : o.wall === 'back' ? 0.35 : 0),
+        ),
+      ),
+    }));
   }
   avatarAnchor() {
     return this.avatarAt ? this.project(this.avatarAt) : null;

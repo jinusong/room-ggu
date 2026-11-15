@@ -117,6 +117,7 @@ export function roomOpenings(list, floorplan, roomId) {
       inward: o.side > 0 !== positive,
       roomId: other.roomId,
       name: other.name,
+      type: other.room.type,
     });
   }
   return found;

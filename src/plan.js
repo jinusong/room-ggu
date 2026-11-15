@@ -242,6 +242,24 @@ export class PlanScene {
       visible: true,
     };
   }
+  // 문 이름표 자리: 문 안쪽으로 조금 들어온 점. 이름표를 누르면 그 문 너머의 공간으로 간다.
+  doorAnchors() {
+    if (!this.scale) return [];
+    const r = this.canvas.getBoundingClientRect(),
+      inset = 20 / this.scale;
+    return roomOpenings(spaces(this.state), this.state.floorplan, this.state.roomId).map((o) => ({
+      roomId: o.roomId,
+      x:
+        r.left +
+        this.ox +
+        (o.x + (o.wall === 'right' ? -inset : o.wall === 'left' ? inset : 0)) * this.scale,
+      y:
+        r.top +
+        this.oy +
+        (o.z + (o.wall === 'front' ? -inset : o.wall === 'back' ? inset : 0)) * this.scale,
+      visible: true,
+    }));
+  }
   // 아바타 이름표 자리: 몸이 차지한 범위의 위쪽 가운데.
   avatarAnchor() {
     const a = avatarLayout(this.state);
@@ -361,29 +379,7 @@ export class PlanScene {
     this.tape(c, `${Math.round(room.w * 100)} cm`, this.ox, ly);
     this.tape(c, `${Math.round(room.d * 100)} cm`, lx, this.oy, -Math.PI / 2);
     const doors = roomOpenings(spaces(this.state), this.state.floorplan, this.state.roomId);
-    for (const o of doors) {
-      drawDoor(c, o, this.ox, this.oy, s, wt * 2 + 2);
-      if (!this.state.dimensions) continue;
-      // 문 너머의 공간 이름을 문 안쪽에 적어 어디로 이어지는지 알린다. 벽 바깥은 치수선 자리다.
-      const inset = 12 / s,
-        name = o.name.length > 9 ? o.name.slice(0, 8) + '…' : o.name;
-      c.save();
-      c.translate(
-        this.ox + (o.x + (o.wall === 'right' ? -inset : o.wall === 'left' ? inset : 0)) * s,
-        this.oy + (o.z + (o.wall === 'front' ? -inset : o.wall === 'back' ? inset : 0)) * s,
-      );
-      if (o.vertical) c.rotate(-Math.PI / 2);
-      c.font = `500 11px ${FONT}`;
-      c.textAlign = 'center';
-      c.textBaseline = 'middle';
-      const text = `${name} 문`,
-        tw = c.measureText(text).width + 8;
-      c.fillStyle = 'rgba(251,250,247,0.86)';
-      c.fillRect(-tw / 2, -8, tw, 16);
-      c.fillStyle = '#545049';
-      c.fillText(text, 0, 0.5);
-      c.restore();
-    }
+    for (const o of doors) drawDoor(c, o, this.ox, this.oy, s, wt * 2 + 2);
     if (room.type === 'bathroom') drawFixtures(c, room, doors, this.ox, this.oy, s);
     const items = [...this.state.items].sort((a, b) => (b.type === 'rug') - (a.type === 'rug'));
     for (const a of items)

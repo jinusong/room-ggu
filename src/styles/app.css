@@ -1711,7 +1711,7 @@ button.row:hover,
 /* ---------- 방 위의 도구 ---------- */
 .stage-top {
   position: absolute;
-  z-index: 6;
+  z-index: 8;
   top: 12px;
   left: calc(var(--inset-left) + 4px);
   right: 12px;
@@ -1804,7 +1804,8 @@ button.row:hover,
   left: 0;
   width: 304px;
   max-width: calc(100vw - 16px);
-  max-height: calc(var(--app-h, 100vh) - 72px);
+  /* 모바일에서는 아래 시트 위쪽까지만 연다. */
+  max-height: calc(var(--app-h, 100vh) - var(--inset-bottom) - 72px);
   overflow-y: auto;
 }
 .pop-label {
@@ -2054,6 +2055,27 @@ button.row:hover,
 .tag-edit:hover {
   background: var(--raised);
 }
+.door-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 180px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px dashed var(--ink-3);
+  border-radius: 8px;
+  background: var(--sheet);
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.door-tag:hover {
+  border-style: solid;
+  color: var(--ink);
+}
+.door-tag .icon {
+  opacity: 0.7;
+}
 .avatar-tag {
   height: 24px;
   border-radius: 5px;
@@ -2283,6 +2305,10 @@ button.avatar-tag {
   height: 30px;
   padding: 0 8px;
 }
+.app.is-mobile .door-tag {
+  height: 30px;
+  max-width: 150px;
+}
 .app.is-mobile .bar-btn.bar-pose span {
   display: none;
 }
@@ -2300,6 +2326,11 @@ button.avatar-tag {
   bottom: calc(var(--controls-bottom, 0px) + 8px);
   left: 8px;
   right: 8px;
+}
+/* 시트를 끝까지 올리면 위쪽 한 줄만 남는다. 그 틈으로 모형 조각이 비치지 않게 가린다. */
+.app.is-mobile:has(.sheet[data-snap='full']) .viewport,
+.app.is-mobile:has(.sheet[data-snap='full']) .stage-tags {
+  visibility: hidden;
 }
 .app.is-mobile:has(.sheet[data-snap='full']) .stage-bottom,
 .app.is-mobile:has(.sheet[data-snap='full']) .stage-warning,
@@ -2371,6 +2402,7 @@ button.avatar-tag {
 .height-scale svg {
   display: block;
   max-width: none;
+  margin: 0 auto;
 }
 .hs-floor {
   stroke: var(--ink);
@@ -2628,10 +2660,15 @@ button.avatar-tag {
   color: var(--ink-3);
 }
 .model-choice .mono {
-  margin-top: 4px;
   font-size: 11px;
   line-height: 1.5;
   color: var(--ink-2);
+}
+.model-choice small + .mono {
+  margin-top: 4px;
+}
+.model-note {
+  margin: 12px 0;
 }
 @container (max-width: 340px) {
   .model-choices {

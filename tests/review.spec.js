@@ -266,6 +266,14 @@ test('집 전체 길잡이·이름표로 공간을 고르고 ㄱ자 집을 만�
       return n;
     }),
   ).toBe(1);
+  // 문 이름표는 문 너머의 공간을 알리고, 누르면 그 공간으로 간다.
+  const door = page.locator(`[data-door-tag="${bath}"]`);
+  await expect(door).toContainText('나의 화장실');
+  await door.click();
+  expect((await stored(page)).roomId).toBe(bath);
+  await expect(page.locator(`[data-door-tag="${first}"]`)).toBeVisible();
+  await page.locator(`[data-door-tag="${first}"]`).click();
+  expect((await stored(page)).roomId).toBe(first);
   // 실행 취소로 공간 위치를 되돌리고, 새로고침 뒤에도 같은 집이 열린다.
   const kept = await stored(page);
   await page.reload();

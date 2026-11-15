@@ -1045,13 +1045,12 @@ function AIPanel() {
           >
             <strong>{m.name}</strong>
             <small>{m.note}</small>
-            <span class="mono">
-              내려받기 약 {sizeText(m.downloadMB)} · GPU 메모리 약 {sizeText(m.vramMB)}
-            </span>
+            <span class="mono">내려받기 약 {sizeText(m.downloadMB)}</span>
+            <span class="mono">GPU 메모리 약 {(m.vramMB / 1000).toFixed(1)}GB</span>
           </button>
         ))}
       </div>
-      <p class="surface-hint">
+      <p class="surface-hint model-note">
         Gemma 4 E2B는 Gemma 3 1B보다 내려받는 양과 GPU 메모리가 네 배 넘게 들어요. 메모리가 넉넉한
         컴퓨터에서만 골라 주세요. 모델을 바꾸면 새 모델을 한 번 내려받아요.
       </p>
