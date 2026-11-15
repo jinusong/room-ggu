@@ -33,7 +33,7 @@
       "path": "codex/skills/humanize-korean",
       "license": "MIT",
       "version": "2.4.4",
-      "note": "self-contained package (references and scripts materialized)"
+      "note": "self-contained package: references materialized, and the 10 runtime scripts from the same commit's scripts/ (install.sh RUNTIME_SCRIPTS) replace the 4 launchers that only resolve inside the upstream repository"
     },
     {
       "name": "open-design",

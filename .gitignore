@@ -10,3 +10,6 @@ test-results/
 
 # 사진 평가용 이미지(원본 라이선스는 eval/photo/manifest.json)
 eval/photo/images/
+
+# 스킬 스크립트를 실행하면 생기는 파이썬 캐시
+__pycache__/
