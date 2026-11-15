@@ -14,6 +14,8 @@ async function start(page, { avatar = false } = {}) {
   await page.getByRole('button', { name: '이 방 옆에 화장실 붙이기' }).click();
 }
 test('화장실 포함 집 전체 3D: 회전·선택·편집·복원·PNG', async ({ page }) => {
+  // 소프트웨어 렌더링인 CI에서는 집 전체 3D를 여러 번 다시 그리는 이 흐름이 30초 가까이 걸린다.
+  test.slow();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await start(page, { avatar: true });
@@ -47,6 +49,21 @@ test('화장실 포함 집 전체 3D: 회전·선택·편집·복원·PNG', asyn
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   );
+  // 화면 맞춤은 끌어 돌린 관성을 멈춘다. 몇 프레임 뒤에도 카메라가 같은 자리에 있어야 한다.
+  const settled = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const camera = window.__roomggu.app.scenes.three.camera,
+          before = camera.position.toArray();
+        let frames = 0;
+        const step = () =>
+          ++frames < 6
+            ? requestAnimationFrame(step)
+            : resolve(camera.position.toArray().every((n, i) => Math.abs(n - before[i]) < 1e-6));
+        requestAnimationFrame(step);
+      }),
+  );
+  expect(settled).toBe(true);
   const point = await page.evaluate((id) => window.__roomggu.app.scenes.three.roomAnchor(id), bath);
   await page.mouse.click(point.x, point.y);
   expect((await stored(page)).roomId).toBe(bath);

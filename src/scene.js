@@ -598,8 +598,16 @@ export class RoomScene {
       th = tan * (W / H) * Math.max(0.2, (W - left - right) / W);
     return (radius / Math.min(tv, th)) * 1.04;
   }
+  // 끌어 돌린 뒤 남은 관성을 없앤다. 그대로 두면 시점을 맞춘 뒤에도 카메라와 이름표가 계속 흘러간다.
+  stopInertia() {
+    const damping = this.controls.enableDamping;
+    this.controls.enableDamping = false;
+    this.controls.update();
+    this.controls.enableDamping = damping;
+  }
   home() {
     this.userMoved = false;
+    this.stopInertia();
     const { h, x, z } = this.extent();
     this.controls.target.set(x, h * 0.28, z);
     const dir = new T.Vector3(0.66, 0.62, 0.8).normalize();
@@ -610,6 +618,7 @@ export class RoomScene {
   }
   top() {
     this.userMoved = true;
+    this.stopInertia();
     const { x, z } = this.extent();
     this.controls.target.set(x, 0, z);
     this.camera.position.set(x, this.fitDistance() * 1.1, z + 0.001);
