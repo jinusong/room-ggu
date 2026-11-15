@@ -6,19 +6,28 @@ import { josa } from '../app/text.js';
 import { Icon } from './icons.js';
 import { useAutosize, useOutside } from './widgets.jsx';
 
-const TOOLS = [
-  ['catalog', '가구 고르기', 'armchair'],
-  ['photo', '가구 사진 올리기', 'image-plus'],
-  ['room-size', '방 크기', 'ruler'],
-  ['room-type', '공간 유형', 'layout-grid'],
-  ['finishes', '벽과 바닥', 'paint-roller'],
-  ['spaces', '내 공간', 'layers'],
-  ['floorplan', '집 전체 평면도', 'house'],
-  ['avatar', '내 키로 크기 비교', 'person-standing'],
-  ['items', '이 방의 가구', 'list'],
-  ['files', '저장과 불러오기', 'folder-open'],
-  ['ai', '이 기기의 AI', 'cpu'],
-  ['help', '사용 방법', 'circle-help'],
+// 입력창의 + 메뉴. 가구 → 공간 → 가늠·집 전체 → 파일·설정 순서로 묶는다.
+const TOOL_GROUPS = [
+  [
+    ['catalog', '가구 고르기', 'armchair'],
+    ['photo', '가구 사진 올리기', 'image-plus'],
+    ['items', '이 방의 가구', 'list'],
+  ],
+  [
+    ['room-size', '방 크기', 'ruler'],
+    ['room-type', '공간 유형', 'layout-grid'],
+    ['finishes', '벽과 바닥', 'paint-roller'],
+    ['spaces', '내 공간', 'layers'],
+  ],
+  [
+    ['avatar', '내 키로 비교', 'person-standing'],
+    ['floorplan', '집 전체 보기', 'house'],
+  ],
+  [
+    ['files', '저장과 불러오기', 'folder-open'],
+    ['ai', '이 기기의 AI', 'cpu'],
+    ['help', '사용 방법', 'circle-help'],
+  ],
 ];
 const ITEM_TOOLS = [
   ['furniture-size', '규격 비교', 'columns-3'],
@@ -104,7 +113,8 @@ function Status() {
       <span class="status-line">
         <Icon name="loader-circle" size={14} className="spin" />
         {ai.label || '상담 모델 준비 중'}
-        {ai.progress > 0 && ` · ${Math.round(ai.progress * 100)}%`} · 그동안 규칙으로 답해요
+        {ai.progress > 0 && ` · ${Math.round(ai.progress * 100)}%`}
+        <span class="status-extra"> · 그동안 규칙으로 답해요</span>
         <button type="button" class="link" onClick={() => store.setModelOn(false)}>
           끄기
         </button>
@@ -144,7 +154,15 @@ function Status() {
 export function Composer({ onFocusChange }) {
   const [text, setText] = useState(draftText);
   const [menu, setMenu] = useState(false);
+  const [menuMax, setMenuMax] = useState(420);
   const menuRef = useRef(null);
+  // 메뉴는 입력창 위로 열린다. 시트가 낮아도 잘리지 않게 위쪽 여유만큼만 키운다.
+  const toggleMenu = () => {
+    const box = menuRef.current?.getBoundingClientRect(),
+      sheet = menuRef.current?.closest('.sheet')?.getBoundingClientRect();
+    if (box && sheet) setMenuMax(Math.max(160, Math.min(440, box.top - sheet.top - 12)));
+    setMenu(!menu);
+  };
   const ref = useAutosize(text);
   useOutside(menuRef, () => setMenu(false), menu);
   const busy = app.busy?.kind === 'model';
@@ -160,6 +178,7 @@ export function Composer({ onFocusChange }) {
   const runTool = (kind) => {
     setMenu(false);
     if (kind === 'photo') store.pickPhoto();
+    else if (kind === 'avatar' && !store.avatarHere()) store.toggleAvatar();
     else store.openTool(kind);
   };
   const hasSubject = !!store.subject();
@@ -187,25 +206,27 @@ export function Composer({ onFocusChange }) {
             class="icon-btn"
             aria-label="도구 열기"
             aria-expanded={menu}
-            onClick={() => setMenu(!menu)}
+            onClick={toggleMenu}
           >
             <Icon name="plus" />
           </button>
           {menu && (
-            <div class="tool-menu" role="menu">
-              {hasSubject &&
-                ITEM_TOOLS.map(([k, l, i]) => (
-                  <button key={k} type="button" role="menuitem" onClick={() => runTool(k)}>
-                    <Icon name={i} size={16} />
-                    {l}
-                  </button>
-                ))}
-              {hasSubject && <hr />}
-              {TOOLS.map(([k, l, i]) => (
-                <button key={k} type="button" role="menuitem" onClick={() => runTool(k)}>
-                  <Icon name={i} size={16} />
-                  {l}
-                </button>
+            <div class="tool-menu" role="menu" style={{ maxHeight: `${menuMax}px` }}>
+              {(hasSubject ? [ITEM_TOOLS, ...TOOL_GROUPS] : TOOL_GROUPS).map((group, n) => (
+                <div class="tool-group-grid" role="group" key={n}>
+                  {group.map(([k, l, i]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      role="menuitem"
+                      data-tool={k}
+                      onClick={() => runTool(k)}
+                    >
+                      <Icon name={i} size={16} />
+                      <span>{l}</span>
+                    </button>
+                  ))}
+                </div>
               ))}
             </div>
           )}

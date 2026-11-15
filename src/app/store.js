@@ -17,7 +17,17 @@ import { planTurn } from './planner.js';
 import { planFromModel } from './interpret.js';
 import { photoCandidates, PHOTO_CONFIDENT } from './photo.js';
 import { josa, dimsText } from './text.js';
-import { parseComparisonCommand } from '../avatar.js';
+import { parseComparisonCommand, avatarLayout, poseAccepts } from '../avatar.js';
+import {
+  TEXT_MODELS,
+  DEFAULT_TEXT_MODEL,
+  textModel,
+  modelName,
+  downloadSize,
+  parseProgress,
+  explainLoadError,
+} from './models.js';
+export { modelName, TEXT_MODELS };
 
 export const KEY = 'room-ggu-v2';
 export const THREAD_KEY = 'room-ggu-thread-v1';
@@ -56,11 +66,14 @@ export const app = {
     text: 'off',
     why: '',
     model: null,
+    choice: DEFAULT_TEXT_MODEL,
     vision: 'off',
     device: 'webgpu',
     progress: 0,
     label: '',
     error: '',
+    // 내려받기 안내: task는 text|vision, phase는 fetch(내려받는 중)|init(준비)|done|error.
+    download: null,
   },
   busy: null,
   modelSeq: 0,
@@ -68,6 +81,8 @@ export const app = {
     sheet: 'half',
     collapsed: false,
     preview: null,
+    avatarBar: false,
+    downloadOpen: true,
     toast: null,
     menu: null,
     webglError: false,
@@ -75,12 +90,13 @@ export const app = {
   },
   history: [],
   future: [],
-  scenes: { three: null, plan: null, house: null },
+  scenes: { three: null, plan: null, house: null, tags: null },
   rev: 0,
   readError,
 };
 try {
   app.ai.device = localStorage.getItem(VISION_KEY) === 'wasm' ? 'wasm' : 'webgpu';
+  app.ai.choice = textModel(localStorage.getItem('room-ggu-model-choice')).key;
 } catch {}
 
 const subs = new Set();
@@ -265,10 +281,11 @@ export function subject(target = app.target) {
 
 // ---------- 선택과 초안 ----------
 export function select(id) {
-  if (app.selected === id) return;
+  if (app.selected === id && !(id === null && app.view.avatarBar)) return;
   app.selected = id;
   app.target = id ? { type: 'item', id } : app.draft ? { type: 'draft' } : { type: 'room' };
   app.view.preview = null;
+  app.view.avatarBar = false;
   emit();
 }
 export function setTarget(target) {
@@ -525,37 +542,38 @@ export async function send(raw) {
     if (auto) analyzePhoto();
     return;
   }
-  const comparison = parseComparisonCommand(text);
+  const comparison = parseComparisonCommand(text, { avatarOn: !!avatarLayout(app.state) });
   if (comparison) {
+    let reply;
     try {
       if (comparison.kind === 'floorplan') {
         setScope('house');
         if (comparison.view) setView(comparison.view);
+        reply =
+          '집 전체를 열었어요. 2D에서 공간을 끌어 배치하고, 3D에서 화장실과 가구를 함께 둘러보세요.';
       } else {
-        const id = comparison.furniture
-          ? app.state.items.find((i) => i.type === comparison.furniture)?.id
+        const { patch, furniture } = comparison;
+        const prefer = furniture
+          ? app.state.items.find((i) => i.type === furniture)?.id
           : app.selected;
-        const error = updateAvatar(comparison.patch, id);
+        // 가구를 말했는데 자세를 말하지 않았으면 그 가구에 맞는 자세로 읽는다.
+        if (furniture && !patch.pose && patch.enabled)
+          patch.pose = furniture === 'bed' ? 'lying' : 'sitting';
+        const id =
+          patch.pose && patch.pose !== 'standing' ? poseTarget(patch.pose, prefer)?.id : null;
+        const error = updateAvatar(patch, id);
         if (error) throw Error(error);
+        reply = avatarSentence();
+        app.view.avatarBar = app.state.avatar.enabled;
       }
-      finishTurn(
-        turn,
-        {
-          reply:
-            comparison.kind === 'floorplan'
-              ? '집 전체를 열었어요. 2D에서 공간을 배치하고, 3D에서 화장실과 가구를 함께 둘러보세요.'
-              : `키 ${app.state.avatar.height}cm 아바타를 ${app.state.avatar.enabled ? '반영했어요' : '숨겼어요'}.`,
-          surfaces: [{ kind: comparison.kind, target: { type: 'room' } }],
-        },
-        { engine: 'app' },
-      );
     } catch (e) {
-      finishTurn(
-        turn,
-        { reply: e.message, surfaces: [{ kind: comparison.kind, target: { type: 'room' } }] },
-        { engine: 'app' },
-      );
+      reply = e.message;
     }
+    finishTurn(
+      turn,
+      { reply, surfaces: [{ kind: comparison.kind, target: { type: 'room' } }] },
+      { engine: 'app' },
+    );
     return;
   }
   if (app.ai.text !== 'ready') {
@@ -642,7 +660,7 @@ export function cancelModel() {
 // ---------- 직접 연 도구와 버튼 동작 ----------
 const TOOL_TEXT = {
   avatar:
-    '키에 맞춘 아바타로 가구 크기를 비교해 보세요. 의자·소파·침대를 고르면 앉거나 누워 볼 수 있어요.',
+    '키를 알려주면 가구와 같은 축척의 아바타를 세워요. 의자·소파·침대에는 앉히거나 눕혀 볼 수 있어요.',
   floorplan: '방과 화장실을 2D·3D로 함께 보세요. 공간 위치는 2D에서 끌어 맞출 수 있어요.',
   'room-size': '방 크기를 정해 볼까요? 숫자를 바로 고치거나 “가로 4m 세로 3m”처럼 말해도 돼요.',
   'room-type': '어떤 공간인가요? 유형을 바꾸면 직접 정한 치수는 그대로 두고 나머지만 바꿔요.',
@@ -661,7 +679,7 @@ const TOOL_TEXT = {
 };
 const TOOL_LABEL = {
   avatar: '내 키로 크기 비교',
-  floorplan: '집 전체 평면도',
+  floorplan: '집 전체 보기',
   'room-size': '방 크기 열기',
   'room-type': '공간 유형 열기',
   finishes: '벽·바닥 열기',
@@ -679,7 +697,6 @@ const TOOL_LABEL = {
 export function openTool(kind, { echo = true, target } = {}) {
   if (!Object.hasOwn(SURFACE_KINDS, kind)) return;
   if (kind === 'floorplan') app.state.scope = 'house';
-  if (kind === 'avatar') app.state.scope = 'room';
   const scope = SURFACE_KINDS[kind].scope;
   let t = target || (scope === 'furniture' ? app.target : roomTarget());
   if (scope === 'furniture' && !subject(t)) {
@@ -711,16 +728,75 @@ function comparisonEdit(change, { live = false } = {}) {
 export function updateAvatar(patch, id = app.selected, opts = {}) {
   try {
     comparisonEdit((s) => ops.setAvatar(s, patch, id), opts);
+    if (patch.enabled === false) app.view.avatarBar = false;
   } catch (e) {
     toast(e.message);
     return e.message;
   }
 }
+// 앉히거나 눕힐 가구: 지금 고른 가구, 이미 쓰던 가구, 방에 있는 첫 가구 순으로 찾는다.
+export function poseTarget(pose, prefer = app.selected) {
+  const items = app.state.items.filter((i) => poseAccepts(pose, i));
+  return (
+    items.find((i) => i.id === prefer) ||
+    items.find((i) => i.id === app.state.avatar.itemId) ||
+    items[0] ||
+    null
+  );
+}
+export function setPose(pose, id) {
+  const target = pose === 'standing' ? null : id || poseTarget(pose)?.id;
+  const error = updateAvatar({ pose, enabled: true }, target);
+  if (!error) {
+    app.view.avatarBar = true;
+    emit();
+  }
+  return error;
+}
+export function avatarHere() {
+  return avatarLayout(app.state);
+}
+function avatarSentence() {
+  const a = app.state.avatar,
+    layout = avatarLayout(app.state);
+  if (!a.enabled || !layout) return `키 ${a.height}cm 아바타를 숨겼어요.`;
+  const where =
+    layout.pose === 'standing'
+      ? '방에 세웠어요'
+      : `${layout.item.name}에 ${layout.pose === 'lying' ? '눕혔어요' : '앉혔어요'}`;
+  return `키 ${a.height}cm 아바타를 ${where}.${layout.warnings[0] ? ` ${layout.warnings[0]}.` : ''}`;
+}
+// 방 위의 사람 버튼: 이 방에 아바타를 세우거나 숨긴다. 처음 세울 때는 대화에 키 도구를 함께 연다.
+export function toggleAvatar() {
+  if (avatarLayout(app.state)) return updateAvatar({ enabled: false });
+  if (updateAvatar({ enabled: true, pose: 'standing' }, null)) return;
+  app.selected = null;
+  app.target = app.draft ? { type: 'draft' } : { type: 'room' };
+  app.view.avatarBar = true;
+  const last = [...app.thread].reverse().find((t) => t.surfaces?.length);
+  if (last?.surfaces.some((x) => x.kind === 'avatar')) emit();
+  else openTool('avatar');
+}
+export function pickAvatar() {
+  app.selected = null;
+  app.target = app.draft ? { type: 'draft' } : { type: 'room' };
+  app.view.avatarBar = true;
+  emit();
+}
+export function closeAvatarBar() {
+  app.view.avatarBar = false;
+  emit();
+}
 export function setScope(scope) {
   app.state.scope = scope === 'house' ? 'house' : 'room';
   app.selected = null;
   app.target = { type: 'room' };
+  app.view.avatarBar = false;
   commit();
+}
+export function editSpace(id) {
+  if (id && id !== app.state.roomId) switchSpace(id);
+  setScope('room');
 }
 export function moveSpace(id, x, z, opts = {}) {
   try {
@@ -1057,9 +1133,9 @@ export function exportPNG() {
         : app.state.scope === 'house'
           ? app.scenes.house
           : app.scenes.plan;
-    const url = sc?.png();
+    const url = sc?.png(app.scenes.tags?.() || []);
     if (!url) throw Error('현재 화면을 저장하지 못했어요.');
-    download(url, `${app.state.name}-배치.png`);
+    download(url, `${app.state.scope === 'house' ? '집 전체' : app.state.name}-배치.png`);
     toast('지금 보이는 배치 화면을 저장했어요.');
   } catch (e) {
     toast(e.message);
@@ -1102,12 +1178,14 @@ export async function analyzePhoto() {
   app.ai.vision = 'loading';
   app.ai.label = '사진 판별 모델 준비 중';
   app.ai.progress = 0;
+  visionFiles.clear();
   emit();
   try {
     const raw = await runAI('classify', { image: photo.data, device: app.ai.device });
     if (app.photo !== photo) return;
     const candidates = photoCandidates(raw?.scores);
     app.ai.vision = 'ready';
+    finishDownload('vision');
     photo.analyzed = true;
     photo.device = raw?.device;
     photo.candidates = candidates;
@@ -1158,8 +1236,9 @@ export async function analyzePhoto() {
     });
   } catch (e) {
     app.ai.vision = 'error';
-    app.ai.error = e.message;
-    toast(`사진 판별: ${e.message}`);
+    app.ai.error = explainLoadError(e.message);
+    failDownload('vision', app.ai.error);
+    toast(`사진 판별: ${app.ai.error}`);
   } finally {
     app.busy = null;
     persist();
@@ -1170,12 +1249,7 @@ export async function analyzePhoto() {
 // ---------- 상담 모델 ----------
 // 기본은 켜짐이다. 사용자가 끄면 이 기기에 기억하고, ?model=off는 이번 방문에만 끈다(테스트·데이터 절약).
 const MODEL_PREF = 'room-ggu-model';
-export const modelName = (id) =>
-  String(id).startsWith('gemma')
-    ? 'Gemma 3 1B'
-    : String(id).startsWith('Qwen')
-      ? 'Qwen3 0.6B'
-      : '상담 모델';
+const MODEL_CHOICE = 'room-ggu-model-choice';
 function offReason() {
   try {
     if (new URLSearchParams(location.search).get('model') === 'off') return 'url';
@@ -1209,22 +1283,30 @@ export async function bootModel() {
 }
 export async function loadText({ auto = false } = {}) {
   if (app.ai.text === 'loading' || app.ai.text === 'ready') return;
+  const choice = textModel(app.ai.choice);
   app.ai.text = 'loading';
   app.ai.why = '';
   app.ai.label = '상담 모델 준비 중';
   app.ai.progress = 0;
   app.ai.error = '';
+  app.ai.download = null;
   emit();
   try {
-    const model = await runAI('load-text');
+    const model = await runAI('load-text', { choice: choice.key });
     if (app.ai.text !== 'loading') return;
     app.ai.text = 'ready';
     app.ai.model = model;
-    if (!auto) toast(`${modelName(model)}를 준비했어요. 이제 모델이 문장을 해석해요.`);
+    const shown = !!app.ai.download;
+    finishDownload('text');
+    if (!auto && !shown) toast(`${modelName(model)}를 준비했어요. 이제 모델이 문장을 해석해요.`);
   } catch (e) {
     if (app.ai.text !== 'loading') return;
-    app.ai.text = /WebGPU|GPU/.test(e.message) ? 'unsupported' : 'error';
-    app.ai.error = e.message;
+    // 브라우저나 GPU가 아예 지원하지 않을 때만 '쓸 수 없음'으로 둔다. 그 밖의 실패는 다시 시도할 수 있다.
+    app.ai.text = /WebGPU를 지원하지|GPU를 찾지 못했|shader-f16/.test(e.message)
+      ? 'unsupported'
+      : 'error';
+    app.ai.error = explainLoadError(e.message);
+    failDownload('text', app.ai.error);
   } finally {
     emit();
   }
@@ -1243,17 +1325,108 @@ export function setModelOn(on) {
   app.ai.why = 'user';
   emit();
 }
+// 상담 모델을 바꾼다. 고른 모델을 기억하고, 켜져 있으면 내린 뒤 새 모델을 준비한다.
+export function setModelChoice(key) {
+  const next = textModel(key).key;
+  if (next === app.ai.choice && (app.ai.text === 'ready' || app.ai.text === 'loading')) return;
+  app.ai.choice = next;
+  try {
+    localStorage.setItem(MODEL_CHOICE, next);
+    localStorage.removeItem(MODEL_PREF);
+  } catch {}
+  if (pending) interruptModel();
+  app.modelSeq++;
+  stopAI('상담 모델을 바꿔요.');
+  app.busy = null;
+  app.ai = {
+    ...app.ai,
+    text: 'off',
+    vision: 'off',
+    model: null,
+    progress: 0,
+    label: '',
+    why: '',
+    download: null,
+  };
+  loadText();
+}
 export function unloadAI() {
   if (pending) interruptModel();
   app.modelSeq++;
   stopAI('모델을 껐어요.');
   app.busy = null;
-  app.ai = { ...app.ai, text: 'off', vision: 'off', model: null, progress: 0, label: '' };
+  app.ai = {
+    ...app.ai,
+    text: 'off',
+    vision: 'off',
+    model: null,
+    progress: 0,
+    label: '',
+    download: null,
+  };
   toast('모델을 껐어요. 규칙으로 계속 답해요.');
 }
+
+// ---------- 내려받기 안내 ----------
+// 모델 파일을 실제로 내려받는 동안에는 다이얼로그로 알린다. 이미 보관한 모델을 불러올 때는 띄우지 않는다.
+const visionFiles = new Map();
+function trackDownload(task, patch) {
+  const fresh =
+    !app.ai.download || app.ai.download.task !== task || app.ai.download.phase === 'done';
+  if (fresh) app.view.downloadOpen = true;
+  const before = fresh ? {} : app.ai.download;
+  // 받은 양이 늘어난 시각을 적어 둔다. 오래 그대로면 화면에서 네트워크를 확인하라고 알린다.
+  const moved = fresh || patch.phase !== before.phase || (patch.mb || 0) > (before.mb || 0);
+  app.ai.download = { ...before, task, ...patch, at: moved ? Date.now() : before.at };
+}
+function finishDownload(task) {
+  if (app.ai.download?.task !== task) return;
+  // 안내를 접어 둔 채 끝났으면 다이얼로그를 다시 띄우지 않고 한 줄로만 알린다.
+  if (!app.view.downloadOpen) {
+    const { name } = app.ai.download;
+    app.ai.download = null;
+    return toast(`${name} 준비가 끝났어요.`);
+  }
+  const done = { ...app.ai.download, phase: 'done', progress: 1 };
+  app.ai.download = done;
+  setTimeout(() => {
+    if (app.ai.download === done) {
+      app.ai.download = null;
+      emit();
+    }
+  }, 5000);
+}
+function failDownload(task, message) {
+  if (app.ai.download?.task !== task) return;
+  app.ai.download = { ...app.ai.download, phase: 'error', error: message };
+  app.view.downloadOpen = true;
+}
+export function setDownloadOpen(open) {
+  app.view.downloadOpen = open;
+  emit();
+}
+export function closeDownload() {
+  app.ai.download = null;
+  emit();
+}
+export function cancelDownload() {
+  const task = app.ai.download?.task;
+  app.ai.download = null;
+  if (task === 'vision') cancelModel();
+  else setModelOn(false);
+}
+export function retryDownload() {
+  const task = app.ai.download?.task;
+  app.ai.download = null;
+  if (task === 'vision') analyzePhoto();
+  else setModelOn(true);
+}
+
 let lastProgressEmit = 0;
 onAIStatus((data) => {
-  if (data.event === 'unloaded' && data.task === 'text') {
+  // 준비하다 실패하면 Worker가 정리하면서 먼저 '내렸다'고 알린다. 그때 꺼짐으로 바꾸면 뒤따르는
+  // 실패 이유를 놓치고 내려받기 안내가 멈춘 채 남으므로, 준비 중일 때는 loadText가 결과를 정하게 둔다.
+  if (data.event === 'unloaded' && data.task === 'text' && app.ai.text !== 'loading') {
     app.ai.text = 'off';
     app.ai.model = null;
   }
@@ -1265,12 +1438,50 @@ onAIStatus((data) => {
   if (data.event === 'progress') {
     let label = data.text || '모델 준비 중';
     if (data.task === 'text') {
-      const percent = label.match(/(\d+)%/);
-      label = /Fetching|Loading model|Start to fetch/i.test(label)
-        ? `상담 모델 내려받는 중${percent ? ` · ${percent[1]}%` : ''}`
-        : '이 기기에 맞게 상담 모델을 준비하는 중';
-    } else
+      const step = parseProgress(label);
+      label =
+        step.phase === 'fetch'
+          ? '상담 모델 내려받는 중'
+          : step.phase === 'cache'
+            ? '보관해 둔 상담 모델을 불러오는 중'
+            : '이 기기에 맞게 상담 모델을 준비하는 중';
+      if (step.phase === 'fetch') {
+        // 받은 양은 로더가 알려준 비율을 실제 파일 크기에 곱해 어림한다.
+        const part = Number.isFinite(data.progress) ? data.progress : step.percent / 100,
+          total = downloadSize(data.model) || textModel(app.ai.choice).downloadMB;
+        trackDownload('text', {
+          phase: 'fetch',
+          name: data.model ? modelName(data.model) : textModel(app.ai.choice).name,
+          mb: Math.round(part * total),
+          totalMB: total,
+          progress: part,
+        });
+      } else if (
+        // 다 받은 뒤 오는 준비 단계에서만 '준비 중'으로 넘긴다. 로더의 시작 문장은 받기 전에도 오므로 무시한다.
+        step.phase !== 'start' &&
+        app.ai.download?.task === 'text' &&
+        app.ai.download.phase === 'fetch' &&
+        app.ai.download.progress > 0.9
+      )
+        trackDownload('text', { phase: 'init', progress: 1 });
+    } else {
+      // 사진 판별 모델은 파일마다 진행률이 따로 온다. 큰 파일을 실제로 받을 때만 알린다.
+      if (data.file && Number.isFinite(data.total))
+        visionFiles.set(data.file, { loaded: data.loaded || 0, total: data.total });
+      const total = [...visionFiles.values()].reduce((n, f) => n + f.total, 0),
+        loaded = [...visionFiles.values()].reduce((n, f) => n + f.loaded, 0);
       label = data.status === 'progress' ? '사진 판별 모델 내려받는 중' : '사진 판별 모델 준비 중';
+      if (data.status === 'progress' && total > 20e6 && loaded < total)
+        trackDownload('vision', {
+          phase: 'fetch',
+          name: 'SigLIP base',
+          mb: Math.round(loaded / 1048576),
+          totalMB: Math.round(total / 1048576),
+          progress: loaded / total,
+        });
+      else if (app.ai.download?.task === 'vision' && total && loaded >= total)
+        trackDownload('vision', { phase: 'init', progress: 1 });
+    }
     app.ai.label = label;
     if (Number.isFinite(data.progress)) app.ai.progress = Math.min(1, Math.max(0, data.progress));
   }
@@ -1283,6 +1494,7 @@ onAIStatus((data) => {
 
 // ---------- 도면 콜백 ----------
 export const sceneCallbacks = {
+  pickAvatar: () => pickAvatar(),
   moveAvatar: (x, z) => {
     const mx = app.state.room.w / 2,
       mz = app.state.room.d / 2;

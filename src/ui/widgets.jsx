@@ -40,9 +40,15 @@ export function Stepper({
   const [text, setText] = useState(fmt(value));
   const [focused, setFocused] = useState(false);
   const [error, setError] = useState('');
+  // 값이 밖에서 바뀌면 입력란과 안내를 그 값에 맞춘다. 범위를 벗어나 남겨 둔 글은 다시 손댈 때까지 둔다.
   useEffect(() => {
-    if (!focused) setText(fmt(value));
+    if (focused || error) return;
+    setText(fmt(value));
   }, [value, focused]);
+  useEffect(() => {
+    setError('');
+    if (!focused) setText(fmt(value));
+  }, [value]);
   const parse = (t) => {
     const n = Number(String(t).replace(',', '.'));
     return Number.isFinite(n) && n >= min && n <= max ? n : null;
@@ -76,8 +82,11 @@ export function Stepper({
             onInput={(e) => {
               setText(e.currentTarget.value);
               const n = parse(e.currentTarget.value);
-              setError(n === null && e.currentTarget.value ? `${min}~${max}${unit}` : '');
-              if (n !== null) onLive(n);
+              // 치는 도중에는 틀렸다고 알리지 않는다. 맞는 값이 되면 안내를 바로 지우고 반영한다.
+              if (n !== null) {
+                setError('');
+                onLive(n);
+              }
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') e.currentTarget.blur();
@@ -92,11 +101,11 @@ export function Stepper({
             }}
             onBlur={(e) => {
               setFocused(false);
-              const n = parse(e.currentTarget.value);
-              if (n === null) {
-                setText(fmt(value));
-                setError('');
-              }
+              const raw = e.currentTarget.value.trim(),
+                n = parse(raw);
+              // 입력을 마쳤을 때 범위를 벗어났으면 쓴 글을 남기고 이유를 알린다. 값은 바꾸지 않는다.
+              if (n === null && raw) setError(`${min}~${max}${unit}`);
+              else if (n === null) setText(fmt(value));
               onBlur?.();
             }}
           />
@@ -114,7 +123,10 @@ export function Stepper({
       {(error || source !== false) && (
         <span class="stepper-source">
           {error ? (
-            <em class="field-error">{error} 범위로 입력해 주세요</em>
+            <em class="field-error" role="alert">
+              {error} 범위로 입력해 주세요 · 지금 값 {fmt(value)}
+              {unit}
+            </em>
           ) : (
             <Tape source={source}>{sourceLabel(source)}</Tape>
           )}
@@ -192,6 +204,106 @@ export function MiniPlan({
         </text>
       </g>
     </svg>
+  );
+}
+
+// 키와 가구 높이를 같은 축척의 정면도로 나란히 세운다. 높이는 입력한 치수 그대로다.
+export function HeightScale({ height, source, room, items, focus }) {
+  const S = 44,
+    h = height / 100,
+    user = String(source).startsWith('사용자');
+  const seen = new Set(),
+    list = [];
+  for (const a of items) {
+    const key = `${a.type}|${a.dims.join()}`;
+    if (a.dims[1] < 5 || seen.has(key)) continue;
+    seen.add(key);
+    list.push(a);
+  }
+  const shown = list.slice(0, 6),
+    top = Math.max(h, room.h, ...shown.map((a) => a.dims[1] / 100)),
+    H = top * S + 34,
+    base = top * S + 14,
+    y = (m) => base - m * S;
+  let x = 34 + h * 0.34 * S + 14;
+  const bars = shown.map((a) => {
+    const w = Math.max(10, (a.dims[0] / 100) * S),
+      bar = { a, x, w };
+    x += w + 10;
+    return bar;
+  });
+  const W = Math.max(x, 200),
+    px = 34 + h * 0.17 * S,
+    part = (ratio) => h * ratio * S;
+  return (
+    <div class="height-scale">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        width={W}
+        height={H}
+        role="img"
+        aria-label={`키 ${height}cm와 가구 ${shown.length}개의 높이를 같은 축척으로 비교한 그림`}
+      >
+        <line class="hs-floor" x1="26" y1={base} x2={W} y2={base} />
+        {room.h <= top && (
+          <>
+            <line class="hs-ceiling" x1="26" y1={y(room.h)} x2={W} y2={y(room.h)} />
+            <text class="hs-note" x={W - 2} y={y(room.h) + 10} text-anchor="end">
+              천장 {Math.round(room.h * 100)}
+            </text>
+          </>
+        )}
+        {[0.5, 1, 1.5, 2]
+          .filter((m) => m < top)
+          .map((m) => (
+            <g key={m}>
+              <line class="hs-tick" x1="22" y1={y(m)} x2="28" y2={y(m)} />
+              <text class="hs-axis" x="19" y={y(m) + 3} text-anchor="end">
+                {m * 100}
+              </text>
+            </g>
+          ))}
+        <line class={`hs-level ${user ? 'is-set' : ''}`} x1="26" y1={y(h)} x2={W} y2={y(h)} />
+        <g class="hs-person">
+          <circle cx={px} cy={y(h * 0.935)} r={part(0.065)} />
+          <rect
+            x={px - part(0.13)}
+            y={y(h * 0.83)}
+            width={part(0.26)}
+            height={part(0.33)}
+            rx={part(0.05)}
+          />
+          <rect x={px - part(0.115)} y={y(h * 0.54)} width={part(0.1)} height={part(0.54)} rx="2" />
+          <rect x={px + part(0.015)} y={y(h * 0.54)} width={part(0.1)} height={part(0.54)} rx="2" />
+        </g>
+        <text class="hs-name" x={px} y={base + 13} text-anchor="middle">
+          나
+        </text>
+        {bars.map(({ a, x, w }) => (
+          <g key={a.id} class={`hs-item ${focus === a.id ? 'is-focus' : ''}`}>
+            <rect
+              x={x}
+              y={y(a.dims[1] / 100)}
+              width={w}
+              height={(a.dims[1] / 100) * S}
+              rx="2"
+              fill={a.color}
+            />
+            <text class="hs-value" x={x + w / 2} y={y(a.dims[1] / 100) - 4} text-anchor="middle">
+              {a.dims[1]}
+            </text>
+            <text class="hs-name" x={x + w / 2} y={base + 13} text-anchor="middle">
+              {a.name.length > 5 && w < 60 ? `${a.name.slice(0, 4)}…` : a.name}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <p class="height-scale-note">
+        <span class={`tape ${user ? 'is-set' : 'is-draft'}`}>{height}</span>
+        cm 선과 가구 높이를 같은 축척으로 그렸어요
+        {list.length > shown.length ? ` · 가구는 ${shown.length}개까지` : ''}
+      </p>
+    </div>
   );
 }
 

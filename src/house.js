@@ -1,8 +1,9 @@
-import { PlanScene } from './plan.js';
+import { PlanScene, drawAvatar, drawDoor, drawFixtures } from './plan.js';
 import { spaces } from './data.js';
-import { floorplanWarnings, normalizeFloorplan, roomBounds, sharedOpening } from './floorplan.js';
+import { floorplanWarnings, normalizeFloorplan, roomBounds } from './floorplan.js';
 import { PAPER } from './tape.js';
-import { bathroomFixtures } from './house-geometry.js';
+import { houseLayout } from './house-geometry.js';
+import { avatarLayout, avatarSpace } from './avatar.js';
 
 const INK = '#2a2824';
 export class HouseScene extends PlanScene {
@@ -112,10 +113,14 @@ export class HouseScene extends PlanScene {
     c.setTransform(ratio, 0, 0, ratio, 0, 0);
     c.fillStyle = PAPER;
     c.fillRect(0, 0, W, H);
-    const conflicts = floorplanWarnings(list, plan);
-    for (const r of list) {
-      const p = plan.positions[r.roomId],
-        b = roomBounds(r, p);
+    const conflicts = floorplanWarnings(list, plan),
+      layout = houseLayout(this.state),
+      wall = Math.max(3, 0.08 * scale);
+    // 가구 이름은 넉넉히 확대됐을 때만 적는다. 방 이름표는 화면 위 이름표가 맡는다.
+    const names = scale >= 90;
+    for (const r of layout.rooms) {
+      const p = r.position,
+        b = r.bounds;
       const x = ox + b.left * scale,
         y = oy + b.top * scale,
         w = r.room.w * scale,
@@ -139,92 +144,70 @@ export class HouseScene extends PlanScene {
         }
         c.stroke();
       }
-      c.strokeStyle = conflicts.has(r.roomId) ? '#b03d29' : INK;
-      c.lineWidth = Math.max(3, 0.08 * scale);
-      c.strokeRect(x, y, w, d);
-      if (r.roomId === this.state.roomId) {
-        c.strokeStyle = '#8c927f';
-        c.lineWidth = 2;
-        c.strokeRect(x + 5, y + 5, Math.max(0, w - 10), Math.max(0, d - 10));
-      }
       this.ox = ox + p.x * scale;
       this.oy = oy + p.z * scale;
+      if (r.room.type === 'bathroom') drawFixtures(c, r.room, r.openings, this.ox, this.oy, scale);
       for (const a of [...r.items].sort((a, b) => (b.type === 'rug') - (a.type === 'rug')))
-        this.item(c, a, {});
+        this.item(c, a, { named: names });
       this.ox = ox;
       this.oy = oy;
-      if (r.room.type === 'bathroom') this.bathroom(c, x, y, w, d);
-      const labelY = y + Math.min(22, d * 0.18);
-      c.font = `500 ${Math.min(13, Math.max(9, scale * 0.25))}px system-ui`;
-      c.textAlign = 'center';
-      const name = r.name.length > 16 ? r.name.slice(0, 15) + '…' : r.name;
-      const textWidth = Math.min(w - 12, c.measureText(name).width + 12);
-      c.fillStyle = '#fbfaf7';
-      c.fillRect(x + (w - textWidth) / 2, labelY - 13, textWidth, 18);
-      c.save();
-      c.beginPath();
-      c.rect(x + 6, y + 4, Math.max(0, w - 12), 24);
-      c.clip();
-      c.fillStyle = INK;
-      c.fillText(name, x + w / 2, labelY);
-      c.restore();
-      if (this.state.dimensions && w > 65) {
-        c.font = '10px "JetBrains Mono", monospace';
-        c.fillStyle = INK;
-        c.fillText(`${r.room.w} × ${r.room.d}m`, x + w / 2, y + d - 12);
-      }
     }
-    for (let i = 0; i < list.length; i++)
-      for (let j = i + 1; j < list.length; j++) {
-        const o = sharedOpening(
-          list[i],
-          plan.positions[list[i].roomId],
-          list[j],
-          plan.positions[list[j].roomId],
-        );
-        if (!o) continue;
-        c.save();
-        c.translate(ox + o.x * scale, oy + o.z * scale);
-        if (o.vertical) c.rotate(-Math.PI / 2);
-        const width = o.width * scale;
-        c.strokeStyle = PAPER;
-        c.lineWidth = Math.max(6, 0.12 * scale);
-        c.beginPath();
-        c.moveTo(-width / 2, 0);
-        c.lineTo(width / 2, 0);
-        c.stroke();
-        c.strokeStyle = '#77776b';
-        c.lineWidth = 1;
-        c.setLineDash([3, 3]);
-        c.beginPath();
-        c.arc(-width / 2, 0, width, -Math.PI / 2, 0);
-        c.stroke();
-        c.setLineDash([]);
-        c.beginPath();
-        c.moveTo(-width / 2, 0);
-        c.lineTo(-width / 2, -width);
-        c.stroke();
-        c.restore();
-      }
+    for (const r of layout.rooms) {
+      const b = r.bounds;
+      c.strokeStyle = conflicts.has(r.roomId) ? '#b03d29' : INK;
+      c.lineWidth = wall;
+      c.strokeRect(ox + b.left * scale, oy + b.top * scale, r.room.w * scale, r.room.d * scale);
+    }
+    for (const o of layout.openings) drawDoor(c, o, ox, oy, scale, wall + 2);
+    // 고른 공간은 벽 안쪽에 줄자 노랑 테두리를 둘러 표시한다.
+    const active = layout.rooms.find((r) => r.roomId === this.state.roomId);
+    if (active) {
+      const b = active.bounds,
+        inset = wall / 2 + 2;
+      c.strokeStyle = '#d9a21b';
+      c.lineWidth = 2.5;
+      c.strokeRect(
+        ox + b.left * scale + inset,
+        oy + b.top * scale + inset,
+        Math.max(0, active.room.w * scale - inset * 2),
+        Math.max(0, active.room.d * scale - inset * 2),
+      );
+    }
+    const home = avatarSpace(this.state, list);
+    if (home) {
+      const a = avatarLayout({ ...this.state, ...home }),
+        p = plan.positions[home.roomId];
+      if (a) drawAvatar(c, a, ox + p.x * scale, oy + p.z * scale, scale);
+    }
   }
-  bathroom(c, x, y, w, d) {
-    c.save();
-    c.strokeStyle = '#737d77';
-    c.fillStyle = '#fbfaf7';
-    c.lineWidth = 1.5;
-    const scale = this.scale;
-    for (const f of bathroomFixtures({ w: w / scale, d: d / scale })) {
-      const cx = x + w / 2 + f.x * scale,
-        cy = y + d / 2 + f.z * scale;
-      c.beginPath();
-      if (f.type === 'basin')
-        c.ellipse(cx, cy, (f.w * scale) / 2, (f.d * scale) / 2, 0, 0, Math.PI * 2);
-      else c.roundRect(cx - (f.w * scale) / 2, cy - (f.d * scale) / 2, f.w * scale, f.d * scale, 4);
-      c.setLineDash(f.type === 'shower' ? [3, 3] : []);
-      c.fill();
-      c.stroke();
-    }
-    c.restore();
+  // 이름표 자리: 공간의 안쪽 왼쪽 위 모서리.
+  tagAnchor(id) {
+    const r = spaces(this.state).find((r) => r.roomId === id),
+      p = this.state.floorplan.positions[id];
+    if (!r || !p || !this.scale) return null;
+    const rect = this.canvas.getBoundingClientRect(),
+      b = roomBounds(r, p);
+    return {
+      x: rect.left + this.ox + b.left * this.scale,
+      y: rect.top + this.oy + b.top * this.scale,
+      width: r.room.w * this.scale,
+      corner: true,
+      visible: true,
+    };
+  }
+  avatarAnchor() {
+    const list = spaces(this.state),
+      home = avatarSpace(this.state, list);
+    if (!home || !this.scale) return null;
+    const a = avatarLayout({ ...this.state, ...home }),
+      p = this.state.floorplan.positions[home.roomId];
+    if (!a || !p) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    return {
+      x: rect.left + this.ox + (p.x + a.x) * this.scale,
+      y: rect.top + this.oy + (p.z + a.z) * this.scale - a.h * 0.5 * this.scale,
+      visible: true,
+    };
   }
   anchor(id) {
     const r = spaces(this.state).find((r) => r.roomId === id),

@@ -1,12 +1,13 @@
 // 실제 앱에서 기본으로 켜지는 상담 모델(Gemma)에 문장 18개를 차례로 보내고, 턴마다
 // 모델이 해석했는지·앱이 무엇을 바로잡았는지·상태가 어떻게 바뀌었는지 기록한다.
-// 먼저 `npm run dev`를 띄운다. WebGPU를 쓰려고 Chrome 창이 열리며, 처음 한 번 모델을 내려받는다.
-// 사용: node eval/chat/run.mjs [http://127.0.0.1:5173/] [results/name.json]
+// 먼저 `npm run dev`를 띄운다. 처음 한 번 모델을 내려받는다(Gemma 3 1B 약 570MB, Gemma 4 E2B 약 2.7GB).
+// 사용: [MODEL=light|large] [HEADLESS=1] node eval/chat/run.mjs [http://127.0.0.1:5173/] [results/name.json]
+// MODEL은 앱의 상담 모델 선택(light: Gemma 3 1B, large: Gemma 4 E2B)이다. HEADLESS=1이면 창을 띄우지 않는다.
 import { chromium } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 const dir = path.dirname(new URL(import.meta.url).pathname);
-const URL = process.argv[2] || 'http://127.0.0.1:5173/';
+const BASE = process.argv[2] || 'http://127.0.0.1:5173/';
 const OUT = path.resolve(dir, process.argv[3] || 'results/gemma.json');
 const PROFILE = path.join(dir, '../../.cache/photo-eval-profile');
 const PROMPTS = [
@@ -29,14 +30,36 @@ const PROMPTS = [
   '겹친 가구 있으면 정리해줘',
   '배치를 파일로 저장하고 싶어',
 ];
+const MODEL = process.env.MODEL === 'large' ? 'large' : 'light';
+// 모델이 켜진 상태에서도 앱이 직접 처리하는 키·자세·집 전체 명령. 18문장 뒤에 이어서 보낸다.
+const APP_PROMPTS = [
+  '예시 방 불러와줘',
+  '내 키 175cm로 침대에 눕혀줘',
+  '의자에 앉혀줘',
+  '일으켜줘',
+  '집 전체를 3D로 보여줘',
+  '아바타 숨겨줘',
+];
 const ctx = await chromium.launchPersistentContext(PROFILE, {
-  channel: 'chrome', headless: false, viewport: { width: 1440, height: 900 }, args: ['--enable-unsafe-webgpu'],
+  channel: 'chrome', headless: process.env.HEADLESS === '1', viewport: { width: 1440, height: 900 }, args: ['--enable-unsafe-webgpu'],
 });
 const page = ctx.pages()[0] || (await ctx.newPage());
+// 모델마다 같은 예시 방에서 시작하도록 처음 한 번 저장된 배치와 대화를 지운다.
+await page.addInitScript((choice) => {
+  try {
+    localStorage.setItem('room-ggu-model-choice', choice);
+    localStorage.removeItem('room-ggu-model');
+    if (!sessionStorage.getItem('eval-reset')) {
+      localStorage.removeItem('room-ggu-v2');
+      localStorage.removeItem('room-ggu-thread-v1');
+      sessionStorage.setItem('eval-reset', '1');
+    }
+  } catch {}
+}, MODEL);
 const errors = [];
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 200)));
 page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
-await page.goto(URL);
+await page.goto(BASE);
 await page.waitForFunction(() => window.__roomggu?.ready(), null, { timeout: 60000 });
 if (await page.getByRole('button', { name: '새 대화' }).count()) {
   await page.getByRole('button', { name: '새 대화' }).click();
@@ -44,11 +67,37 @@ if (await page.getByRole('button', { name: '새 대화' }).count()) {
 }
 const t0 = Date.now();
 const status0 = await page.evaluate(() => window.__roomggu.app.ai.text);
-await page.waitForFunction(() => ['ready', 'error', 'unsupported'].includes(window.__roomggu.app.ai.text), null, { timeout: 5 * 60e3 });
+// 처음 내려받을 때는 안내 다이얼로그가 뜬다. 화면을 남기고 "계속 쓰기"로 접은 뒤 준비를 기다린다.
+const dialog = page.locator('#download-dialog');
+const seen = await dialog.waitFor({ state: 'visible', timeout: 20000 }).then(() => true, () => false);
+if (seen) {
+  await page.waitForTimeout(1500);
+  const info = await page.evaluate(() => ({ ...window.__roomggu.app.ai.download }));
+  console.log('download dialog', JSON.stringify(info));
+  if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+  if (info.phase === 'fetch' || info.phase === 'init') await page.locator('#download-continue').click();
+}
+// 준비가 끝나거나 실패할 때까지 기다린다. 받은 양이 3분 넘게 늘지 않으면 멈춘 것으로 본다.
+let lastMb = null,
+  lastAt = Date.now(),
+  logged = 0;
+for (;;) {
+  const s = await page.evaluate(() => ({ text: window.__roomggu?.app.ai.text, mb: window.__roomggu?.app.ai.download?.mb ?? null }));
+  if (['ready', 'error', 'unsupported', 'off'].includes(s.text)) break;
+  if (s.mb !== lastMb) {
+    lastMb = s.mb;
+    lastAt = Date.now();
+    if (s.mb !== null && s.mb - logged >= 300) console.log('downloaded', (logged = s.mb), 'MB');
+  } else if (Date.now() - lastAt > 180e3) throw Error(`모델 준비가 멈췄어요 (${s.mb}MB에서 3분간 변화 없음)`);
+  await page.waitForTimeout(2000);
+}
+await page.waitForTimeout(500);
+if (await dialog.isVisible()) await page.locator('#download-continue').click();
 const ai = await page.evaluate(() => ({ ...window.__roomggu.app.ai }));
 console.log('model', status0, '→', ai.text, ai.model, Date.now() - t0, 'ms', ai.error || '');
 const results = [];
-for (const prompt of PROMPTS) {
+const only = process.env.ONLY === 'app' ? [] : PROMPTS;
+for (const prompt of [...only, ...APP_PROMPTS]) {
   const start = Date.now();
   await page.locator('#chat-input').fill(prompt);
   await page.keyboard.press('Enter');
@@ -68,6 +117,7 @@ for (const prompt of PROMPTS) {
       room: `${s.name} ${s.room.type} ${s.room.w}x${s.room.d}x${s.room.h} wall ${s.room.wallColor} floor ${s.room.floorColor}`,
       draft: app.draft && `${app.draft.type} ${app.draft.dims.join('/')} ${app.draft.color} [${app.draft.sources.join(' | ')}]`,
       items: s.items.length, spaces: 1 + (s.otherRooms?.length || 0), target: app.target.type,
+      avatar: s.avatar.enabled ? `${s.avatar.height}cm ${s.avatar.pose}` : 'off', scope: `${s.scope} ${s.view}`,
       label: document.querySelector('.msg.assistant:last-of-type .msg-meta')?.textContent,
     };
   });

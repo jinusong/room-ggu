@@ -52,7 +52,7 @@ export function validateSurface(value, scope, fallback = 'dimensions') {
 // 나머지는 규칙 기반 상담이나 사용자의 직접 호출로만 열린다.
 export const SURFACE_KINDS = {
   avatar: { scope: 'app', title: '내 키로 크기 비교', icon: 'person-standing' },
-  floorplan: { scope: 'app', title: '집 전체 평면도', icon: 'house' },
+  floorplan: { scope: 'app', title: '집 전체', icon: 'house' },
   'room-size': { scope: 'room', model: 'dimensions', title: '방 크기', icon: 'ruler' },
   'room-type': { scope: 'room', model: 'types', title: '공간 유형', icon: 'layout-grid' },
   finishes: { scope: 'room', model: 'finishes', title: '벽과 바닥', icon: 'paint-roller' },

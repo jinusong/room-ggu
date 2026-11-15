@@ -60,26 +60,70 @@ export function floorplanWarnings(list, floorplan) {
   return conflicts;
 }
 // 맞닿은 벽의 80cm 개구부를 연결 초안으로 그린다. 실제 문 위치는 측정값이 아니다.
+// side는 문짝이 열리는 쪽(+1: +x 또는 +z, -1: 반대)이며 더 넓은 공간 쪽으로 연다.
 export function sharedOpening(a, ap, b, bp) {
   const A = roomBounds(a, ap),
     B = roomBounds(b, bp);
+  // 넓이가 같으면 왼쪽·위쪽 공간으로 연다. 두 공간의 순서를 바꿔 불러도 결과가 같다.
+  const areaA = a.room.w * a.room.d,
+    areaB = b.room.w * b.room.d,
+    side = (aFirst) => ((areaA > areaB || (areaA === areaB && aFirst)) === aFirst ? -1 : 1);
   const z0 = Math.max(A.top, B.top),
     z1 = Math.min(A.bottom, B.bottom);
-  if (Math.min(Math.abs(A.right - B.left), Math.abs(A.left - B.right)) < 0.02 && z1 - z0 >= 0.9)
+  if (Math.min(Math.abs(A.right - B.left), Math.abs(A.left - B.right)) < 0.02 && z1 - z0 >= 0.9) {
+    const aFirst = Math.abs(A.right - B.left) < 0.02;
     return {
-      x: Math.abs(A.right - B.left) < 0.02 ? A.right : A.left,
+      x: aFirst ? A.right : A.left,
       z: (z0 + z1) / 2,
       vertical: true,
       width: 0.8,
+      side: side(aFirst),
     };
+  }
   const x0 = Math.max(A.left, B.left),
     x1 = Math.min(A.right, B.right);
-  if (Math.min(Math.abs(A.bottom - B.top), Math.abs(A.top - B.bottom)) < 0.02 && x1 - x0 >= 0.9)
+  if (Math.min(Math.abs(A.bottom - B.top), Math.abs(A.top - B.bottom)) < 0.02 && x1 - x0 >= 0.9) {
+    const aFirst = Math.abs(A.bottom - B.top) < 0.02;
     return {
       x: (x0 + x1) / 2,
-      z: Math.abs(A.bottom - B.top) < 0.02 ? A.bottom : A.top,
+      z: aFirst ? A.bottom : A.top,
       vertical: false,
       width: 0.8,
+      side: side(aFirst),
     };
+  }
   return null;
+}
+// 한 공간의 벽에 난 연결 문을 그 공간의 로컬 좌표로 옮긴다. inward는 문짝이 이 공간 안으로 열리는지다.
+export function roomOpenings(list, floorplan, roomId) {
+  const self = list.find((r) => r.roomId === roomId),
+    p = self && floorplan.positions[roomId];
+  if (!p) return [];
+  const found = [];
+  for (const other of list) {
+    if (other.roomId === roomId || !floorplan.positions[other.roomId]) continue;
+    const o = sharedOpening(self, p, other, floorplan.positions[other.roomId]);
+    if (!o) continue;
+    const x = o.x - p.x,
+      z = o.z - p.z,
+      positive = o.vertical ? x > 0 : z > 0;
+    found.push({
+      x,
+      z,
+      vertical: o.vertical,
+      width: o.width,
+      wall: o.vertical ? (positive ? 'right' : 'left') : positive ? 'front' : 'back',
+      side: o.side,
+      inward: o.side > 0 !== positive,
+      roomId: other.roomId,
+      name: other.name,
+    });
+  }
+  return found;
+}
+// 문짝 기호의 기준점. 경첩에서 along 방향이 닫힌 문, leaf 방향이 열린 문이다(2D·3D 공용).
+export function doorSwing(o) {
+  return o.vertical
+    ? { hinge: [o.x, o.z + o.width / 2], along: [0, -1], leaf: [o.side, 0] }
+    : { hinge: [o.x - o.width / 2, o.z], along: [1, 0], leaf: [0, o.side] };
 }

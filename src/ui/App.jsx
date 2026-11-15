@@ -3,6 +3,7 @@ import * as store from '../app/store.js';
 import { app } from '../app/store.js';
 import { Stage } from './Stage.jsx';
 import { Sheet } from './Sheet.jsx';
+import { ModelDownload } from './ModelDownload.jsx';
 import { Icon } from './icons.js';
 
 const MOBILE = 760;
@@ -62,7 +63,7 @@ function useShortcuts() {
         document.getElementById('chat-input')?.focus();
         return;
       }
-      if (e.key === 'Escape' && app.selected) store.select(null);
+      if (e.key === 'Escape' && (app.selected || app.view.avatarBar)) store.select(null);
       if (!app.selected) return;
       if (['Delete', 'Backspace'].includes(e.key)) {
         e.preventDefault();
@@ -110,6 +111,7 @@ export function App() {
     store.bootModel();
     window.__roomggu = {
       app,
+      store,
       anchor: (id, opts) =>
         (app.state.view === '2d' ? app.scenes.plan : app.scenes.three)?.anchor(id, opts),
       ready: () => !!app.scenes.three || app.view.webglError,
@@ -153,6 +155,7 @@ export function App() {
           가구 사진을 놓으면 대화에 붙어요
         </div>
       )}
+      <ModelDownload />
       <Toast />
       <input
         id="photo-file"

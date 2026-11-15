@@ -1,11 +1,112 @@
-import { TYPES, footprint } from './data.js';
-import { tapeCanvas, PAPER } from './tape.js';
-import { avatarLayout, LIMBS } from './avatar.js';
+import { TYPES, footprint, spaces } from './data.js';
+import { tapeCanvas, drawTags, PAPER } from './tape.js';
+import { avatarLayout, avatarHit, avatarReach, LIMBS } from './avatar.js';
+import { roomOpenings, doorSwing } from './floorplan.js';
+import { bathroomFixtures } from './house-geometry.js';
 
 // 건축 평면도 방식의 2D 도면. 벽은 먹색 단면, 가구는 위에서 본 기호와 이름으로 그린다.
 const INK = '#2a2824';
 const FONT = '"Pretendard Variable", Pretendard, system-ui, sans-serif';
 const TALL = new Set(['wardrobe', 'shelf', 'fridge', 'shoe_cabinet']);
+
+// 위에서 본 아바타. 관절 좌표(m)를 그대로 그려 가구와 같은 축척을 유지한다.
+export function drawAvatar(c, a, ox, oy, s) {
+  const j = a.joints,
+    h = a.h,
+    at = (p) => [p[0] * s, p[2] * s],
+    line = (from, to, width) => {
+      c.lineWidth = Math.max(2, width * s);
+      c.beginPath();
+      c.moveTo(...at(from));
+      c.lineTo(...at(to));
+      c.stroke();
+    };
+  c.save();
+  c.translate(ox + a.x * s, oy + a.z * s);
+  c.rotate((-a.angle * Math.PI) / 180);
+  c.lineCap = 'round';
+  c.strokeStyle = '#667669';
+  c.fillStyle = '#667669';
+  for (const [from, to] of LIMBS)
+    line(j[from], j[to], h * (from.includes('Hip') || from.includes('Knee') ? 0.075 : 0.05));
+  for (const side of ['left', 'right']) line(j[side + 'Foot'], j[side + 'Toe'], h * 0.055);
+  c.strokeStyle = '#59695c';
+  const spine = Math.hypot(j.shoulder[0] - j.hip[0], j.shoulder[2] - j.hip[2]);
+  if (spine > h * 0.08) line(j.hip, j.shoulder, h * 0.24);
+  c.fillStyle = '#59695c';
+  c.beginPath();
+  c.ellipse(...at(j.shoulder), h * 0.16 * s, h * 0.085 * s, 0, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = '#48574b';
+  c.beginPath();
+  c.arc(...at(j.head), Math.max(3, h * 0.062 * s), 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+}
+
+// 화장실 설비 기호. 3D 모형과 같은 위치·방향을 쓴다.
+export function drawFixtures(c, room, openings, cx, cy, s) {
+  c.save();
+  c.strokeStyle = '#737d77';
+  c.fillStyle = '#fbfaf7';
+  c.lineWidth = 1.5;
+  for (const f of bathroomFixtures(room, openings)) {
+    const w = f.w * s,
+      d = f.d * s;
+    c.save();
+    c.translate(cx + f.x * s, cy + f.z * s);
+    c.rotate((-f.angle * Math.PI) / 180);
+    c.setLineDash(f.type === 'shower' ? [3, 3] : []);
+    c.beginPath();
+    if (f.type === 'basin') c.ellipse(0, 0, w / 2, d / 2, 0, 0, Math.PI * 2);
+    else if (f.type === 'toilet') c.ellipse(0, d * 0.12, w / 2, d * 0.38, 0, 0, Math.PI * 2);
+    else c.roundRect(-w / 2, -d / 2, w, d, 3);
+    c.fill();
+    c.stroke();
+    if (f.type === 'toilet') {
+      // 물탱크는 벽 쪽에 따로 그린다.
+      c.beginPath();
+      c.roundRect(-w * 0.45, -d / 2, w * 0.9, d * 0.26, 2);
+      c.fill();
+      c.stroke();
+    }
+    c.restore();
+  }
+  c.restore();
+}
+
+// 연결 문: 벽을 비우고 문짝과 열리는 호를 점선으로 그린다. 위치는 초안이다.
+export function drawDoor(c, o, ox, oy, s, wall) {
+  const { hinge, along, leaf } = doorSwing(o),
+    w = o.width * s,
+    hx = ox + hinge[0] * s,
+    hy = oy + hinge[1] * s;
+  c.save();
+  c.strokeStyle = PAPER;
+  c.lineCap = 'butt';
+  c.lineWidth = wall;
+  c.beginPath();
+  c.moveTo(hx, hy);
+  c.lineTo(hx + along[0] * w, hy + along[1] * w);
+  c.stroke();
+  c.strokeStyle = '#77776b';
+  c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(hx, hy);
+  c.lineTo(hx + leaf[0] * w, hy + leaf[1] * w);
+  c.stroke();
+  c.setLineDash([3, 3]);
+  c.beginPath();
+  for (let i = 0; i <= 12; i++) {
+    const t = (i / 12) * (Math.PI / 2),
+      x = hx + (Math.cos(t) * along[0] + Math.sin(t) * leaf[0]) * w,
+      y = hy + (Math.cos(t) * along[1] + Math.sin(t) * leaf[1]) * w;
+    if (i) c.lineTo(x, y);
+    else c.moveTo(x, y);
+  }
+  c.stroke();
+  c.restore();
+}
 
 export class PlanScene {
   constructor(host, state, cb) {
@@ -25,22 +126,21 @@ export class PlanScene {
     this.resize = new ResizeObserver(() => this.draw());
     this.resize.observe(host);
     this.hit = (p) => {
-      const avatar = avatarLayout(this.state);
-      if (
-        avatar?.pose === 'standing' &&
-        Math.hypot(p.x - avatar.x, p.z - avatar.z) < avatar.h * 0.18
-      )
-        return { id: 'avatar', x: avatar.x, z: avatar.z };
-      for (const a of [...this.state.items].sort(
-        (a, b) => (a.type === 'rug') - (b.type === 'rug'),
-      )) {
+      const inside = (a) => {
         const dx = p.x - a.x,
           dz = p.z - a.z,
           r = (a.angle * Math.PI) / 180;
         const x = dx * Math.cos(r) - dz * Math.sin(r),
           z = dx * Math.sin(r) + dz * Math.cos(r);
-        if (Math.abs(x) <= a.dims[0] / 200 && Math.abs(z) <= a.dims[2] / 200) return a;
-      }
+        return Math.abs(x) <= a.dims[0] / 200 && Math.abs(z) <= a.dims[2] / 200;
+      };
+      // 앉거나 누운 아바타는 가구 위를 덮는다. 그 가구를 누르면 가구가 잡히게 하고,
+      // 아바타는 머리 위 이름표나 가구 밖으로 나온 부분으로 고른다.
+      const avatar = avatarLayout(this.state);
+      if (avatar && avatarHit(avatar, p.x, p.z) && !(avatar.item && inside(avatar.item)))
+        return { id: 'avatar', x: avatar.x, z: avatar.z, fixed: avatar.pose !== 'standing' };
+      for (const a of [...this.state.items].sort((a, b) => (a.type === 'rug') - (b.type === 'rug')))
+        if (inside(a)) return a;
       return null;
     };
     this.down = (e) => {
@@ -49,7 +149,15 @@ export class PlanScene {
         hit = this.hit(p);
       if (hit?.id !== 'avatar') this.cb.select(hit?.id || null);
       if (hit) {
-        this.drag = { id: hit.id, dx: hit.x - p.x, dz: hit.z - p.z, started: false };
+        this.drag = {
+          id: hit.id,
+          dx: hit.x - p.x,
+          dz: hit.z - p.z,
+          px: e.clientX,
+          py: e.clientY,
+          fixed: !!hit.fixed,
+          started: false,
+        };
         this.canvas.setPointerCapture(e.pointerId);
       }
     };
@@ -59,6 +167,12 @@ export class PlanScene {
         this.canvas.style.cursor = this.hit(p) ? 'grab' : '';
         return;
       }
+      // 손가락이 살짝 흔들린 정도는 누르기로 본다. 앉거나 누운 아바타는 가구를 따라가므로 끌지 않는다.
+      if (
+        this.drag.fixed ||
+        (!this.drag.started && Math.hypot(e.clientX - this.drag.px, e.clientY - this.drag.py) < 4)
+      )
+        return;
       if (!this.drag.started) {
         this.drag.started = true;
         this.cb.start?.();
@@ -69,10 +183,11 @@ export class PlanScene {
     };
     this.up = () => {
       if (this.drag) {
-        const started = this.drag.started;
+        const { started, id } = this.drag;
         this.drag = null;
         this.canvas.style.cursor = '';
         if (started) this.cb.commit();
+        else if (id === 'avatar') this.cb.pickAvatar?.();
       }
     };
     this.canvas.addEventListener('pointerdown', this.down);
@@ -124,6 +239,25 @@ export class PlanScene {
     return {
       x: r.left + this.ox + a.x * this.scale,
       y: r.top + this.oy + (center ? a.z : a.z - f.d / 2) * this.scale - (center ? 0 : 8),
+      visible: true,
+    };
+  }
+  // 아바타 이름표 자리: 몸이 차지한 범위의 위쪽 가운데.
+  avatarAnchor() {
+    const a = avatarLayout(this.state);
+    if (!a || !this.scale) return null;
+    const r = this.canvas.getBoundingClientRect(),
+      b = avatarReach(a),
+      rad = (a.angle * Math.PI) / 180;
+    const zs = [
+      [b.minX, b.minZ],
+      [b.maxX, b.minZ],
+      [b.minX, b.maxZ],
+      [b.maxX, b.maxZ],
+    ].map(([x, z]) => -x * Math.sin(rad) + z * Math.cos(rad));
+    return {
+      x: r.left + this.ox + a.x * this.scale,
+      y: r.top + this.oy + (a.z + Math.min(...zs)) * this.scale,
       visible: true,
     };
   }
@@ -226,44 +360,39 @@ export class PlanScene {
     c.stroke();
     this.tape(c, `${Math.round(room.w * 100)} cm`, this.ox, ly);
     this.tape(c, `${Math.round(room.d * 100)} cm`, lx, this.oy, -Math.PI / 2);
+    const doors = roomOpenings(spaces(this.state), this.state.floorplan, this.state.roomId);
+    for (const o of doors) {
+      drawDoor(c, o, this.ox, this.oy, s, wt * 2 + 2);
+      if (!this.state.dimensions) continue;
+      // 문 너머의 공간 이름을 문 안쪽에 적어 어디로 이어지는지 알린다. 벽 바깥은 치수선 자리다.
+      const inset = 12 / s,
+        name = o.name.length > 9 ? o.name.slice(0, 8) + '…' : o.name;
+      c.save();
+      c.translate(
+        this.ox + (o.x + (o.wall === 'right' ? -inset : o.wall === 'left' ? inset : 0)) * s,
+        this.oy + (o.z + (o.wall === 'front' ? -inset : o.wall === 'back' ? inset : 0)) * s,
+      );
+      if (o.vertical) c.rotate(-Math.PI / 2);
+      c.font = `500 11px ${FONT}`;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      const text = `${name} 문`,
+        tw = c.measureText(text).width + 8;
+      c.fillStyle = 'rgba(251,250,247,0.86)';
+      c.fillRect(-tw / 2, -8, tw, 16);
+      c.fillStyle = '#545049';
+      c.fillText(text, 0, 0.5);
+      c.restore();
+    }
+    if (room.type === 'bathroom') drawFixtures(c, room, doors, this.ox, this.oy, s);
     const items = [...this.state.items].sort((a, b) => (b.type === 'rug') - (a.type === 'rug'));
     for (const a of items)
       this.item(c, a, { warn: this.warnings.has(a.id), selected: a.id === this.selected });
     if (this.ghostItem) this.item(c, this.ghostItem, { ghost: true });
-    this.drawAvatar(c);
+    const avatar = avatarLayout(this.state);
+    if (avatar) drawAvatar(c, avatar, this.ox, this.oy, s);
   }
-  drawAvatar(c) {
-    const a = avatarLayout(this.state);
-    if (!a) return;
-    const s = this.scale;
-    c.save();
-    c.translate(this.ox + a.x * s, this.oy + a.z * s);
-    c.rotate((-a.angle * Math.PI) / 180);
-    c.strokeStyle = '#526354';
-    c.fillStyle = '#667669';
-    c.lineCap = 'round';
-    for (const [from, to] of [...LIMBS, ['hip', 'shoulder']]) {
-      c.lineWidth = Math.max(3, a.h * (from === 'hip' ? 0.2 : 0.05) * s);
-      c.beginPath();
-      c.moveTo(a.joints[from][0] * s, a.joints[from][2] * s);
-      c.lineTo(a.joints[to][0] * s, a.joints[to][2] * s);
-      c.stroke();
-    }
-    const head = a.joints.head;
-    c.beginPath();
-    c.arc(head[0] * s, head[2] * s, Math.max(3, a.h * 0.06 * s), 0, Math.PI * 2);
-    c.fill();
-    c.restore();
-    this.tape(
-      c,
-      `키 ${a.height} cm`,
-      this.ox + a.x * s,
-      this.oy + (a.z + (a.pose === 'lying' ? a.h / 2 : a.h * 0.25)) * s + 20,
-      0,
-      { fill: '#fbfaf7' },
-    );
-  }
-  item(c, a, { warn = false, selected = false, ghost = false }) {
+  item(c, a, { warn = false, selected = false, ghost = false, named = true }) {
     const s = this.scale,
       fw = (a.dims[0] * s) / 100,
       fd = (a.dims[2] * s) / 100;
@@ -360,6 +489,7 @@ export class PlanScene {
       this.tape(c, `${a.dims[2]}`, fw / 2 + 18, 0, -Math.PI / 2);
     }
     c.restore();
+    if (!named) return;
     // 이름은 가구가 돌아가도 똑바로 읽히게 회전 없이 쓴다.
     const f = footprint(a),
       bw = f.w * s,
@@ -381,9 +511,18 @@ export class PlanScene {
       c.fillText(label, cx, cy + bd / 2 - 12);
     }
   }
-  png() {
+  png(tags = []) {
     this.draw();
-    return this.canvas.toDataURL('image/png');
+    if (!tags.length) return this.canvas.toDataURL('image/png');
+    const out = document.createElement('canvas'),
+      ratio = this.canvas.width / this.host.clientWidth;
+    out.width = this.canvas.width;
+    out.height = this.canvas.height;
+    const g = out.getContext('2d');
+    g.drawImage(this.canvas, 0, 0);
+    g.scale(ratio, ratio);
+    drawTags(g, tags);
+    return out.toDataURL('image/png');
   }
   dispose() {
     this.resize.disconnect();

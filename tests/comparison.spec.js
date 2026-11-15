@@ -110,7 +110,8 @@ test('서 있는 아바타를 3D·2D에서 실제로 끌어 옮긴다', async ({
     const sc = window.__roomggu.app.scenes.three,
       model = sc.comparison.children.find((o) => o.userData.avatar);
     model.updateMatrixWorld(true);
-    const v = model.children[1].getWorldPosition(model.position.clone()).project(sc.camera);
+    // 몸통 가운데를 잡는다.
+    const v = model.children[2].getWorldPosition(model.position.clone()).project(sc.camera);
     const r = sc.renderer.domElement.getBoundingClientRect();
     return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
   });

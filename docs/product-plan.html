@@ -378,7 +378,7 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-md h3, .am-md h4 { margin: 14px 0 6px; font-size: var(--am-fs-text); }
 .am-md a { color: var(--accent); }
 .am-md blockquote { margin: 0 0 8px; padding: 2px 12px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); }
-.am-md :not(pre) > code { font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }
+.am-md :not(pre) > code { overflow-wrap: break-word; font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }
 .am-md hr { border: 0; border-top: 1px solid var(--line-2); margin: 12px 0; }
 .am-md table { width: 100%; border-collapse: collapse; font-size: var(--am-fs-text); }
 .am-md th {
@@ -523,20 +523,25 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 /* ── timeline ────────────────────────────── */
 .am-timeline { list-style: none; margin: 0; padding: 0; }
 .am-timeline--h { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); padding-top: 4px; }
-.am-timeline--h li { position: relative; text-align: center; padding: 0 6px; }
-.am-timeline--h li::before {
-  content: ""; position: absolute; top: calc(var(--am-ln-whenHeight) + 7px); left: 0; right: 0; border-top: var(--bw) solid var(--line);
+/* Every item spans the same four rows (date, dot, title, text) through subgrid, so a date that wraps to two lines moves every dot down
+   together instead of running into its own. The axis is drawn from each dot to both edges of its item; the item clips it, and the first
+   and last items leave out their outer half. Do not make the li a size container: Chrome then ignores subgrid. */
+.am-timeline--h { grid-template-rows: repeat(4, auto); }
+.am-timeline--h li { position: relative; text-align: center; padding: 0 6px; display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 0; overflow-x: clip; }
+.am-timeline--h .am-tl-dot::before, .am-timeline--h .am-tl-dot::after {
+  content: ""; position: absolute; top: calc(50% - var(--bw) / 2); width: 100vw; border-top: var(--bw) solid var(--line);
 }
-.am-timeline--h li:first-child::before { inset-inline-start: 50%; }
-.am-timeline--h li:last-child::before { inset-inline-end: 50%; }
-.am-tl-when { display: block; font-size: var(--am-fs-heading); font-weight: 500; height: var(--am-ln-whenHeight); }
+.am-timeline--h .am-tl-dot::before { inset-inline-end: calc(100% + var(--bw)); }
+.am-timeline--h .am-tl-dot::after { inset-inline-start: calc(100% + var(--bw)); }
+.am-timeline--h li:first-child .am-tl-dot::before, .am-timeline--h li:last-child .am-tl-dot::after { content: none; }
+.am-tl-when { display: block; font-size: var(--am-fs-heading); font-weight: 500; min-height: var(--am-ln-whenHeight); align-self: end; }
 .am-tl-dot {
   position: relative; display: block; width: 11px; height: 11px; margin: 2px auto 8px;
   border: var(--bw) solid var(--line); border-radius: 50%; background: var(--paper);
 }
 .am-tl-item--hi .am-tl-dot { background: var(--hi-stroke, var(--accent)); border-color: var(--hi-stroke, var(--accent)); }
-.am-tl-title { display: block; font-size: var(--am-fs-code); font-weight: 500; }
-.am-tl-text { display: block; font-size: var(--am-fs-small); color: var(--ink-2); line-height: 1.45; }
+.am-tl-title { display: block; font-size: var(--am-fs-code); font-weight: 500; overflow-wrap: break-word; min-width: 0; }
+.am-tl-text { display: block; font-size: var(--am-fs-small); color: var(--ink-2); line-height: 1.45; overflow-wrap: break-word; min-width: 0; }
 .am-timeline--v li { position: relative; padding: 0 0 14px; padding-inline-start: 22px; }
 .am-timeline--v li::before { content: ""; position: absolute; inset-inline-start: 5px; top: 6px; bottom: -6px; border-inline-start: var(--bw) solid var(--line-2); }
 .am-timeline--v li:last-child::before { display: none; }
@@ -550,9 +555,10 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-tl-wrap { container-type: inline-size; }
 @container (max-width: 560px) {
   .am-timeline--h { display: block; padding-top: 0; }
-  .am-timeline--h li { text-align: start; padding: 0 0 14px; padding-inline-start: 22px; }
-  .am-timeline--h li::before, .am-timeline--h li:first-child::before {
-    top: 6px; bottom: -6px; inset-inline-start: 5px; inset-inline-end: auto; border-top: 0; border-inline-start: var(--bw) solid var(--line-2);
+  .am-timeline--h li { display: block; overflow-x: visible; text-align: start; padding: 0 0 14px; padding-inline-start: 22px; }
+  .am-timeline--h .am-tl-dot::before, .am-timeline--h .am-tl-dot::after { content: none; }
+  .am-timeline--h li::before {
+    content: ""; position: absolute; top: 6px; bottom: -6px; inset-inline-start: 5px; inset-inline-end: auto; border-top: 0; border-inline-start: var(--bw) solid var(--line-2);
   }
   .am-timeline--h li:last-child::before { display: none; }
   .am-timeline--h .am-tl-dot { position: absolute; inset-inline-start: 0; top: 4px; margin: 0; }
@@ -623,6 +629,9 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-tree-col:first-child::before { inset-inline-start: 50%; }
 .am-tree-col:last-child::before { inset-inline-end: 50%; }
 .am-tree-col::after { content: ""; position: absolute; top: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }
+/* A forest (no single root) has nothing above its columns, so they draw no connectors. */
+.am-tree-cols--free > .am-tree-col { padding-top: 0; }
+.am-tree-cols--free > .am-tree-col::before, .am-tree-cols--free > .am-tree-col::after { content: none; }
 .am-tree-list, .am-tree-list ul { list-style: none; margin: 0; padding: 0; }
 .am-tree-col > .am-tree-list { margin: 8px 0 0; margin-inline-start: 14px; }
 .am-tree-list ul { margin-inline-start: 16px; }
@@ -671,6 +680,8 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 /* API contracts use the existing prose and table styles; the endpoint keeps its protocol punctuation left to right. */
 .am-api-endpoint { display: flex; gap: 10px; align-items: baseline; overflow-wrap: anywhere; }
 .am-api-endpoint strong { color: var(--accent); }
+/* The target is inline code, whose break-word keeps a flex item at its full word width; min-width: 0 lets it shrink and wrap. */
+.am-api-endpoint > code { min-width: 0; }
 .am-api .am-api-section h4 { margin: 16px 0 6px; font-size: var(--am-fs-text); }
 .am-api .am-api-section h4 code { font-weight: 400; }
 .am-api .am-api-section table { margin: 0; table-layout: fixed; }
@@ -952,7 +963,7 @@ html[data-theme="paper"] .am-md table { font-family: var(--font-sans); }
 <button class="am-btn" type="button" data-am="copy" data-done="Copied ✓">Copy source</button>
 </div>
 <main class="am-doc">
-<header class="am-head"><p class="am-colophon">Generated by <a href="https://github.com/QingYunA/answer-me-with-html" target="_blank" rel="noopener">Answer me with HTML</a> 0.5.11 · 2026-11-14 17:34 · <a href="https://github.com/QingYunA/answer-me-with-html" target="_blank" rel="noopener">★ Star on GitHub</a></p><h1>룸꾸 — 말로 꾸미는 내 방</h1><p class="am-sub">대화 시트와 화면 전체의 방 모형, 대화 안에 나타나는 편집 도구</p><div class="am-intro am-md"><div class="am-md"><p>방 모형이 화면 전체를 채우고 대화가 그 위에 시트로 붙는다. 사용자는 말이나 사진으로 방과 가구를 설명한다. 그 순간 필요한 도구가 대화 안에 나타나고 방이 바로 바뀐다. 탭과 별도 메뉴는 없다.</p>
+<header class="am-head"><p class="am-colophon">Generated by <a href="https://github.com/QingYunA/answer-me-with-html" target="_blank" rel="noopener">Answer me with HTML</a> 0.5.11 · 2026-11-16 00:15 · <a href="https://github.com/QingYunA/answer-me-with-html" target="_blank" rel="noopener">★ Star on GitHub</a></p><h1>룸꾸 — 말로 꾸미는 내 방</h1><p class="am-sub">대화 시트와 화면 전체의 방 모형, 대화 안에 나타나는 편집 도구</p><div class="am-intro am-md"><div class="am-md"><p>방 모형이 화면 전체를 채우고 대화가 그 위에 시트로 붙는다. 사용자는 말이나 사진으로 방과 가구를 설명한다. 그 순간 필요한 도구가 대화 안에 나타나고 방이 바로 바뀐다. 탭과 별도 메뉴는 없다.</p>
 </div></div></header>
 <div class="am-doc-layout am-doc-layout--rail-end">
 <nav class="am-toc" aria-label="Contents" data-side="end" data-flow="in"><details class="am-outline"><summary aria-label="Contents"><span class="am-ticks" aria-hidden="true"><i class="am-tick" data-id="A" data-title="A · 사용 흐름"></i><i class="am-tick" data-id="B" data-title="B · 화면 구성"></i><i class="am-tick" data-id="C" data-title="C · 대화에 나타나는 도구"></i><i class="am-tick" data-id="D" data-title="D · 모델과 앱의 경계"></i><i class="am-tick" data-id="E" data-title="E · 지원 범위"></i><i class="am-tick" data-id="F" data-title="F · 서버 없는 실행"></i></span></summary><ol class="am-outline-list"><li><a href="#panel-A">A · 사용 흐름</a></li><li><a href="#panel-B">B · 화면 구성</a></li><li><a href="#panel-C">C · 대화에 나타나는 도구</a></li><li><a href="#panel-D">D · 모델과 앱의 경계</a></li><li><a href="#panel-E">E · 지원 범위</a></li><li><a href="#panel-F">F · 서버 없는 실행</a></li></ol></details></nav>
@@ -1022,14 +1033,14 @@ html[data-theme="paper"] .am-md table { font-family: var(--font-sans); }
 <td>화장실을 포함한 8가지 유형, 직접 정한 치수는 유지</td>
 </tr>
 <tr>
-<td>내 키 175cm야</td>
+<td>내 키 175cm야 (또는 방 아래 사람 버튼)</td>
 <td>내 키로 크기 비교</td>
-<td>같은 축척의 아바타, 의자·소파에 앉기와 침대에 눕기</td>
+<td>같은 축척의 아바타와 높이 비교 그림, 고른 가구에 앉히기·눕히기</td>
 </tr>
 <tr>
-<td>집 전체를 3D로 보여줘</td>
-<td>집 전체 평면도 → 3D 모형</td>
-<td>방·화장실·가구를 함께 보고, 공간 선택 후 방 편집</td>
+<td>집 전체를 3D로 보여줘 (또는 위쪽 길잡이의 집 전체)</td>
+<td>집 전체</td>
+<td>방·화장실·가구·아바타를 함께 보고, 이름표의 방 편집으로 들어감</td>
 </tr>
 <tr>
 <td>벽은 세이지, 바닥은 월넛</td>
@@ -1093,7 +1104,7 @@ html[data-theme="paper"] .am-md table { font-family: var(--font-sans); }
 </section>
 <section class="am-panel" id="panel-F">
 <header class="am-panel-head"><span class="am-panel-id">F</span><h2>서버 없는 실행</h2></header>
-<div class="am-panel-body"><div class="am-md"><p>추론은 WebLLM(Gemma 3 1B, f16 미지원 GPU는 Qwen3 0.6B)과 Transformers.js(SigLIP base)로 브라우저 Worker에서 한다. 처음 한 번 공개 저장소에서 모델을 내려받고, 사진과 대화는 추론 서버로 보내지 않는다. GitHub Pages에 정적 빌드를 배포한다.</p>
+<div class="am-panel-body"><div class="am-md"><p>추론은 WebLLM과 Transformers.js(SigLIP base)로 브라우저 Worker에서 한다. 상담 모델의 기본은 Gemma 3 1B(약 600MB)이고 f16 미지원 GPU는 Qwen3 0.6B를 쓴다. 사용자가 고르면 Gemma 4 E2B(약 2.8GB)를 쓴다. 모델 파일을 내려받는 동안에는 다이얼로그로 진행률을 알린다. 처음 한 번 공개 저장소에서 모델을 내려받고, 사진과 대화는 추론 서버로 보내지 않는다. GitHub Pages에 정적 빌드를 배포한다.</p>
 <p>공용 스킬 파이프라인: 기획(answer-me-with-html) → 구현 → unslop 디자인 점검 → humanizer 문구 점검 → 단위·브라우저 테스트·실제 모델 확인 → 커밋·푸시·배포.</p>
 </div></div>
 </section>
@@ -1155,8 +1166,8 @@ theme: paper
 |---|---|---|
 | 거실 가로 5m 세로 4m | 방 크기 | 가로·세로·천장, 크기 초안 3개, 평면 미리보기 |
 | 책 읽는 아담한 방 | 방 크기 또는 공간 유형 | 화장실을 포함한 8가지 유형, 직접 정한 치수는 유지 |
-| 내 키 175cm야 | 내 키로 크기 비교 | 같은 축척의 아바타, 의자·소파에 앉기와 침대에 눕기 |
-| 집 전체를 3D로 보여줘 | 집 전체 평면도 → 3D 모형 | 방·화장실·가구를 함께 보고, 공간 선택 후 방 편집 |
+| 내 키 175cm야 (또는 방 아래 사람 버튼) | 내 키로 크기 비교 | 같은 축척의 아바타와 높이 비교 그림, 고른 가구에 앉히기·눕히기 |
+| 집 전체를 3D로 보여줘 (또는 위쪽 길잡이의 집 전체) | 집 전체 | 방·화장실·가구·아바타를 함께 보고, 이름표의 방 편집으로 들어감 |
 | 벽은 세이지, 바닥은 월넛 | 벽과 바닥 | 지금·바꾸기 전(또는 미리보기) 모서리 비교 |
 | 두 명이 앉는 소파 | 규격 비교 | 규격마다 들어가는지·겹치는지·방보다 큰지 |
 | 책상 가로 120cm | 치수 직접 입력 | 가로·깊이·높이, 줄자 칩으로 출처 표시 |
@@ -1194,7 +1205,7 @@ theme: paper
 각 공간의 가구는 직사각형 로컬 좌표에서 편집하고, 집 전체 2D·3D에서 방들을 연결해 ㄱ자 같은 외곽을 구성한다. 내부 벽은 낮춘 단면이고 문과 화장실 설비는 위치 비교용 초안이다. 임의 벽·창문 편집은 지원하지 않는다. 아바타 신체 비율·착석 높이는 단순 모형이며 실제 착석감은 제품에서 확인한다. 사진과 대화는 배치 파일에 넣지 않는다.
 
 ## F 서버 없는 실행
-추론은 WebLLM(Gemma 3 1B, f16 미지원 GPU는 Qwen3 0.6B)과 Transformers.js(SigLIP base)로 브라우저 Worker에서 한다. 처음 한 번 공개 저장소에서 모델을 내려받고, 사진과 대화는 추론 서버로 보내지 않는다. GitHub Pages에 정적 빌드를 배포한다.
+추론은 WebLLM과 Transformers.js(SigLIP base)로 브라우저 Worker에서 한다. 상담 모델의 기본은 Gemma 3 1B(약 600MB)이고 f16 미지원 GPU는 Qwen3 0.6B를 쓴다. 사용자가 고르면 Gemma 4 E2B(약 2.8GB)를 쓴다. 모델 파일을 내려받는 동안에는 다이얼로그로 진행률을 알린다. 처음 한 번 공개 저장소에서 모델을 내려받고, 사진과 대화는 추론 서버로 보내지 않는다. GitHub Pages에 정적 빌드를 배포한다.
 
 공용 스킬 파이프라인: 기획(answer-me-with-html) → 구현 → unslop 디자인 점검 → humanizer 문구 점검 → 단위·브라우저 테스트·실제 모델 확인 → 커밋·푸시·배포.
 </textarea>

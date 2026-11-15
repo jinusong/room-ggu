@@ -1,5 +1,5 @@
 import { spaces } from './data.js';
-import { normalizeFloorplan, roomBounds, sharedOpening } from './floorplan.js';
+import { normalizeFloorplan, roomBounds, sharedOpening, roomOpenings } from './floorplan.js';
 
 // 2D와 같은 공간 중심 좌표를 사용한다. 벽은 맞닿는 구간마다 한 번만 만든다.
 export function houseLayout(state) {
@@ -9,6 +9,7 @@ export function houseLayout(state) {
     ...r,
     position: plan.positions[r.roomId],
     bounds: roomBounds(r, plan.positions[r.roomId]),
+    openings: roomOpenings(list, plan, r.roomId),
   }));
   const minX = Math.min(...rooms.map((r) => r.bounds.left)),
     maxX = Math.max(...rooms.map((r) => r.bounds.right));
@@ -80,32 +81,87 @@ export function houseLayout(state) {
   };
 }
 
-// 설비는 시각적 배치 초안이다. 2D 기호와 3D 모형이 같은 위치를 쓴다.
-export function bathroomFixtures(room) {
-  return [
-    {
-      type: 'toilet',
-      x: -room.w * 0.27,
-      z: -room.d * 0.15,
-      w: Math.min(0.42, room.w * 0.3),
-      d: Math.min(0.68, room.d * 0.4),
-      h: 0.75,
-    },
-    {
-      type: 'basin',
-      x: room.w * 0.25,
-      z: -room.d * 0.29,
-      w: Math.min(0.5, room.w * 0.32),
-      d: Math.min(0.4, room.d * 0.25),
-      h: 0.82,
-    },
-    {
-      type: 'shower',
-      x: room.w * 0.22,
-      z: room.d * 0.25,
-      w: Math.min(0.8, room.w * 0.44),
-      d: Math.min(0.8, room.d * 0.36),
-      h: 1.7,
-    },
-  ];
+// 설비는 시각적 배치 초안이다. 2D 기호와 3D 모형이 같은 위치·방향을 쓴다.
+// 문이 난 벽의 맞은편에 샤워·변기를 두고 세면대는 옆벽에 붙인다. w는 벽을 따른 폭, d는 벽에서 나온 깊이다.
+const TURN = { front: 0, right: 90, back: 180, left: 270 };
+export function fixtureFootprint(f) {
+  const swap = Math.round(f.angle / 90) % 2 !== 0;
+  return { w: swap ? f.d : f.w, d: swap ? f.w : f.d };
+}
+function doorZone(o, room) {
+  const depth = o.inward ? o.width + 0.05 : 0.5,
+    half = o.width / 2 + 0.05;
+  if (o.vertical) {
+    const edge = o.x > 0 ? room.w / 2 : -room.w / 2;
+    return {
+      left: o.x > 0 ? edge - depth : edge,
+      right: o.x > 0 ? edge : edge + depth,
+      top: o.z - half,
+      bottom: o.z + half,
+    };
+  }
+  const edge = o.z > 0 ? room.d / 2 : -room.d / 2;
+  return {
+    left: o.x - half,
+    right: o.x + half,
+    top: o.z > 0 ? edge - depth : edge,
+    bottom: o.z > 0 ? edge : edge + depth,
+  };
+}
+export function bathroomFixtures(room, openings = []) {
+  const turn = TURN[openings[0]?.wall] ?? 0,
+    quarter = turn % 180 !== 0;
+  const W = quarter ? room.d : room.w,
+    D = quarter ? room.w : room.d;
+  const shower = { w: Math.min(0.8, W * 0.44), d: Math.min(0.8, D * 0.36), h: 1.7 },
+    toilet = { w: Math.min(0.42, W * 0.3), d: Math.min(0.68, D * 0.4), h: 0.75 },
+    basin = { w: Math.min(0.5, D * 0.32), d: Math.min(0.4, W * 0.25), h: 0.82 };
+  const rad = (turn * Math.PI) / 180,
+    cos = Math.round(Math.cos(rad)),
+    sin = Math.round(Math.sin(rad));
+  const zones = openings.map((o) => doorZone(o, room));
+  const build = (mirror) => {
+    const m = mirror ? -1 : 1;
+    const local = [
+      { type: 'toilet', ...toilet, x: (m * -shower.w) / 2, z: -D / 2 + toilet.d / 2, angle: 0 },
+      {
+        type: 'basin',
+        ...basin,
+        x: m * (W / 2 - basin.d / 2),
+        z: Math.min(D / 2 - basin.w / 2, -D / 2 + shower.d + 0.08 + basin.w / 2),
+        angle: mirror ? 90 : 270,
+      },
+      {
+        type: 'shower',
+        ...shower,
+        x: m * (W / 2 - shower.w / 2),
+        z: -D / 2 + shower.d / 2,
+        angle: 0,
+        flip: mirror,
+      },
+    ];
+    return local.map((f) => ({
+      ...f,
+      x: f.x * cos + f.z * sin,
+      z: -f.x * sin + f.z * cos,
+      angle: (f.angle + turn) % 360,
+    }));
+  };
+  const blocked = (list) =>
+    list.reduce((sum, f) => {
+      const p = fixtureFootprint(f);
+      return (
+        sum +
+        zones.reduce(
+          (n, r) =>
+            n +
+            Math.max(0, Math.min(r.right, f.x + p.w / 2) - Math.max(r.left, f.x - p.w / 2)) *
+              Math.max(0, Math.min(r.bottom, f.z + p.d / 2) - Math.max(r.top, f.z - p.d / 2)),
+          0,
+        )
+      );
+    }, 0);
+  const plain = build(false),
+    mirrored = build(true);
+  return blocked(mirrored) < blocked(plain) - 1e-9 ? mirrored : plain;
 }

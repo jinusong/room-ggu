@@ -1,12 +1,15 @@
 // 브라우저 Worker에서 공개 가중치 모델을 실행한다. 대화와 사진은 이 기기 밖으로 보내지 않는다.
-// - 상담 모델: WebLLM의 Gemma 3 1B(또는 f16이 없는 GPU에서 Qwen3 0.6B)가 문장을 해석해 JSON으로 답한다.
+// - 상담 모델: WebLLM의 Gemma 3 1B(f16이 없는 GPU에서는 Qwen3 0.6B)가 기본이고, 사용자가 고르면 Gemma 4 E2B를 쓴다.
+//   어느 모델이든 문장을 해석해 같은 JSON 스키마로 답한다.
 // - 사진 모델: Transformers.js의 SigLIP이 사진과 20가지 가구 이름을 비교해 점수를 낸다.
 import { TYPES, ROOM_TYPES, WALL_COLORS, FLOOR_COLORS, FURNITURE_COLORS } from './catalog.js';
 import { MODEL_ACTIONS, MODEL_UI } from './ui-schema.js';
 import { PHOTO_MODEL, PHOTO_LABELS } from './app/photo.js';
+import { textModel, DOWNLOAD_START } from './app/models.js';
 
 let engine = null,
   textId = null,
+  textChoice = null,
   classifier = null,
   classifierKey = '';
 const emit = (task, detail) => self.postMessage({ event: 'progress', task, ...detail });
@@ -26,25 +29,42 @@ async function unloadClassifier() {
   self.postMessage({ event: 'unloaded', task: 'vision' });
 }
 
-async function loadText() {
-  if (engine) return textId;
+// 이 모델의 가중치 조각이 브라우저 캐시에 있는지 본다. 라이브러리의 hasModelInCache는 저장소 형식에 따라
+// 받아 둔 모델도 없다고 답해서, 로더가 쓰는 캐시(webllm/model)를 직접 확인한다.
+async function hasWeights(id) {
+  try {
+    const keys = await (await caches.open('webllm/model')).keys();
+    return keys.filter((r) => r.url.includes(`/${id}/`) && r.url.endsWith('.bin')).length >= 3;
+  } catch {
+    return false;
+  }
+}
+
+async function loadText(choice) {
+  if (engine && (!choice || textModel(choice) === textModel(textChoice))) return textId;
+  if (engine) await unloadText();
   if (!self.navigator.gpu)
     throw Error('이 브라우저는 WebGPU를 지원하지 않아요. 상담은 규칙으로 계속할 수 있어요.');
   const adapter = await self.navigator.gpu.requestAdapter();
   if (!adapter)
     throw Error('사용할 수 있는 GPU를 찾지 못했어요. 브라우저 하드웨어 가속을 확인해 주세요.');
   const { MLCEngine, prebuiltAppConfig } = await import('@mlc-ai/web-llm');
-  const preferred = adapter.features.has('shader-f16')
-    ? 'gemma3-1b-it-q4f16_1-MLC'
-    : 'Qwen3-0.6B-q4f32_1-MLC';
+  const model = textModel(choice),
+    preferred = adapter.features.has('shader-f16') ? model.f16 : model.f32;
   if (!prebuiltAppConfig.model_list.some((x) => x.model_id === preferred))
     throw Error('이 버전에서 지원하는 모델을 찾지 못했어요.');
+  // 보관해 둔 모델이 없으면 내려받기를 시작한다고 먼저 알린다. 로더는 설정·토크나이저를 받은 뒤에야
+  // 첫 진행 상황을 보내므로, 그 사이에도 화면이 내려받는 중임을 보여줄 수 있게 한다.
+  if (!(await hasWeights(preferred)))
+    emit('text', { progress: 0, text: DOWNLOAD_START, model: preferred });
   engine = new MLCEngine({
-    initProgressCallback: (r) => emit('text', { progress: r.progress, text: r.text }),
+    initProgressCallback: (r) =>
+      emit('text', { progress: r.progress, text: r.text, model: preferred }),
   });
   try {
     await engine.reload(preferred);
     textId = preferred;
+    textChoice = model.key;
     return preferred;
   } catch (e) {
     await unloadText();
@@ -174,6 +194,9 @@ async function classify(payload) {
         emit('vision', {
           status: r.status,
           progress: typeof r.progress === 'number' ? r.progress / 100 : undefined,
+          file: r.file,
+          loaded: r.loaded,
+          total: r.total,
         }),
     });
     classifierKey = key;
@@ -204,7 +227,7 @@ self.onmessage = ({ data }) => {
       let result;
       switch (data.task) {
         case 'load-text':
-          result = await loadText();
+          result = await loadText(data.payload?.choice);
           break;
         case 'interpret':
           result = await interpret(data.payload);

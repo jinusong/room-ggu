@@ -7,7 +7,13 @@ import { STARTERS, EXAMPLE_PROMPTS } from '../app/planner.js';
 import { Icon } from './icons.js';
 import { Surface } from './surfaces.jsx';
 
-const STARTER_ICONS = { 'room-size': 'ruler', catalog: 'armchair', finishes: 'paint-roller' };
+const STARTER_ICONS = {
+  'room-size': 'ruler',
+  catalog: 'armchair',
+  finishes: 'paint-roller',
+  avatar: 'person-standing',
+  floorplan: 'house',
+};
 
 function Welcome({ mobile }) {
   const example = isExampleLike(app.state);
@@ -34,7 +40,14 @@ function Welcome({ mobile }) {
           <button
             key={s.label}
             class="starter"
-            onClick={() => (s.action === 'photo' ? store.pickPhoto() : store.openTool(s.arg))}
+            data-starter={s.arg || s.action}
+            onClick={() =>
+              s.action === 'photo'
+                ? store.pickPhoto()
+                : s.arg === 'avatar' && !store.avatarHere()
+                  ? store.toggleAvatar()
+                  : store.openTool(s.arg)
+            }
           >
             <Icon name={s.action === 'photo' ? 'image-plus' : STARTER_ICONS[s.arg]} />
             <span>
@@ -109,9 +122,7 @@ function Thinking() {
   return (
     <div class="thinking" role="status">
       <Icon name="loader-circle" size={16} className="spin" />
-      <span>
-        {app.ai.model?.startsWith('gemma') ? 'Gemma' : '모델'}가 이 기기에서 문장을 해석하는 중
-      </span>
+      <span>{store.modelName(app.ai.model)}가 이 기기에서 문장을 해석하는 중</span>
       <button class="link" onClick={() => store.cancelModel()}>
         취소
       </button>

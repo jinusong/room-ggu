@@ -20,7 +20,7 @@ import {
   exampleState,
   DEFAULT_SOURCE,
 } from '../data.js';
-import { defaultAvatar, POSES, SEATS } from '../avatar.js';
+import { defaultAvatar, POSES, poseAccepts } from '../avatar.js';
 import { normalizeFloorplan, roomBounds, rectanglesOverlap } from '../floorplan.js';
 
 export const round2 = (n) => Math.round(n * 100) / 100;
@@ -256,13 +256,30 @@ export function updateItem(state, id, next) {
     after = sanitizeItem({ ...next, id });
   clampItem(after, state.room);
   state.items[i] = after;
+  syncAvatar(state, before);
   return diffItem(before, after);
+}
+
+// 앉거나 누운 가구가 없어지거나 종류가 바뀌면 그 자리에 세운다. 다른 공간의 아바타는 건드리지 않는다.
+export function syncAvatar(state, last) {
+  const a = state.avatar;
+  if (!a || a.pose === 'standing' || (a.roomId && a.roomId !== state.roomId)) return;
+  const item = state.items.find((i) => i.id === a.itemId);
+  if (poseAccepts(a.pose, item)) return;
+  const at = item || (last?.id === a.itemId ? last : null);
+  state.avatar = {
+    ...a,
+    pose: 'standing',
+    itemId: null,
+    ...(at ? { x: at.x, z: at.z, angle: at.angle } : {}),
+  };
 }
 
 export function removeItem(state, id) {
   const item = state.items.find((a) => a.id === id);
   if (!item) throw Error('가구를 찾지 못했어요.');
   state.items = state.items.filter((a) => a.id !== id);
+  syncAvatar(state, item);
   return item;
 }
 
@@ -298,9 +315,42 @@ export function relocateConflicts(state) {
   return { moved, remaining: layoutWarnings(state).all.size };
 }
 
+// 지금 공간의 벽에 맞닿는 빈자리. 집 전체에서 바로 이어져 보이도록 새 공간을 여기에 둔다.
+function adjacentSlot(state, size, align = 'start') {
+  const list = spaces(state),
+    plan = normalizeFloorplan(state.floorplan, list),
+    origin = plan.positions[state.roomId],
+    { w, d } = state.room;
+  const dz = ((d - size.d) / 2) * (align === 'end' ? 1 : -1),
+    dx = -(w - size.w) / 2;
+  return [
+    { x: origin.x + (w + size.w) / 2, z: origin.z + dz },
+    { x: origin.x - (w + size.w) / 2, z: origin.z + dz },
+    { x: origin.x + dx, z: origin.z + (d + size.d) / 2 },
+    { x: origin.x + dx, z: origin.z - (d + size.d) / 2 },
+  ]
+    .map((p) => ({ x: round2(p.x), z: round2(p.z) }))
+    .find(
+      (p) =>
+        Math.abs(p.x) <= 200 &&
+        Math.abs(p.z) <= 200 &&
+        list.every(
+          (r) =>
+            !rectanglesOverlap(
+              roomBounds({ room: size }, p),
+              roomBounds(r, plan.positions[r.roomId]),
+            ),
+        ),
+    );
+}
+
 export function addSpace(state, type = 'studio') {
   if (!Object.hasOwn(ROOM_TYPES, type)) throw Error('알 수 없는 공간 유형이에요.');
-  return addRoom(state, type);
+  if (state.otherRooms.length >= 11) throw Error('공간은 최대 12개까지 저장할 수 있어요.');
+  const slot = adjacentSlot(state, makeRoom(type));
+  const id = addRoom(state, type);
+  if (slot) state.floorplan.positions[id] = slot;
+  return id;
 }
 
 export function switchSpace(state, id) {
@@ -339,7 +389,7 @@ export function setAvatar(state, patch = {}, selectedId = null) {
   if (patch.pose && patch.pose !== 'standing') {
     const id = selectedId || next.itemId;
     const item = state.items.find((a) => a.id === id);
-    if (!item || (patch.pose === 'lying' ? item.type !== 'bed' : !SEATS.has(item.type)))
+    if (!poseAccepts(patch.pose, item))
       throw Error(
         patch.pose === 'lying'
           ? '먼저 이 방의 침대를 골라 주세요.'
@@ -392,31 +442,11 @@ export function moveSpace(state, id, x, z, { snap = true } = {}) {
 
 export function attachBathroom(state) {
   if (spaces(state).length >= 12) throw Error('공간은 최대 12개까지 저장할 수 있어요.');
-  const original = state.roomId,
-    list = spaces(state);
-  const origin = normalizeFloorplan(state.floorplan, list).positions[original];
-  const bath = makeRoom('bathroom');
-  const candidates = [
-    { x: origin.x + (state.room.w + bath.w) / 2, z: origin.z + (state.room.d - bath.d) / 2 },
-    { x: origin.x - (state.room.w + bath.w) / 2, z: origin.z + (state.room.d - bath.d) / 2 },
-    { x: origin.x, z: origin.z + (state.room.d + bath.d) / 2 },
-    { x: origin.x, z: origin.z - (state.room.d + bath.d) / 2 },
-  ];
-  const position = candidates.find(
-    (p) =>
-      Math.abs(p.x) <= 200 &&
-      Math.abs(p.z) <= 200 &&
-      list.every(
-        (r) =>
-          !rectanglesOverlap(
-            roomBounds({ room: bath }, p),
-            roomBounds(r, state.floorplan.positions[r.roomId]),
-          ),
-      ),
-  );
+  const original = state.roomId;
+  const position = adjacentSlot(state, makeRoom('bathroom'), 'end');
   if (!position)
     throw Error('방 옆에 화장실을 붙일 자리가 없어요. 집 전체에서 공간 위치를 먼저 조정해 주세요.');
-  const id = addSpace(state, 'bathroom');
+  const id = addRoom(state, 'bathroom');
   state.floorplan.positions[id] = position;
   switchSpace(state, original);
   state.scope = 'house';
@@ -431,6 +461,7 @@ export function renameSpace(state, name) {
 export function clearItems(state) {
   const n = state.items.length;
   state.items = [];
+  syncAvatar(state);
   return n;
 }
 
@@ -439,6 +470,7 @@ export function loadExample(state) {
   state.name = ex.name;
   state.room = ex.room;
   state.items = ex.items;
+  syncAvatar(state);
 }
 
 export function isExampleLike(state) {

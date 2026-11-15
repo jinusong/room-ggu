@@ -18,13 +18,15 @@ function ellipsoid(group, x, y, z, w, h, d, mat) {
   group.add(m);
   return m;
 }
-export function bathroomModel(room) {
+export function bathroomModel(room, openings = []) {
   const root = new T.Group(),
     ceramic = new T.MeshStandardMaterial({ color: '#fbfaf7', roughness: 0.28 }),
     metal = material('#a6aaa5');
-  for (const f of bathroomFixtures(room)) {
+  for (const f of bathroomFixtures(room, openings)) {
     const g = new T.Group();
     g.position.set(f.x, 0, f.z);
+    g.rotation.y = (f.angle * Math.PI) / 180;
+    if (f.flip) g.scale.x = -1;
     g.userData.fixture = f.type;
     g.userData.draft = true;
     if (f.type === 'toilet') {
@@ -60,7 +62,7 @@ export function bathroomModel(room) {
   return root;
 }
 
-export function houseStructure(state, { tapeSprite, plankTexture, height = 800 } = {}) {
+export function houseStructure(state, { plankTexture } = {}) {
   const layout = houseLayout(state),
     root = new T.Group(),
     cap = material('#2a2824'),
@@ -93,29 +95,23 @@ export function houseStructure(state, { tapeSprite, plankTexture, height = 800 }
         ),
       );
     }
-    if (r.room.type === 'bathroom') g.add(bathroomModel(r.room));
+    if (r.room.type === 'bathroom') g.add(bathroomModel(r.room, r.openings));
     if (r.roomId === state.roomId) {
-      const line = new T.LineLoop(
-        new T.BufferGeometry().setFromPoints(
-          [
-            [-r.room.w / 2 + 0.04, 0.012, -r.room.d / 2 + 0.04],
-            [r.room.w / 2 - 0.04, 0.012, -r.room.d / 2 + 0.04],
-            [r.room.w / 2 - 0.04, 0.012, r.room.d / 2 - 0.04],
-            [-r.room.w / 2 + 0.04, 0.012, r.room.d / 2 - 0.04],
-          ].map((p) => new T.Vector3(...p)),
-        ),
-        new T.LineBasicMaterial({ color: '#667669' }),
-      );
-      g.add(line);
-    }
-    if (tapeSprite) {
-      const label = tapeSprite(r.name, { fill: '#fbfaf7' }, height);
-      label.position.set(0, 0.15, -r.room.d / 2 + 0.35);
-      g.add(label);
-      if (state.dimensions) {
-        const dims = tapeSprite(`${r.room.w} × ${r.room.d}m`, { fill: '#fbfaf7' }, height);
-        dims.position.set(0, 0.15, r.room.d / 2 - 0.18);
-        g.add(dims);
+      // 고른 공간은 바닥 가장자리에 줄자 노랑 띠를 두른다.
+      const mark = new T.MeshBasicMaterial({ color: '#e2ae2a', transparent: true, opacity: 0.95 }),
+        t = 0.05,
+        iw = r.room.w - 0.12,
+        id = r.room.d - 0.12;
+      for (const [w, d, x, z] of [
+        [iw, t, 0, -id / 2 + t / 2],
+        [iw, t, 0, id / 2 - t / 2],
+        [t, id - t * 2, -iw / 2 + t / 2, 0],
+        [t, id - t * 2, iw / 2 - t / 2, 0],
+      ]) {
+        const bar = new T.Mesh(new T.BoxGeometry(w, 0.006, d), mark);
+        bar.position.set(x, 0.006, z);
+        bar.userData.selection = true;
+        g.add(bar);
       }
     }
     root.add(g);
@@ -148,7 +144,7 @@ export function houseStructure(state, { tapeSprite, plankTexture, height = 800 }
     for (const x of [-o.width / 2, o.width / 2]) box(g, 0.045, 0.85, 0.11, x, 0.425, 0, edge);
     const door = new T.Group();
     door.position.x = -o.width / 2;
-    door.rotation.y = Math.PI / 2;
+    door.rotation.y = (-o.side * Math.PI) / 2;
     box(door, o.width - 0.06, 0.75, 0.025, (o.width - 0.06) / 2, 0.375, 0, material('#c6bca7'));
     g.add(door);
     root.add(g);

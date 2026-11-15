@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Vector3 } from 'three';
 import { exampleState, spaces } from './data.js';
 import { attachBathroom, moveSpace } from './app/ops.js';
-import { houseLayout, bathroomFixtures } from './house-geometry.js';
+import { houseLayout, bathroomFixtures, fixtureFootprint } from './house-geometry.js';
 import { houseStructure, houseFurniture, bathroomModel } from './house-three.js';
 import { disposeGroup } from './furniture.js';
 import { parseComparisonCommand } from './avatar.js';
@@ -72,9 +72,11 @@ test('화장실 세 설비가 2D와 같은 위치에 생성되고 작은 화장�
   );
   for (const f of defs) {
     const g = model.children.find((g) => g.userData.fixture === f.type);
+    const size = fixtureFootprint(f);
     assert.deepEqual([g.position.x, g.position.z], [f.x, f.z]);
-    assert.ok(Math.abs(f.x) + f.w / 2 <= room.w / 2);
-    assert.ok(Math.abs(f.z) + f.d / 2 <= room.d / 2);
+    assert.equal(g.rotation.y, (f.angle * Math.PI) / 180);
+    assert.ok(Math.abs(f.x) + size.w / 2 <= room.w / 2 + 1e-9);
+    assert.ok(Math.abs(f.z) + size.d / 2 <= room.d / 2 + 1e-9);
     assert.equal(g.userData.draft, true);
   }
   disposeGroup(model);

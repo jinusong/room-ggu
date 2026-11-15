@@ -255,11 +255,14 @@ export const STARTERS = [
   { label: '가구 고르기', detail: '20종 · 63가지 크기', action: 'tool', arg: 'catalog' },
   { label: '사진으로 시작', detail: '가구 사진에서 종류부터 잡기', action: 'photo' },
   { label: '벽과 바닥', detail: '마감 색 비교하기', action: 'tool', arg: 'finishes' },
+  { label: '내 키로 가늠하기', detail: '같은 축척의 아바타 세우기', action: 'tool', arg: 'avatar' },
+  { label: '집 전체로 잇기', detail: '화장실까지 2D·3D로', action: 'tool', arg: 'floorplan' },
 ];
 export const EXAMPLE_PROMPTS = [
   '6평 원룸, 천장 2.4m',
   '두 명이 앉는 소파',
   '벽은 세이지, 바닥은 월넛',
+  '내 키 175cm',
 ];
 export const ROOM_TYPE_NAMES = Object.fromEntries(
   Object.entries(ROOM_TYPES).map(([k, v]) => [k, v.name]),

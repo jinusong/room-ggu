@@ -27,7 +27,7 @@ test('아바타는 선택 기능이며 키의 실제 m 축척을 보존한다', 
   for (const height of [80, 170, 230]) {
     setAvatar(s, { enabled: true, height });
     const a = avatarLayout(s);
-    assert.ok(Math.abs(a.joints.head[1] + a.h * 0.06 - height / 100) < 1e-9);
+    assert.ok(Math.abs(a.top - height / 100) < 1e-9);
     assert.ok(Math.abs(a.joints.leftFoot[1] - a.h * 0.035) < 1e-9);
   }
   const before = structuredClone(s.avatar);
@@ -44,7 +44,7 @@ test('앉기·눕기는 실제 가구에 연결하고 이동·회전을 따라�
   bed.angle = 90;
   const a = avatarLayout(s);
   assert.deepEqual([a.x, a.angle, a.item.id], [0.4, 90, bed.id]);
-  assert.match(a.warnings.join(), /10cm/);
+  assert.match(a.warnings.join(), /모형 기준.*15cm/);
   assert.throws(() => setAvatar(s, { pose: 'sitting' }, bed.id));
   setAvatar(s, { pose: 'sitting' }, chair.id);
   assert.equal(avatarLayout(s).pose, 'sitting');
