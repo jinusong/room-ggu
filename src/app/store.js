@@ -18,6 +18,7 @@ import { planFromModel } from './interpret.js';
 import { photoCandidates, PHOTO_CONFIDENT } from './photo.js';
 import { josa, dimsText } from './text.js';
 import { parseComparisonCommand, avatarLayout, poseAccepts } from '../avatar.js';
+import { connections } from '../floorplan.js';
 import {
   TEXT_MODELS,
   DEFAULT_TEXT_MODEL,
@@ -82,6 +83,8 @@ export const app = {
     collapsed: false,
     preview: null,
     avatarBar: false,
+    door: null,
+    doorList: false,
     downloadOpen: true,
     toast: null,
     menu: null,
@@ -110,14 +113,28 @@ export function emit() {
 }
 
 let toastTimer;
+const hideToast = () => {
+  clearTimeout(toastTimer);
+  app.view.toast = null;
+  emit();
+};
 export function toast(text) {
   app.view.toast = { text, at: Date.now() };
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    app.view.toast = null;
-    emit();
-  }, 4200);
+  toastTimer = setTimeout(hideToast, 4200);
   emit();
+}
+// 알림 위에 포인터를 올리거나 누르고 있는 동안에는 사라지지 않게 멈추고, 떼면 조금 뒤에 닫는다.
+export function holdToast() {
+  clearTimeout(toastTimer);
+}
+export function releaseToast() {
+  if (!app.view.toast) return;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, 2000);
+}
+export function dismissToast() {
+  if (app.view.toast) hideToast();
 }
 
 // ---------- 저장 ----------
@@ -286,6 +303,7 @@ export function select(id) {
   app.target = id ? { type: 'item', id } : app.draft ? { type: 'draft' } : { type: 'room' };
   app.view.preview = null;
   app.view.avatarBar = false;
+  app.view.door = null;
   emit();
 }
 export function setTarget(target) {
@@ -551,6 +569,10 @@ export async function send(raw) {
         if (comparison.view) setView(comparison.view);
         reply =
           '집 전체를 열었어요. 2D에서 공간을 끌어 배치하고, 3D에서 화장실과 가구를 함께 둘러보세요.';
+      } else if (comparison.kind === 'door') {
+        // 문 명령의 답에는 집 전체 도구(문 목록)를 붙인다.
+        comparison.kind = 'floorplan';
+        reply = doorCommand(comparison);
       } else {
         const { patch, furniture } = comparison;
         const prefer = furniture
@@ -792,6 +814,7 @@ export function setScope(scope) {
   app.selected = null;
   app.target = { type: 'room' };
   app.view.avatarBar = false;
+  app.view.door = null;
   commit();
 }
 export function editSpace(id) {
@@ -805,6 +828,78 @@ export function moveSpace(id, x, z, opts = {}) {
     if (!opts.live) toast(e.message);
   }
 }
+// 대화로 받은 문 명령. 대상 문이 하나로 정해질 때만 바로 바꾸고, 아니면 집 전체 2D와 문 목록을 열어 고르게 한다.
+function doorCommand({ action, width }) {
+  app.view.doorList = true;
+  const all = connections(spaces(app.state), app.state.floorplan),
+    wanted = all.filter((l) => (action === 'open' ? l.closed : !l.closed)),
+    here = wanted.filter((l) => l.ids.includes(app.state.roomId)),
+    target = here.length === 1 ? here[0] : wanted.length === 1 ? wanted[0] : null;
+  if (!all.length)
+    return '아직 벽이 맞닿은 공간이 없어 문이 없어요. 집 전체에서 공간을 붙이면 그 사이에 문이 생겨요.';
+  const show = () => {
+    setScope('house');
+    setView('2d');
+  };
+  if (!target || action === 'show' || (action === 'width' && !width)) {
+    show();
+    if (action === 'open' && !wanted.length) return '막아 둔 문이 없어요. 문은 모두 열려 있어요.';
+    return target || action === 'show'
+      ? '집 전체 2D를 열었어요. 문을 끌어 옮기고, 눌러서 폭과 여는 방향을 바꿀 수 있어요. 아래 문 목록에서 숫자로도 맞출 수 있어요.'
+      : '문이 여러 개라 어느 문인지 알 수 없었어요. 집 전체 2D에서 문을 누르거나 아래 문 목록에서 골라 주세요.';
+  }
+  const [a, b] = target.ids,
+    name = `${josa(target.names[0], '과/와')} ${target.names[1]} 사이 문`,
+    patch =
+      action === 'width'
+        ? { width: width / 100 }
+        : action === 'flip'
+          ? { flip: !target.door.flip }
+          : { closed: action === 'close' };
+  comparisonEdit((s) => ops.setDoor(s, a, b, patch));
+  app.view.door = null;
+  show();
+  if (action === 'width') return `${name}의 폭을 ${width}cm로 바꿨어요.`;
+  if (action === 'flip') return `${name}이 반대쪽으로 열리게 바꿨어요.`;
+  if (action === 'close')
+    return `${josa(name, '을/를')} 막았어요. 아래 문 목록에서 다시 낼 수 있어요.`;
+  return `${josa(name, '을/를')} 다시 냈어요.`;
+}
+// 문: 두 공간 사이 문의 위치·폭·여는 방향을 바꾸거나 막는다. 끄는 동안(live)은 기록을 남기지 않는다.
+export function setDoor(a, b, patch, opts = {}) {
+  try {
+    comparisonEdit((s) => ops.setDoor(s, a, b, patch), opts);
+    if (patch.closed) app.view.door = null;
+  } catch (e) {
+    if (!opts.live) toast(e.message);
+    return e.message;
+  }
+}
+export function closeDoor(a, b) {
+  const names = [a, b].map((id) => spaces(app.state).find((r) => r.roomId === id)?.name);
+  if (setDoor(a, b, { closed: true })) return;
+  app.view.doorList = true;
+  event(
+    `${josa(names[0], '과/와')} ${names[1]} 사이 문을 막았어요 · 집 전체 도구의 문 목록에서 다시 낼 수 있어요`,
+  );
+  persist();
+  emit();
+}
+// 집 전체 도구의 문 목록을 펼쳐 둘지. 문을 막거나 대화로 문을 말하면 펼친다.
+export function setDoorList(open) {
+  if (app.view.doorList === !!open) return;
+  app.view.doorList = !!open;
+  emit();
+}
+// 집 전체 2D에서 고른 문. 고르면 문 위에 폭·방향·막기 막대가 뜬다.
+export function pickDoor(ids) {
+  const next = ids ? [...ids] : null;
+  if (!next && !app.view.door) return;
+  app.view.door = next;
+  app.view.avatarBar = false;
+  emit();
+}
+
 export function attachBathroom() {
   try {
     comparisonEdit((s) => ops.attachBathroom(s));
@@ -1379,7 +1474,11 @@ function trackDownload(task, patch) {
   const moved = fresh || patch.phase !== before.phase || (patch.mb || 0) > (before.mb || 0);
   app.ai.download = { ...before, task, ...patch, at: moved ? Date.now() : before.at };
 }
+// 이어서 실패한 횟수. 다시 시도까지 잠깐 기다리게 해 끊긴 네트워크에 요청이 몰리지 않게 한다.
+const downloadFailures = { text: 0, vision: 0 };
+const RETRY_WAIT = [0, 3000, 6000, 12000];
 function finishDownload(task) {
+  downloadFailures[task] = 0;
   if (app.ai.download?.task !== task) return;
   // 안내를 접어 둔 채 끝났으면 다이얼로그를 다시 띄우지 않고 한 줄로만 알린다.
   if (!app.view.downloadOpen) {
@@ -1398,7 +1497,14 @@ function finishDownload(task) {
 }
 function failDownload(task, message) {
   if (app.ai.download?.task !== task) return;
-  app.ai.download = { ...app.ai.download, phase: 'error', error: message };
+  const attempts = ++downloadFailures[task];
+  app.ai.download = {
+    ...app.ai.download,
+    phase: 'error',
+    error: message,
+    attempts,
+    retryAt: Date.now() + RETRY_WAIT[Math.min(attempts, RETRY_WAIT.length) - 1],
+  };
   app.view.downloadOpen = true;
 }
 export function setDownloadOpen(open) {
@@ -1406,17 +1512,20 @@ export function setDownloadOpen(open) {
   emit();
 }
 export function closeDownload() {
+  if (app.ai.download?.phase === 'error') downloadFailures[app.ai.download.task] = 0;
   app.ai.download = null;
   emit();
 }
 export function cancelDownload() {
   const task = app.ai.download?.task;
+  if (task) downloadFailures[task] = 0;
   app.ai.download = null;
   if (task === 'vision') cancelModel();
   else setModelOn(false);
 }
 export function retryDownload() {
   const task = app.ai.download?.task;
+  if (Date.now() < (app.ai.download?.retryAt || 0)) return;
   app.ai.download = null;
   if (task === 'vision') analyzePhoto();
   else setModelOn(true);
@@ -1495,6 +1604,8 @@ onAIStatus((data) => {
 // ---------- 도면 콜백 ----------
 export const sceneCallbacks = {
   pickAvatar: () => pickAvatar(),
+  pickDoor: (ids) => pickDoor(ids),
+  moveDoor: (ids, center) => setDoor(ids[0], ids[1], { center }, { live: true }),
   moveAvatar: (x, z) => {
     const mx = app.state.room.w / 2,
       mz = app.state.room.d / 2;

@@ -21,7 +21,16 @@ import {
   DEFAULT_SOURCE,
 } from '../data.js';
 import { defaultAvatar, POSES, poseAccepts } from '../avatar.js';
-import { normalizeFloorplan, roomBounds, rectanglesOverlap } from '../floorplan.js';
+import {
+  normalizeFloorplan,
+  roomBounds,
+  rectanglesOverlap,
+  sharedWall,
+  sharedOpening,
+  doorPlacement,
+  findDoor,
+  DOOR,
+} from '../floorplan.js';
 
 export const round2 = (n) => Math.round(n * 100) / 100;
 export const fmtM = (n) => `${round2(n)}m`;
@@ -438,6 +447,73 @@ export function moveSpace(state, id, x, z, { snap = true } = {}) {
   plan.positions[id] = p;
   state.floorplan = plan;
   return p;
+}
+
+// 두 공간 사이 문을 옮기거나 폭·여는 방향을 바꾸거나 막는다. 기본값으로 돌아가면 설정을 지운다.
+// center는 벽을 따라 잰 전역 좌표, edge는 맞닿은 벽 구간의 시작(왼쪽·위쪽 끝)에서 문까지의 거리다.
+export function setDoor(state, a, b, patch = {}) {
+  const list = spaces(state),
+    plan = normalizeFloorplan(state.floorplan, list),
+    A = list.find((r) => r.roomId === a),
+    B = list.find((r) => r.roomId === b),
+    wall = A && B && a !== b ? sharedWall(A, plan.positions[a], B, plan.positions[b]) : null;
+  if (!wall || !doorPlacement(wall, { width: DOOR.min }))
+    throw Error('벽이 60cm 넘게 맞닿은 두 공간 사이에만 문을 낼 수 있어요.');
+  const next = patch.reset ? { rooms: [a, b] } : { rooms: [a, b], ...findDoor(plan, a, b) },
+    length = wall.end - wall.start,
+    mid = (wall.start + wall.end) / 2,
+    before = doorPlacement(wall, next);
+  if (patch.closed !== undefined) {
+    if (patch.closed) next.closed = true;
+    else delete next.closed;
+  }
+  if (patch.flip !== undefined) {
+    if (patch.flip) next.flip = true;
+    else delete next.flip;
+  }
+  if (patch.width !== undefined) {
+    const fits = Math.min(DOOR.max, Math.floor((length - 0.1) * 100 + 1e-6) / 100);
+    if (!Number.isFinite(patch.width) || patch.width < DOOR.min || patch.width > DOOR.max)
+      throw Error('문 폭은 60~120cm로 입력해주세요.');
+    if (patch.width > fits + 1e-9)
+      throw Error(
+        `맞닿은 벽이 ${Math.round(length * 100)}cm라 문 폭은 ${Math.round(fits * 100)}cm까지 낼 수 있어요.`,
+      );
+    next.width = round2(patch.width);
+  }
+  const place = doorPlacement(wall, next);
+  if (!place) throw Error('맞닿은 벽이 짧아 문을 낼 수 없어요.');
+  let center = patch.center,
+    exact = patch.exact;
+  if (patch.edge !== undefined) center = wall.start + patch.edge + place.width / 2;
+  // 직접 옮겨 둔 문은 폭을 바꿔도 벽 끝에서의 거리를 지킨다(경첩 쪽이 그대로다).
+  if (center === undefined && patch.width !== undefined && next.offset !== undefined && before) {
+    center = before.center - before.width / 2 + place.width / 2;
+    exact = true;
+  }
+  if (center !== undefined) {
+    if (!Number.isFinite(center)) throw Error('문 위치를 숫자로 입력해주세요.');
+    // 벽 끝에서 문까지의 거리를 5cm 단위로 맞추고 구간 안에 둔다.
+    const snapped = exact
+      ? center
+      : wall.start +
+        Math.round((center - place.width / 2 - wall.start) * 20) / 20 +
+        place.width / 2;
+    const offset = round2(Math.max(-place.reach, Math.min(place.reach, snapped - mid)));
+    if (offset) next.offset = offset;
+    else delete next.offset;
+  } else if (next.offset !== undefined) {
+    // 폭이 바뀌어 문이 구간을 벗어나면 저장한 위치도 구간 안으로 당긴다.
+    const offset = round2(Math.max(-place.reach, Math.min(place.reach, next.offset)));
+    if (offset) next.offset = offset;
+    else delete next.offset;
+  }
+  const doors = (plan.doors || []).filter((d) => !(d.rooms.includes(a) && d.rooms.includes(b)));
+  state.floorplan = normalizeFloorplan(
+    { positions: plan.positions, doors: [...doors, next] },
+    list,
+  );
+  return sharedOpening(A, plan.positions[a], B, plan.positions[b], findDoor(state.floorplan, a, b));
 }
 
 export function attachBathroom(state) {

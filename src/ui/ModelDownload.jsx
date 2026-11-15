@@ -33,6 +33,15 @@ export function ModelDownload() {
     const id = setInterval(() => tick((n) => n + 1), 5000);
     return () => clearInterval(id);
   }, [d?.phase]);
+  // 이어서 실패하면 다시 시도까지 남은 시간을 1초마다 다시 센다.
+  useEffect(() => {
+    if (d?.phase !== 'error' || !(d.retryAt > Date.now())) return;
+    const id = setInterval(() => {
+      tick((n) => n + 1);
+      if (Date.now() >= d.retryAt) clearInterval(id);
+    }, 250);
+    return () => clearInterval(id);
+  }, [d?.phase, d?.retryAt]);
   useEffect(() => {
     if (!open) return;
     primary.current?.focus();
@@ -59,6 +68,8 @@ export function ModelDownload() {
   if (!d) return null;
   const stalled =
     (d.phase === 'fetch' || d.phase === 'init') && d.at && Date.now() - d.at > STALL_MS;
+  const wait =
+    d.phase === 'error' ? Math.max(0, Math.ceil((d.retryAt - Date.now()) / 1000)) || 0 : 0;
   const busy = d.phase === 'fetch' || d.phase === 'init',
     percent = Math.round((d.progress || 0) * 100),
     title = TITLES[d.task][d.phase];
@@ -132,7 +143,11 @@ export function ModelDownload() {
         )}
         <p id="download-desc" class="download-desc">
           {d.phase === 'error'
-            ? `${d.error || '알 수 없는 오류예요.'} 모델 없이도 규칙으로 상담과 배치를 계속할 수 있어요.`
+            ? `${d.error || '알 수 없는 오류예요.'} ${
+                d.attempts >= 3
+                  ? `${d.attempts}번 이어서 실패했어요. 잠시 뒤에 다시 시도하거나 모델 없이 계속해 주세요.`
+                  : '모델 없이도 규칙으로 상담과 배치를 계속할 수 있어요.'
+              }`
             : d.phase === 'done'
               ? d.task === 'text'
                 ? '이제 문장을 모델이 먼저 해석하고, 숫자와 범위는 앱이 확인해요.'
@@ -153,8 +168,13 @@ export function ModelDownload() {
             </button>
           )}
           {d.phase === 'error' && (
-            <button class="btn" onClick={() => store.retryDownload()}>
-              다시 시도
+            <button
+              class="btn"
+              id="download-retry"
+              aria-disabled={wait > 0}
+              onClick={() => store.retryDownload()}
+            >
+              {wait > 0 ? `다시 시도 · ${wait}초 뒤` : '다시 시도'}
             </button>
           )}
           <button

@@ -12,7 +12,7 @@ export function Tape({ children, source = '', title }) {
   );
 }
 export function sourceLabel(source = '') {
-  if (source === '비교용 기본값') return source;
+  if (source === '비교용 기본값' || source === '가정값' || source === '자동 위치') return source;
   if (source.startsWith('사용자')) return '직접 정한 값';
   if (source.startsWith('AI') || source.includes('모델')) return '모델 단서로 고친 초안';
   if (source.startsWith('대화')) return '대화로 가늠한 초안';

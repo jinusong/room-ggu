@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { TYPES, ROOM_TYPES } from '../catalog.js';
 import { layoutWarnings, spaces } from '../data.js';
-import { roomOpenings } from '../floorplan.js';
+import { roomOpenings, connections, DOOR } from '../floorplan.js';
 import { avatarLayout, avatarSpace, poseAccepts, POSES } from '../avatar.js';
 import { PlanScene } from '../plan.js';
 import { HouseScene } from '../house.js';
@@ -49,7 +49,9 @@ function syncScenes(force = false) {
     warnSig = [...warn.all].join(),
     ghost = ghostItem(),
     ghostSig = JSON.stringify(ghost),
-    avatar = JSON.stringify(s.avatar);
+    avatar = JSON.stringify(s.avatar),
+    door = JSON.stringify(app.view.door);
+  for (const sc of [app.scenes.plan, app.scenes.house]) if (sc) sc.doorSelected = app.view.door;
   for (const sc of [app.scenes.three, app.scenes.plan]) {
     if (!sc) continue;
     const fresh = force || !known.has(sc);
@@ -64,8 +66,18 @@ function syncScenes(force = false) {
     if (fresh || s.scope !== last.scope) sc.home?.();
     else if (room !== last.room && !sc.userMoved) sc.home?.();
   }
+  if (door !== last.door) app.scenes.plan?.draw();
   app.scenes.house?.draw();
-  last = { room, items, sel: app.selected, warn: warnSig, ghost: ghostSig, avatar, scope: s.scope };
+  last = {
+    room,
+    items,
+    sel: app.selected,
+    warn: warnSig,
+    ghost: ghostSig,
+    avatar,
+    scope: s.scope,
+    door,
+  };
 }
 
 // 방과 집 전체를 오가는 길잡이. 지금 범위의 버튼을 다시 누르면 공간 목록이 열린다.
@@ -446,7 +458,11 @@ function DoorTags() {
       data-tag-kind="room"
       data-tag-text={`${o.name} 문`}
       aria-label={`${o.name}(으)로 가는 문 · 그 공간 편집`}
-      title="문 위치는 초안이에요 · 누르면 그 공간으로 가요"
+      title={
+        o.custom
+          ? '누르면 그 공간으로 가요 · 2D에서 문을 끌어 옮길 수 있어요'
+          : '문 위치는 초안이에요 · 2D에서 문을 끌어 옮길 수 있어요'
+      }
       onClick={() => store.editSpace(o.roomId)}
     >
       <Icon name={ROOM_TYPES[o.type].icon} size={14} />
@@ -454,6 +470,74 @@ function DoorTags() {
       <Icon name="arrow-right" size={14} />
     </button>
   ));
+}
+
+// 2D에서 고른 문 위에 뜨는 막대. 문은 끌어서 옮기고, 폭·여는 방향·막기는 여기서 바꾼다.
+function DoorBar() {
+  const s = app.state,
+    ids = app.view.door;
+  if (!ids || s.view !== '2d' || (s.scope !== 'house' && !ids.includes(s.roomId))) return null;
+  const link = connections(spaces(s), s.floorplan).find(
+    (c) => c.ids.includes(ids[0]) && c.ids.includes(ids[1]),
+  );
+  if (!link?.opening) return null;
+  const [a, b] = link.ids,
+    cm = Math.round(link.width * 100),
+    set = link.door.width !== undefined,
+    max = Math.min(DOOR.max * 100, Math.floor((link.length - 0.1) * 100 + 1e-6));
+  return (
+    <div
+      class="stage-tag door-bar"
+      data-door-bar
+      role="toolbar"
+      aria-label={`${link.names[0]}와 ${link.names[1]} 사이 문`}
+    >
+      <button
+        class="bar-btn"
+        aria-label="문 폭 5cm 줄이기"
+        title="폭 줄이기"
+        disabled={cm - 5 < DOOR.min * 100}
+        onClick={() => store.setDoor(a, b, { width: (cm - 5) / 100 })}
+      >
+        <Icon name="minus" />
+      </button>
+      <span
+        class={`tape ${set ? 'is-set' : 'is-draft'}`}
+        data-door-width
+        title={set ? '직접 정한 문 폭' : '문 폭 80cm는 가정값이에요. 실제 문에 맞게 바꿔 주세요'}
+      >
+        문 {cm}cm
+      </span>
+      <button
+        class="bar-btn"
+        aria-label="문 폭 5cm 늘리기"
+        title="폭 늘리기"
+        disabled={cm + 5 > max}
+        onClick={() => store.setDoor(a, b, { width: (cm + 5) / 100 })}
+      >
+        <Icon name="plus" />
+      </button>
+      <button
+        class="bar-btn"
+        aria-label="문 여는 방향 바꾸기"
+        title="여는 방향 바꾸기"
+        onClick={() => store.setDoor(a, b, { flip: !link.door.flip })}
+      >
+        <Icon name="flip" />
+      </button>
+      <button class="bar-btn bar-text" data-door-close onClick={() => store.closeDoor(a, b)}>
+        문 막기
+      </button>
+      <button
+        class="bar-btn"
+        aria-label="문 막대 닫기"
+        title="닫기"
+        onClick={() => store.pickDoor(null)}
+      >
+        <Icon name="x" />
+      </button>
+    </div>
+  );
 }
 
 // 집 전체에서 공간마다 붙는 이름표. 고른 공간의 이름표에서 바로 방 편집으로 들어간다.
@@ -472,6 +556,7 @@ function RoomTags() {
           class="tag-main"
           aria-pressed={selected}
           aria-label={`${r.name} ${dims}${selected ? ' · 선택됨' : ' 선택'}`}
+          title={`${r.name} ${dims}`}
           data-tag-kind={selected ? 'selected' : 'room'}
           data-tag-text={s.dimensions ? `${r.name} ${dims}` : r.name}
           onClick={() => store.switchSpace(r.roomId)}
@@ -549,11 +634,23 @@ export function Stage({ mobile, sheetRef }) {
       const b = bar.getBoundingClientRect();
       placed.push({ x: b.left - r.left, y: b.top - r.top, w: b.width, h: b.height });
     }
+    // 문 막대가 떠 있는 동안 그 밑에 깔리는 이름표는 밀어내지 않고 잠시 숨긴다. 밀려난 이름표가 문을 덮지 않게 한다.
+    let guard = null;
     const put = (el, x, y) => {
       const w = el.offsetWidth,
         h = el.offsetHeight;
       x = Math.max(left, Math.min(r.width - w - 8, x));
       y = Math.max(56, Math.min(bottom - h, y));
+      if (
+        guard &&
+        x < guard.x + guard.w + 4 &&
+        x + w + 4 > guard.x &&
+        y < guard.y + guard.h + 4 &&
+        y + h + 4 > guard.y
+      ) {
+        el.style.visibility = 'hidden';
+        return;
+      }
       for (const o of placed)
         if (x < o.x + o.w + 4 && x + w + 4 > o.x && y < o.y + o.h + 4 && y + h + 4 > o.y)
           y = o.y + o.h + 4;
@@ -561,26 +658,53 @@ export function Stage({ mobile, sheetRef }) {
       el.style.visibility = '';
       el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
     };
+    // 고른 문의 막대는 문 바로 위에 두고, 이름표는 그 자리를 비켜 간다.
+    const doorBar = layer.querySelector('[data-door-bar]'),
+      doorAt = doorBar && sc.doorAnchor?.(app.view.door);
+    if (doorBar && (!doorAt || !doorAt.visible)) doorBar.style.visibility = 'hidden';
+    else if (doorBar) {
+      put(
+        doorBar,
+        doorAt.x - r.left - doorBar.offsetWidth / 2,
+        // 세로 벽의 문은 위아래로 길다. 문과 열리는 호를 가리지 않게 문 위쪽 끝보다 위에 둔다.
+        doorAt.y - r.top - (doorAt.vertical ? doorAt.half : 0) - doorBar.offsetHeight - 14,
+      );
+      guard = placed[placed.length - 1];
+    }
     const tags = [...layer.querySelectorAll('[data-room-tag]')]
       .map((el) => ({ el, p: sc.tagAnchor?.(el.dataset.roomTag) }))
-      .sort((a, b) => (a.p?.y || 0) - (b.p?.y || 0));
+      // 고른 공간의 이름표를 먼저 놓아 제 자리를 지키게 하고, 나머지는 위에서부터 놓는다.
+      .sort(
+        (a, b) =>
+          b.el.classList.contains('is-selected') - a.el.classList.contains('is-selected') ||
+          (a.p?.y || 0) - (b.p?.y || 0),
+      );
+    const share = (r.width - left - 8) / Math.max(1, tags.length),
+      density = share >= 150 ? 0 : share >= 80 ? 1 : 2;
     for (const { el, p } of tags) {
       if (!p || !p.visible) {
         el.style.visibility = 'hidden';
         continue;
       }
-      // 좁은 공간에서는 이름을 남기고 크기 표시를 먼저 접는다. 글자 수로 어림해 매 프레임 바뀌지 않게 한다.
-      const room = p.corner && !el.classList.contains('is-selected') ? p.width - 16 : Infinity,
-        name = el.querySelector('.tag-name')?.textContent.length || 0;
-      el.style.maxWidth = Number.isFinite(room) ? `${Math.max(44, Math.round(room))}px` : '';
-      el.classList.toggle('is-narrow', room < name * 12 + 112);
+      // 좁은 공간에서는 크기 표시를 먼저 접고, 더 좁으면 아이콘만 남긴다. 고른 공간은 줄이지 않는다.
+      // 2D는 방 폭으로, 방 밖에 놓이는 3D는 공간 수와 화면 폭으로 정해 매 프레임 바뀌지 않게 한다.
+      const selected = el.classList.contains('is-selected'),
+        room = p.corner && !selected ? p.width - 16 : Infinity,
+        name = el.querySelector('.tag-name')?.textContent.length || 0,
+        crowd = p.corner || selected ? 0 : density;
+      el.classList.toggle('is-icon', room < 64 || crowd === 2);
+      el.classList.toggle('is-narrow', room < name * 12 + 112 || crowd >= 1);
+      el.style.maxWidth =
+        Number.isFinite(room) && room >= 64 ? `${Math.max(44, Math.round(room))}px` : '';
       if (p.corner) put(el, p.x - r.left + 8, p.y - r.top + 8);
       else put(el, p.x - r.left - el.offsetWidth / 2, p.y - r.top - el.offsetHeight - 4);
     }
     const doors = sc.doorAnchors?.() || [];
     for (const el of layer.querySelectorAll('[data-door-tag]')) {
       const p = doors.find((d) => d.roomId === el.dataset.doorTag);
-      if (!p || !p.visible) el.style.visibility = 'hidden';
+      // 막대가 떠 있는 문의 이름표는 잠시 숨긴다.
+      if (!p || !p.visible || (doorBar && app.view.door?.includes(el.dataset.doorTag)))
+        el.style.visibility = 'hidden';
       else put(el, p.x - r.left - el.offsetWidth / 2, p.y - r.top - el.offsetHeight / 2);
     }
     const tag = layer.querySelector('[data-avatar-tag]'),
@@ -602,6 +726,8 @@ export function Stage({ mobile, sheetRef }) {
       ...houseCallbacks,
       start: store.snapshot,
       moveSpace: (id, x, z) => store.moveSpace(id, x, z, { live: true }),
+      moveDoor: store.sceneCallbacks.moveDoor,
+      pickDoor: store.pickDoor,
       commit: () => {
         store.persist();
         store.emit();
@@ -706,6 +832,7 @@ export function Stage({ mobile, sheetRef }) {
   // 화장실은 설비 초안이 이미 놓여 있으므로 빈 방 안내를 띄우지 않는다.
   const empty = !house && !s.items.length && !app.draft && s.room.type !== 'bathroom';
   const avatarOn = !!avatarLayout(s);
+  const hasDoor = !house && roomOpenings(spaces(s), s.floorplan, s.roomId).length > 0;
   const history = (
     <div class="tool-group">
       <button
@@ -742,6 +869,7 @@ export function Stage({ mobile, sheetRef }) {
       />
       <div class="stage-tags" ref={tagsRef}>
         {house ? <RoomTags /> : <DoorTags />}
+        <DoorBar />
         <AvatarTag mobile={mobile} />
       </div>
       <div class="stage-top">
@@ -808,9 +936,11 @@ export function Stage({ mobile, sheetRef }) {
             {house
               ? s.view === '3d'
                 ? '끌어서 돌려 보기 · 공간을 눌러 고르고 두 번 눌러 편집'
-                : '공간을 끌어 집 모양 맞추기 · 벽이 닿으면 문이 이어져요 · 두 번 눌러 편집'
+                : '공간을 끌어 집 모양 맞추기 · 문은 끌어 옮기고 눌러서 폭 바꾸기 · 두 번 눌러 편집'
               : s.view === '2d'
-                ? '가구를 끌어 옮기기 · 방향키로 5cm씩'
+                ? hasDoor
+                  ? '가구와 문을 끌어 옮기기 · 방향키로 5cm씩'
+                  : '가구를 끌어 옮기기 · 방향키로 5cm씩'
                 : '빈 곳을 끌어 돌리기 · 휠로 확대 · 가구 끌어 옮기기'}
           </span>
         )}

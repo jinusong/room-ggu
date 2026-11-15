@@ -15,7 +15,7 @@ import { app } from '../app/store.js';
 import { findFreeSpot, fitStatus, clearance, pyeong, wallName, floorName } from '../app/ops.js';
 import { josa } from '../app/text.js';
 import { avatarLayout, poseAccepts, poseFor, POSES } from '../avatar.js';
-import { floorplanWarnings } from '../floorplan.js';
+import { floorplanWarnings, connections, DOOR } from '../floorplan.js';
 import { TEXT_MODELS, sizeText } from '../app/models.js';
 import { Icon } from './icons.js';
 import {
@@ -138,10 +138,95 @@ function Avatar() {
   );
 }
 
+// 문 하나의 위치·폭·여는 방향. 위치는 맞닿은 벽 구간의 왼쪽(세로 벽은 위쪽) 끝에서 문까지의 거리다.
+function DoorRow({ link }) {
+  const [a, b] = link.ids,
+    key = `door-${a}-${b}`,
+    cm = (m) => Math.round(m * 100),
+    width = cm(link.width),
+    edge = cm(link.center - link.width / 2 - link.wall.start),
+    widest = Math.min(cm(DOOR.max), Math.floor((link.length - 0.1) * 100 + 1e-6)),
+    furthest = Math.max(5, cm(link.length - link.width) - 5),
+    title = `${link.names[0]} ↔ ${link.names[1]}`,
+    from = link.wall.vertical ? '위쪽' : '왼쪽';
+  return (
+    <div class="house-position house-door" data-door-row={`${a}|${b}`}>
+      <div class="house-door-head">
+        <strong>{title}</strong>
+        <small class="mono">
+          맞닿은 벽 {cm(link.length)}cm{link.closed ? '' : ` · ${from} 끝부터 잼`}
+        </small>
+      </div>
+      {link.closed ? (
+        <div class="door-actions">
+          <span class="tape is-draft">문 없음</span>
+          <button
+            class="btn small"
+            data-door-open
+            onClick={() => store.setDoor(a, b, { closed: false })}
+          >
+            <Icon name="door-open" size={16} />문 내기
+          </button>
+        </div>
+      ) : (
+        <>
+          <Stepper
+            label="위치"
+            ariaLabel={`${title} 문 위치 · 벽 ${from} 끝에서`}
+            value={edge}
+            unit="cm"
+            source={link.door.offset !== undefined ? '사용자 설정' : '자동 위치'}
+            step={5}
+            min={5}
+            max={furthest}
+            onFocus={() => store.beginEdit(`${key}-edge`)}
+            onBlur={store.endEdit}
+            onLive={(v) => store.setDoor(a, b, { edge: v / 100, exact: true }, { live: true })}
+            onCommit={(v) => store.setDoor(a, b, { edge: v / 100, exact: true })}
+          />
+          <Stepper
+            label="문 폭"
+            ariaLabel={`${title} 문 폭`}
+            value={width}
+            unit="cm"
+            source={link.door.width !== undefined ? '사용자 설정' : '가정값'}
+            step={5}
+            min={cm(DOOR.min)}
+            max={widest}
+            onFocus={() => store.beginEdit(`${key}-width`)}
+            onBlur={store.endEdit}
+            onLive={(v) => store.setDoor(a, b, { width: v / 100 }, { live: true })}
+            onCommit={(v) => store.setDoor(a, b, { width: v / 100 })}
+          />
+          <div class="door-actions">
+            <button
+              class="btn small"
+              onClick={() => store.setDoor(a, b, { flip: !link.door.flip })}
+            >
+              <Icon name="flip" size={16} />
+              여는 방향 바꾸기
+            </button>
+            {(link.opening?.custom || link.door.flip) && (
+              <button class="btn small" onClick={() => store.setDoor(a, b, { reset: true })}>
+                자동으로 되돌리기
+              </button>
+            )}
+            <button class="btn small" data-door-close onClick={() => store.closeDoor(a, b)}>
+              <Icon name="door-closed" size={16} />문 막기
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function Floorplan() {
   const s = app.state,
     list = spaces(s),
     conflicts = floorplanWarnings(list, s.floorplan),
+    links = connections(list, s.floorplan),
+    blocked = links.filter((l) => l.closed).length,
     house = s.scope === 'house';
   return (
     <>
@@ -236,9 +321,27 @@ function Floorplan() {
           );
         })}
       </details>
+      {links.length > 0 && (
+        <details
+          class="house-positions house-doors"
+          open={app.view.doorList}
+          onToggle={(e) => store.setDoorList(e.currentTarget.open)}
+        >
+          <summary>
+            문 {links.length - blocked}개{blocked ? ` · 막은 벽 ${blocked}곳` : ''} · 위치와 폭
+            맞추기
+          </summary>
+          <p class="surface-hint">
+            2D에서는 문을 끌어 옮길 수 있어요. 문을 누르면 폭·여는 방향·막기 막대가 떠요.
+          </p>
+          {links.map((link) => (
+            <DoorRow key={link.ids.join('|')} link={link} />
+          ))}
+        </details>
+      )}
       <p class="surface-hint">
-        벽이 맞닿은 공간 사이에는 80cm 문을 자동으로 그려요. 문 위치와 화장실 설비, 낮춘 안쪽 벽은
-        배치를 가늠하기 위한 초안이에요.
+        벽이 맞닿으면 가운데에 80cm 문을 자동으로 그려요. 폭 80cm는 가정값이니 실제 문에 맞게 바꿔
+        주세요. 화장실 설비와 낮춘 안쪽 벽은 배치를 가늠하기 위한 초안이에요.
       </p>
     </>
   );

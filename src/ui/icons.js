@@ -69,9 +69,13 @@ import {
   Pencil,
   Bath,
   PersonStanding,
+  DoorOpen,
+  FlipHorizontal2,
 } from 'lucide';
 const MAP = {
   bath: Bath,
+  'door-open': DoorOpen,
+  flip: FlipHorizontal2,
   'person-standing': PersonStanding,
   ruler: Ruler,
   'layout-grid': LayoutGrid,

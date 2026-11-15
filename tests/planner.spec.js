@@ -91,7 +91,8 @@ test('가구 설명 → 방 안의 점선 초안 → 놓기 → 회전·삭제·
   const file = page.waitForEvent('download');
   await page.getByRole('button', { name: '파일과 설정' }).click();
   await page.locator('#export').click();
-  expect((await file).suggestedFilename()).toMatch(/배치\.json$/);
+  // WebKit은 내려받는 파일 이름의 한글을 자모로 풀어(NFD) 알려 주므로 합쳐서 견준다.
+  expect((await file).suggestedFilename().normalize('NFC')).toMatch(/배치\.json$/);
 });
 
 test('선택한 가구는 입력창의 대상이 되고, 다른 가구 이름은 새 초안을 만든다', async ({ page }) => {

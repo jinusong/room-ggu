@@ -1,4 +1,4 @@
-import { PlanScene, drawAvatar, drawDoor, drawFixtures } from './plan.js';
+import { PlanScene, drawAvatar, drawDoor, drawFixtures, doorHit } from './plan.js';
 import { spaces } from './data.js';
 import { floorplanWarnings, normalizeFloorplan, roomBounds } from './floorplan.js';
 import { PAPER } from './tape.js';
@@ -11,7 +11,7 @@ export class HouseScene extends PlanScene {
     super(host, state, cb);
     this.canvas.setAttribute(
       'aria-label',
-      '집 전체 평면도. 공간을 끌어 옮기고 더블클릭하면 방을 편집해요.',
+      '집 전체 평면도. 공간과 문을 끌어 옮기고, 공간을 더블클릭하면 방을 편집해요.',
     );
     for (const [event, fn] of [
       ['pointerdown', this.down],
@@ -25,10 +25,27 @@ export class HouseScene extends PlanScene {
         const b = roomBounds(r, state.floorplan.positions[r.roomId]);
         return p.x >= b.left && p.x <= b.right && p.z >= b.top && p.z <= b.bottom;
       });
+    this.doorAt = (p, e) =>
+      houseLayout(state).openings.find((o) =>
+        doorHit(o, p, this.scale, e?.pointerType === 'touch' ? 22 : 14),
+      );
     this.down = (e) => {
       if (e.button !== 0) return;
       const p = this.point(e),
+        door = this.doorAt(p, e),
         r = this.spaceAt(p);
+      if (door) {
+        this.drag = {
+          door,
+          grab: (door.vertical ? p.z : p.x) - (door.vertical ? door.z : door.x),
+          px: e.clientX,
+          py: e.clientY,
+          started: false,
+        };
+        this.canvas.setPointerCapture(e.pointerId);
+        return;
+      }
+      cb.pickDoor?.(null);
       if (!r) return;
       const pos = state.floorplan.positions[r.roomId];
       this.drag = {
@@ -44,7 +61,15 @@ export class HouseScene extends PlanScene {
     };
     this.move = (e) => {
       if (!this.drag) {
-        this.canvas.style.cursor = this.spaceAt(this.point(e)) ? 'grab' : '';
+        const at = this.point(e),
+          door = this.doorAt(at, e);
+        this.canvas.style.cursor = door
+          ? door.vertical
+            ? 'ns-resize'
+            : 'ew-resize'
+          : this.spaceAt(at)
+            ? 'grab'
+            : '';
         return;
       }
       if (!this.drag.started && Math.hypot(e.clientX - this.drag.px, e.clientY - this.drag.py) < 4)
@@ -54,13 +79,20 @@ export class HouseScene extends PlanScene {
         cb.start?.();
       }
       const p = this.point(e);
+      if (this.drag.door) {
+        const { door, grab } = this.drag;
+        cb.moveDoor?.(door.roomIds, (door.vertical ? p.z : p.x) - grab);
+        return;
+      }
       this.canvas.style.cursor = 'grabbing';
       cb.moveSpace(this.drag.id, p.x + this.drag.dx, p.z + this.drag.dz);
     };
     this.up = () => {
-      const moved = this.drag?.started;
+      const moved = this.drag?.started,
+        door = this.drag?.door;
       this.drag = null;
       this.canvas.style.cursor = '';
+      if (door) cb.pickDoor?.(door.roomIds);
       if (moved) cb.commit();
       this.draw();
     };
@@ -158,7 +190,17 @@ export class HouseScene extends PlanScene {
       c.lineWidth = wall;
       c.strokeRect(ox + b.left * scale, oy + b.top * scale, r.room.w * scale, r.room.d * scale);
     }
-    for (const o of layout.openings) drawDoor(c, o, ox, oy, scale, wall + 2);
+    const picked = this.doorSelected;
+    for (const o of layout.openings)
+      drawDoor(
+        c,
+        o,
+        ox,
+        oy,
+        scale,
+        wall + 2,
+        !!picked && o.roomIds.includes(picked[0]) && o.roomIds.includes(picked[1]),
+      );
     // 고른 공간은 벽 안쪽에 줄자 노랑 테두리를 둘러 표시한다.
     const active = layout.rooms.find((r) => r.roomId === this.state.roomId);
     if (active) {
@@ -192,6 +234,22 @@ export class HouseScene extends PlanScene {
       y: rect.top + this.oy + b.top * this.scale,
       width: r.room.w * this.scale,
       corner: true,
+      visible: true,
+    };
+  }
+  // 고른 문의 막대 자리: 문 가운데.
+  doorAnchor(ids) {
+    if (!ids || !this.scale) return null;
+    const o = houseLayout(this.state).openings.find(
+      (o) => o.roomIds.includes(ids[0]) && o.roomIds.includes(ids[1]),
+    );
+    if (!o) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    return {
+      x: rect.left + this.ox + o.x * this.scale,
+      y: rect.top + this.oy + o.z * this.scale,
+      half: (o.width / 2) * this.scale,
+      vertical: o.vertical,
       visible: true,
     };
   }

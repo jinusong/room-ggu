@@ -3,6 +3,7 @@
 // 먼저 `npm run dev`를 띄운다. 처음 한 번 모델을 내려받는다(Gemma 3 1B 약 570MB, Gemma 4 E2B 약 2.7GB).
 // 사용: [MODEL=light|large] [HEADLESS=1] node eval/chat/run.mjs [http://127.0.0.1:5173/] [results/name.json]
 // MODEL은 앱의 상담 모델 선택(light: Gemma 3 1B, large: Gemma 4 E2B)이다. HEADLESS=1이면 창을 띄우지 않는다.
+// F16=off이면 Worker 스크립트의 shader-f16 확인을 거짓으로 바꿔, f16이 없는 GPU에서 고르는 f32 모델 경로를 실행한다.
 import { chromium } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,6 +45,17 @@ const ctx = await chromium.launchPersistentContext(PROFILE, {
   channel: 'chrome', headless: process.env.HEADLESS === '1', viewport: { width: 1440, height: 900 }, args: ['--enable-unsafe-webgpu'],
 });
 const page = ctx.pages()[0] || (await ctx.newPage());
+// F32_MODEL을 주면 가벼운 모델의 f32 후보(Qwen3 0.6B) 자리에 다른 WebLLM 모델 id를 넣어 같은 문장으로 견준다.
+const F32_DEFAULT = 'Qwen3-0.6B-q4f32_1-MLC';
+if (process.env.F16 === 'off')
+  await ctx.route(/(ai-worker|index)[^/]*\.js(\?.*)?$/, async (route) => {
+    const res = await route.fetch();
+    const text = await res.text();
+    let body = text.replace(/features\.has\((["'])shader-f16\1\)/g, 'features.has("shader-f16-off")');
+    if (process.env.F32_MODEL) body = body.replaceAll(F32_DEFAULT, process.env.F32_MODEL);
+    if (body !== text) console.log('f16 off: patched', route.request().url().split('/').pop());
+    await route.fulfill({ response: res, body });
+  });
 // 모델마다 같은 예시 방에서 시작하도록 처음 한 번 저장된 배치와 대화를 지운다.
 await page.addInitScript((choice) => {
   try {

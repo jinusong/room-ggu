@@ -518,10 +518,11 @@ export class RoomScene {
       }
       const arc = new T.Line(
         new T.BufferGeometry().setFromPoints(points),
+        // 자동으로 놓인 문은 점선, 직접 옮기거나 폭을 정한 문은 실선이다.
         new T.LineDashedMaterial({
           color: '#55524a',
           dashSize: 0.06,
-          gapSize: 0.05,
+          gapSize: o.custom ? 0 : 0.05,
           transparent: true,
           opacity: o.inward ? 0.8 : 0,
         }),

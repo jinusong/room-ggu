@@ -301,7 +301,7 @@ test('집 전체 이미지에는 방 이름표와 키 이름표가 함께 저장
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: '파일과 설정' }).click();
     await page.locator('#png').click();
-    expect((await download).suggestedFilename()).toBe('집 전체-배치.png');
+    expect((await download).suggestedFilename().normalize('NFC')).toBe('집 전체-배치.png');
   }
 });
 
@@ -417,6 +417,35 @@ test('모델을 내려받는 동안 다이얼로그로 알리고, 접거나 취�
   await expect(page.locator('#download-continue')).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.locator('#download-dialog')).toHaveCount(0);
+  // 이어서 실패하면 다시 시도까지 잠깐 기다리게 하고, 세 번째부터는 나중에 하라고 권한다.
+  await progress({
+    task: 'text',
+    phase: 'error',
+    name: 'Gemma 3 1B',
+    totalMB: 600,
+    error: '모델 파일을 받는 중에 네트워크 연결이 끊겼어요.',
+    attempts: 3,
+    retryAt: Date.now() + 2500,
+  });
+  const retry = page.locator('#download-retry');
+  await expect(retry).toHaveAttribute('aria-disabled', 'true');
+  await expect(retry).toContainText('초 뒤');
+  await expect(page.getByRole('alertdialog')).toContainText('3번 이어서 실패했어요');
+  // 기다리는 동안에는 눌러도 다시 받지 않는다.
+  await retry.click();
+  await expect(page.getByRole('alertdialog')).toBeVisible();
+  await expect(retry).toHaveText('다시 시도', { timeout: 6000 });
+  await expect(retry).toHaveAttribute('aria-disabled', 'false');
+  await page.keyboard.press('Escape');
+  // 잠깐 뜨는 알림은 포인터를 올려 둔 동안 사라지지 않고, 누르면 닫힌다.
+  await page.evaluate(() => window.__roomggu.store.toast('공간이 겹쳐요. 빈 곳으로 옮겨 주세요.'));
+  const toast = page.locator('#toast');
+  await expect(toast).toHaveClass(/is-visible/);
+  await toast.hover();
+  await page.waitForTimeout(5000);
+  await expect(toast).toHaveClass(/is-visible/);
+  await toast.click();
+  await expect(toast).not.toHaveClass(/is-visible/);
   // AI 도구에서 두 모델의 크기를 비교해 고를 수 있다. 기본은 가벼운 모델이다.
   await page.getByRole('button', { name: '파일과 설정' }).click();
   await page.getByRole('menuitem', { name: '이 기기의 AI' }).click();

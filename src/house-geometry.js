@@ -1,5 +1,11 @@
 import { spaces } from './data.js';
-import { normalizeFloorplan, roomBounds, sharedOpening, roomOpenings } from './floorplan.js';
+import {
+  normalizeFloorplan,
+  roomBounds,
+  sharedOpening,
+  roomOpenings,
+  findDoor,
+} from './floorplan.js';
 
 // 2D와 같은 공간 중심 좌표를 사용한다. 벽은 맞닿는 구간마다 한 번만 만든다.
 export function houseLayout(state) {
@@ -18,7 +24,13 @@ export function houseLayout(state) {
   const openings = [];
   for (let i = 0; i < rooms.length; i++)
     for (let j = i + 1; j < rooms.length; j++) {
-      const o = sharedOpening(rooms[i], rooms[i].position, rooms[j], rooms[j].position);
+      const o = sharedOpening(
+        rooms[i],
+        rooms[i].position,
+        rooms[j],
+        rooms[j].position,
+        findDoor(plan, rooms[i].roomId, rooms[j].roomId),
+      );
       if (o) openings.push({ ...o, roomIds: [rooms[i].roomId, rooms[j].roomId] });
     }
   const lines = new Map();
@@ -88,9 +100,10 @@ export function fixtureFootprint(f) {
   const swap = Math.round(f.angle / 90) % 2 !== 0;
   return { w: swap ? f.d : f.w, d: swap ? f.w : f.d };
 }
-function doorZone(o, room) {
-  const depth = o.inward ? o.width + 0.05 : 0.5,
-    half = o.width / 2 + 0.05;
+// 문 앞에 비워 둘 자리. pad는 문 폭 양옆과 깊이에 더하는 여유다.
+function doorZone(o, room, pad = 0.05) {
+  const depth = o.inward ? o.width + pad : 0.5,
+    half = o.width / 2 + pad;
   if (o.vertical) {
     const edge = o.x > 0 ? room.w / 2 : -room.w / 2;
     return {
@@ -109,19 +122,20 @@ function doorZone(o, room) {
   };
 }
 export function bathroomFixtures(room, openings = []) {
-  const turn = TURN[openings[0]?.wall] ?? 0,
-    quarter = turn % 180 !== 0;
-  const W = quarter ? room.d : room.w,
-    D = quarter ? room.w : room.d;
-  const shower = { w: Math.min(0.8, W * 0.44), d: Math.min(0.8, D * 0.36), h: 1.7 },
-    toilet = { w: Math.min(0.42, W * 0.3), d: Math.min(0.68, D * 0.4), h: 0.75 },
-    basin = { w: Math.min(0.5, D * 0.32), d: Math.min(0.4, W * 0.25), h: 0.82 };
-  const rad = (turn * Math.PI) / 180,
-    cos = Math.round(Math.cos(rad)),
-    sin = Math.round(Math.sin(rad));
-  const zones = openings.map((o) => doorZone(o, room));
-  const build = (mirror) => {
-    const m = mirror ? -1 : 1;
+  // 문 폭 그대로의 통로를 막는 것을 여유 5cm를 침범하는 것보다 훨씬 크게 친다.
+  const ways = openings.map((o) => doorZone(o, room, 0)),
+    zones = openings.map((o) => doorZone(o, room));
+  const build = (turn, mirror) => {
+    const quarter = turn % 180 !== 0,
+      W = quarter ? room.d : room.w,
+      D = quarter ? room.w : room.d;
+    const shower = { w: Math.min(0.8, W * 0.44), d: Math.min(0.8, D * 0.36), h: 1.7 },
+      toilet = { w: Math.min(0.42, W * 0.3), d: Math.min(0.68, D * 0.4), h: 0.75 },
+      basin = { w: Math.min(0.5, D * 0.32), d: Math.min(0.4, W * 0.25), h: 0.82 };
+    const rad = (turn * Math.PI) / 180,
+      cos = Math.round(Math.cos(rad)),
+      sin = Math.round(Math.sin(rad)),
+      m = mirror ? -1 : 1;
     const local = [
       { type: 'toilet', ...toilet, x: (m * -shower.w) / 2, z: -D / 2 + toilet.d / 2, angle: 0 },
       {
@@ -147,12 +161,12 @@ export function bathroomFixtures(room, openings = []) {
       angle: (f.angle + turn) % 360,
     }));
   };
-  const blocked = (list) =>
+  const overlap = (list, rects) =>
     list.reduce((sum, f) => {
       const p = fixtureFootprint(f);
       return (
         sum +
-        zones.reduce(
+        rects.reduce(
           (n, r) =>
             n +
             Math.max(0, Math.min(r.right, f.x + p.w / 2) - Math.max(r.left, f.x - p.w / 2)) *
@@ -161,7 +175,19 @@ export function bathroomFixtures(room, openings = []) {
         )
       );
     }, 0);
-  const plain = build(false),
-    mirrored = build(true);
-  return blocked(mirrored) < blocked(plain) - 1e-9 ? mirrored : plain;
+  const blocked = (list) => overlap(list, ways) * 1000 + overlap(list, zones);
+  // 첫 문의 맞은편 벽을 먼저 보고, 문 앞을 막으면 옆벽과 좌우를 뒤집은 안까지 견줘 가장 덜 막는 안을 고른다.
+  const first = TURN[openings[0]?.wall] ?? 0;
+  let best = null,
+    least = Infinity;
+  for (const turn of [first, (first + 90) % 360, (first + 270) % 360, (first + 180) % 360])
+    for (const mirror of [false, true]) {
+      const list = build(turn, mirror),
+        area = blocked(list);
+      if (area < least - 1e-9) {
+        best = list;
+        least = area;
+      }
+    }
+  return best;
 }

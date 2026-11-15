@@ -48,8 +48,15 @@ export function drawTags(g, tags = []) {
   g.save();
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  for (const t of tags) {
+  for (let t of tags) {
     const style = TAG_STYLE[t.kind] || TAG_STYLE.room;
+    g.font = `500 ${t.size || 12}px "Pretendard Variable", Pretendard, system-ui, sans-serif`;
+    // 화면에서 아이콘만 남긴 이름표도 이미지에는 이름을 다 적는다. 글자가 들어가도록 상자를 넓힌다.
+    const need = Math.ceil(g.measureText(t.text).width) + 16;
+    if (need > t.w) {
+      const limit = g.canvas.width / (g.getTransform().a || 1);
+      t = { ...t, x: Math.max(4, Math.min(t.x, limit - need - 4)), w: need };
+    }
     g.beginPath();
     g.roundRect(t.x, t.y, t.w, t.h, Math.min(8, t.h / 2));
     g.fillStyle = style.fill;
@@ -62,7 +69,6 @@ export function drawTags(g, tags = []) {
       g.setLineDash([]);
     }
     g.fillStyle = style.ink;
-    g.font = `500 ${t.size || 12}px "Pretendard Variable", Pretendard, system-ui, sans-serif`;
     g.fillText(t.text, t.x + t.w / 2, t.y + t.h / 2 + 0.5, t.w - 8);
   }
   g.restore();

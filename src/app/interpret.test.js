@@ -192,3 +192,37 @@ test('사진 점수는 확률로 바꿔 상위 3개만 남긴다', () => {
   assert.ok(Math.abs(c.reduce((a, x) => a + x.p, 0) - 1) < 0.01);
   assert.deepEqual(photoCandidates(null), []);
 });
+
+test('가구 초안을 가리키는 중에 모델이 방 이야기로 잘못 읽어도 문장에 방 말이 없으면 가구에 반영한다', () => {
+  const s = freshState();
+  const draft = makeItem('sofa');
+  const ctx = { state: s, draft, target: { type: 'draft' } };
+  // 작은 모델(Qwen3 0.6B)이 실제로 낸 답: 방 이야기로 분류하고 아무 값도 고르지 않았다.
+  const color = planFromModel(model({ intent: 'room', ui: 'room_type' }), '네이비로 바꿔줘', ctx);
+  assert.equal(color.intent, 'furniture');
+  assert.equal(color.changes.draft.color, '#3f4d63');
+  assert.match(color.fixes.join(), /지금 대상인 소파 이야기로 처리/);
+  const depth = planFromModel(
+    model({ intent: 'room', depth: 'deep' }),
+    '앉는 부분이 깊었으면 좋겠어',
+    ctx,
+  );
+  assert.equal(depth.intent, 'furniture');
+  assert.ok(depth.changes.draft.dims[2] > draft.dims[2]);
+  // 방을 가리키는 말이 있거나 방에서 실제로 바뀐 것이 있으면 방 이야기 그대로다.
+  const wall = planFromModel(
+    model({ intent: 'room', wall: '샌드' }),
+    '벽은 따뜻한 느낌이면 좋겠어',
+    ctx,
+  );
+  assert.equal(wall.intent, 'room');
+  assert.ok(wall.changes.room);
+  const size = planFromModel(model({ intent: 'room' }), '방이 좀 답답해 보여', ctx);
+  assert.equal(size.intent, 'room');
+  // 대상이 방이면 손대지 않는다.
+  const none = planFromModel(model({ intent: 'room' }), '네이비로 바꿔줘', {
+    state: s,
+    target: room,
+  });
+  assert.equal(none.intent, 'room');
+});

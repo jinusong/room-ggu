@@ -90,7 +90,16 @@ function useShortcuts() {
 function Toast() {
   const t = app.view.toast;
   return (
-    <div id="toast" class={`toast ${t ? 'is-visible' : ''}`} role="status" aria-live="polite">
+    <div
+      id="toast"
+      class={`toast ${t ? 'is-visible' : ''}`}
+      role="status"
+      aria-live="polite"
+      title={t ? '누르면 닫혀요' : undefined}
+      onPointerEnter={store.holdToast}
+      onPointerLeave={store.releaseToast}
+      onClick={store.dismissToast}
+    >
       {t?.text}
     </div>
   );

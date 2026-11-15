@@ -38,7 +38,7 @@ import { dimsText, josa } from './text.js';
 
 const WALL_WORDS = /벽|도배|벽지/;
 const FLOOR_WORDS = /바닥|마루|장판|타일/;
-const COLOR_TALK = /색|컬러|톤|[가-힣]+색|으로\s*(?:바꿔|해)/;
+const COLOR_TALK = /색|컬러|톤|[가-힣]+색|(?:으로|로)\s*(?:바꿔|해)/;
 const MOOD_TALK = /느낌|분위기|톤/;
 const PURPOSE =
   /책|공부|업무|작업|일하|잠|수면|자는|쉬|휴식|아이|어린이|아기|요리|조리|식사|밥|손님|가족|모여|영화|게임|운동|취미|음악|홈\s*카페|드레스룸|옷|(?:하는|할|위한|용)\s*(?:방|공간)|(?:방|공간)으로\s*(?:꾸미|꾸며|쓰|만들)/;
@@ -186,9 +186,24 @@ export function planFromModel(raw, text, ctx) {
       });
     }
   }
-  return done(
-    intent === 'room' ? roomPlan(v, t, ctx, fixes) : furniturePlan(v, t, ctx, item, named, fixes),
-  );
+  if (intent === 'room') {
+    const plan = roomPlan(v, t, ctx, fixes);
+    // 선택한 가구나 초안을 가리키는 중에 모델이 방 이야기로 읽었는데 방에서 바뀐 것이 없고
+    // 문장에도 방을 가리키는 말이 없으면, 지금 대상인 가구 이야기로 다시 읽는다.
+    // (작은 모델이 “네이비로 바꿔줘”를 방 이야기로 분류해 아무것도 바꾸지 않던 경우)
+    if (
+      subj &&
+      !plan.changes.room &&
+      !literal &&
+      !/방|공간|룸|집|벽|바닥|천장/.test(t) &&
+      resolveScope(t, target) === 'furniture'
+    ) {
+      fixes.push(`지금 대상인 ${TYPES[subj.type].name} 이야기로 처리`);
+      return done(furniturePlan(v, t, ctx, item, named, fixes));
+    }
+    return done(plan);
+  }
+  return done(furniturePlan(v, t, ctx, item, named, fixes));
 }
 
 function actionPlan(v, t, ctx, item, named, fixes) {

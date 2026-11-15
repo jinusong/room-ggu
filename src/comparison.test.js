@@ -115,3 +115,28 @@ test('방 크기 변경으로 생긴 공간 중첩을 표시한다', () => {
   setRoom(s, roomWithDims(s.room, { w: 6 }));
   assert.equal(floorplanWarnings(spaces(s), s.floorplan).size, 2);
 });
+test('문 명령은 폭·막기·다시 내기·방향을 읽고 문을 기준으로 한 가구 문장은 읽지 않는다', () => {
+  assert.deepEqual(parseComparisonCommand('화장실 문 폭 90cm로 해줘'), {
+    kind: 'door',
+    action: 'width',
+    width: 90,
+  });
+  assert.deepEqual(parseComparisonCommand('문 너비를 0.7m로'), {
+    kind: 'door',
+    action: 'width',
+    width: 70,
+  });
+  assert.equal(parseComparisonCommand('화장실 문 막아줘').action, 'close');
+  assert.equal(parseComparisonCommand('문을 없애줘').action, 'close');
+  assert.equal(parseComparisonCommand('문 다시 내줘').action, 'open');
+  assert.equal(parseComparisonCommand('문 여는 방향 바꿔줘').action, 'flip');
+  assert.equal(parseComparisonCommand('문 위치를 옮기고 싶어').action, 'show');
+  for (const text of [
+    '문 옆에 소파 놓아줘',
+    '창문 쪽으로 책상 옮겨줘',
+    '질문 있어',
+    '주문한 침대 폭 140cm',
+    '방문 손님용 의자',
+  ])
+    assert.equal(parseComparisonCommand(text), null, text);
+});

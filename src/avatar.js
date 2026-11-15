@@ -271,6 +271,30 @@ export function parseComparisonCommand(text, { avatarOn = false } = {}) {
       furniture: FURNITURE_WORDS.find(([word]) => word.test(text))?.[1] || null,
     };
   }
+  // 연결 문 명령. “문 옆에 소파”처럼 문을 기준으로 가구를 말하는 문장은 읽지 않는다.
+  const door = text.match(
+    /(?:^|[\s,.·])(?:화장실|욕실|방|침실|거실|연결)?\s*문(?:을|이|은|의|도)?\s*(위치|폭|너비|옮|이동|막|없애|닫아|다시\s*내|내\s*줘|내줘|방향|여는|열리는)/,
+  );
+  if (door) {
+    const word = door[1].replace(/\s/g, ''),
+      size = text.match(/(\d+(?:\.\d+)?)\s*(cm|센티(?:미터)?|m(?![a-z])|미터)?/i);
+    const action = /폭|너비/.test(word)
+      ? 'width'
+      : /막|없애|닫아/.test(word)
+        ? 'close'
+        : /다시내|내줘/.test(word)
+          ? 'open'
+          : /방향|여는|열리는/.test(word)
+            ? 'flip'
+            : 'show';
+    return {
+      kind: 'door',
+      action,
+      ...(action === 'width' && size
+        ? { width: Number(size[1]) * (/^(m|미터)$/i.test(size[2] || '') ? 100 : 1) }
+        : {}),
+    };
+  }
   if (/(집\s*전체|전체\s*평면도|집\s*평면도)/.test(text))
     return {
       kind: 'floorplan',

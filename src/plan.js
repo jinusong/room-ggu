@@ -75,8 +75,16 @@ export function drawFixtures(c, room, openings, cx, cy, s) {
   c.restore();
 }
 
-// 연결 문: 벽을 비우고 문짝과 열리는 호를 점선으로 그린다. 위치는 초안이다.
-export function drawDoor(c, o, ox, oy, s, wall) {
+// 문을 끌어 잡는 범위(m). 화면에서 최소 pixels만큼은 잡히게 한다.
+export function doorHit(o, p, scale, pixels = 14) {
+  const reach = Math.max(0.12, pixels / scale),
+    along = o.vertical ? p.z - o.z : p.x - o.x,
+    across = o.vertical ? p.x - o.x : p.z - o.z;
+  return Math.abs(along) <= o.width / 2 + reach * 0.4 && Math.abs(across) <= reach;
+}
+
+// 연결 문: 벽을 비우고 문짝과 열리는 호를 그린다. 자동으로 놓인 문은 점선, 직접 옮기거나 폭을 정한 문은 실선이다.
+export function drawDoor(c, o, ox, oy, s, wall, selected = false) {
   const { hinge, along, leaf } = doorSwing(o),
     w = o.width * s,
     hx = ox + hinge[0] * s,
@@ -95,7 +103,7 @@ export function drawDoor(c, o, ox, oy, s, wall) {
   c.moveTo(hx, hy);
   c.lineTo(hx + leaf[0] * w, hy + leaf[1] * w);
   c.stroke();
-  c.setLineDash([3, 3]);
+  c.setLineDash(o.custom ? [] : [3, 3]);
   c.beginPath();
   for (let i = 0; i <= 12; i++) {
     const t = (i / 12) * (Math.PI / 2),
@@ -105,6 +113,16 @@ export function drawDoor(c, o, ox, oy, s, wall) {
     else c.moveTo(x, y);
   }
   c.stroke();
+  if (selected) {
+    // 고른 문은 문턱 자리에 줄자 노랑 선을 긋는다.
+    c.setLineDash([]);
+    c.strokeStyle = '#d9a21b';
+    c.lineWidth = 3;
+    c.beginPath();
+    c.moveTo(hx, hy);
+    c.lineTo(hx + along[0] * w, hy + along[1] * w);
+    c.stroke();
+  }
   c.restore();
 }
 
@@ -143,10 +161,29 @@ export class PlanScene {
         if (inside(a)) return a;
       return null;
     };
+    // 이 방 벽에 난 문. 가구가 그 위에 없을 때만 잡힌다.
+    this.doorAt = (p, e) =>
+      roomOpenings(spaces(this.state), this.state.floorplan, this.state.roomId).find((o) =>
+        doorHit(o, p, this.scale, e?.pointerType === 'touch' ? 22 : 14),
+      );
     this.down = (e) => {
       if (e.button !== 0) return;
       const p = this.point(e),
-        hit = this.hit(p);
+        hit = this.hit(p),
+        door = !hit && this.cb.moveDoor ? this.doorAt(p, e) : null;
+      if (door) {
+        // 문은 벽을 따라서만 움직인다. 누른 지점과 문 가운데의 차이를 유지한다.
+        this.drag = {
+          door,
+          grab: (door.vertical ? p.z : p.x) - (door.vertical ? door.z : door.x),
+          px: e.clientX,
+          py: e.clientY,
+          started: false,
+        };
+        this.cb.select(null);
+        this.canvas.setPointerCapture(e.pointerId);
+        return;
+      }
       if (hit?.id !== 'avatar') this.cb.select(hit?.id || null);
       if (hit) {
         this.drag = {
@@ -164,7 +201,33 @@ export class PlanScene {
     this.move = (e) => {
       const p = this.point(e);
       if (!this.drag) {
-        this.canvas.style.cursor = this.hit(p) ? 'grab' : '';
+        const door = !this.hit(p) && this.cb.moveDoor ? this.doorAt(p, e) : null;
+        this.canvas.style.cursor = door
+          ? door.vertical
+            ? 'ns-resize'
+            : 'ew-resize'
+          : this.hit(p)
+            ? 'grab'
+            : '';
+        return;
+      }
+      if (this.drag.door) {
+        const { door, grab } = this.drag;
+        if (
+          !this.drag.started &&
+          Math.hypot(e.clientX - this.drag.px, e.clientY - this.drag.py) < 4
+        )
+          return;
+        if (!this.drag.started) {
+          this.drag.started = true;
+          this.cb.start?.();
+        }
+        // 방 안 좌표를 집 전체 좌표로 옮겨 넘긴다.
+        const origin = this.state.floorplan.positions[this.state.roomId];
+        this.cb.moveDoor(
+          [this.state.roomId, door.roomId],
+          (door.vertical ? p.z + origin.z : p.x + origin.x) - grab,
+        );
         return;
       }
       // 손가락이 살짝 흔들린 정도는 누르기로 본다. 앉거나 누운 아바타는 가구를 따라가므로 끌지 않는다.
@@ -183,10 +246,11 @@ export class PlanScene {
     };
     this.up = () => {
       if (this.drag) {
-        const { started, id } = this.drag;
+        const { started, id, door } = this.drag;
         this.drag = null;
         this.canvas.style.cursor = '';
         if (started) this.cb.commit();
+        else if (door) this.cb.pickDoor?.([this.state.roomId, door.roomId]);
         else if (id === 'avatar') this.cb.pickAvatar?.();
       }
     };
@@ -239,6 +303,22 @@ export class PlanScene {
     return {
       x: r.left + this.ox + a.x * this.scale,
       y: r.top + this.oy + (center ? a.z : a.z - f.d / 2) * this.scale - (center ? 0 : 8),
+      visible: true,
+    };
+  }
+  // 고른 문의 막대 자리: 문 가운데.
+  doorAnchor(ids) {
+    if (!ids || !this.scale || !ids.includes(this.state.roomId)) return null;
+    const o = roomOpenings(spaces(this.state), this.state.floorplan, this.state.roomId).find((o) =>
+      ids.includes(o.roomId),
+    );
+    if (!o) return null;
+    const r = this.canvas.getBoundingClientRect();
+    return {
+      x: r.left + this.ox + o.x * this.scale,
+      y: r.top + this.oy + o.z * this.scale,
+      half: (o.width / 2) * this.scale,
+      vertical: o.vertical,
       visible: true,
     };
   }
@@ -379,7 +459,8 @@ export class PlanScene {
     this.tape(c, `${Math.round(room.w * 100)} cm`, this.ox, ly);
     this.tape(c, `${Math.round(room.d * 100)} cm`, lx, this.oy, -Math.PI / 2);
     const doors = roomOpenings(spaces(this.state), this.state.floorplan, this.state.roomId);
-    for (const o of doors) drawDoor(c, o, this.ox, this.oy, s, wt * 2 + 2);
+    for (const o of doors)
+      drawDoor(c, o, this.ox, this.oy, s, wt * 2 + 2, !!this.doorSelected?.includes(o.roomId));
     if (room.type === 'bathroom') drawFixtures(c, room, doors, this.ox, this.oy, s);
     const items = [...this.state.items].sort((a, b) => (b.type === 'rug') - (a.type === 'rug'));
     for (const a of items)

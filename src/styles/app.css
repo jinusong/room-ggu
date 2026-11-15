@@ -60,7 +60,8 @@ button {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-button:disabled {
+button:disabled,
+button[aria-disabled='true'] {
   cursor: default;
   opacity: 0.45;
 }
@@ -2040,6 +2041,14 @@ button.row:hover,
 .room-tag.is-narrow .tag-dims {
   display: none;
 }
+/* 공간이 많거나 방이 아주 좁으면 아이콘만 남긴다. 누르면 고른 공간으로 펼쳐진다. */
+.room-tag.is-icon .tag-name,
+.room-tag.is-icon .tag-dims {
+  display: none;
+}
+.room-tag.is-icon .tag-main {
+  padding: 0 7px;
+}
 .tag-edit {
   display: flex;
   align-items: center;
@@ -2087,7 +2096,8 @@ button.avatar-tag {
 .avatar-tag.is-draft {
   background-color: var(--sheet);
 }
-.avatar-bar {
+.avatar-bar,
+.door-bar {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2117,6 +2127,34 @@ button.avatar-tag {
 .avatar-bar .bar-btn {
   width: 36px;
   height: 36px;
+}
+/* 고른 문의 막대: 폭 줄자 칩을 가운데 두고 양옆에서 5cm씩 바꾼다. */
+.door-bar {
+  gap: 4px;
+  padding: 0 4px;
+}
+.door-bar .tape {
+  height: 24px;
+  border-radius: 5px;
+}
+.door-bar .tape.is-set {
+  border: 0;
+}
+.door-bar .bar-btn {
+  width: 36px;
+  height: 36px;
+}
+.bar-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.bar-btn.bar-text {
+  width: auto;
+  padding: 0 10px;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
 }
 .stage-bottom {
   position: absolute;
@@ -2162,6 +2200,8 @@ button.avatar-tag {
 }
 .toast.is-visible {
   opacity: 1;
+  pointer-events: auto;
+  cursor: pointer;
   transform: translate(-50%, 0);
 }
 .drop-hint {
@@ -2500,6 +2540,25 @@ button.avatar-tag {
 .house-position strong {
   font-weight: 500;
   overflow-wrap: anywhere;
+}
+.house-door-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.house-door-head small {
+  color: var(--ink-3);
+}
+.house-positions + .surface-hint {
+  margin-top: 12px;
+}
+.door-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 /* ---------- 모델 내려받기 안내 ---------- */
