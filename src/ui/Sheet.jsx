@@ -4,16 +4,151 @@ import { app } from '../app/store.js';
 import { Icon } from './icons.js';
 import { Thread } from './Thread.jsx';
 import { Composer } from './Composer.jsx';
+import { BrandMark } from './widgets.jsx';
 
-export function Brand() {
+const OFF_TEXT = {
+  user: '모델 꺼 둠',
+  url: '모델 꺼 둠',
+  'save-data': '데이터 절약 모드라 모델을 켜지 않음',
+  memory: '메모리가 작아 모델을 켜지 않음',
+};
+// 지금 누가 답하는지. 상담 상대 이름 바로 아래에 둔다.
+function Status() {
+  const ai = app.ai;
+  if (app.busy?.kind === 'model')
+    return (
+      <span class="status-line">
+        <Icon name="loader-circle" size={14} className="spin" />
+        문장을 해석하는 중
+        <button type="button" class="link" onClick={() => store.cancelModel()}>
+          멈추기
+        </button>
+      </span>
+    );
+  if (app.busy?.kind === 'vision')
+    return (
+      <span class="status-line">
+        <Icon name="loader-circle" size={14} className="spin" />
+        사진 판별 중
+        <button type="button" class="link" onClick={() => store.cancelModel()}>
+          취소
+        </button>
+      </span>
+    );
+  // 준비 상황은 위쪽 아일랜드가 움직임으로 보여 준다. 여기서는 오래 도는 표시 없이 글로만 알린다.
+  if (ai.text === 'loading')
+    return (
+      <span class="status-line">
+        <span class="status-dot is-loading" />
+        상담 모델 준비 중<span class="status-extra"> · 그동안 규칙으로 답해요</span>
+        <button type="button" class="link" onClick={() => store.setModelOn(false)}>
+          끄기
+        </button>
+      </span>
+    );
+  if (ai.text === 'ready')
+    return (
+      <span class="status-line">
+        <span class="status-dot is-ready" />
+        {store.modelName(ai.model)}가 이 기기에서 답해요
+        <button type="button" class="link" onClick={() => store.openTool('ai')}>
+          설정
+        </button>
+      </span>
+    );
+  const text =
+    ai.text === 'unsupported'
+      ? '이 브라우저는 모델을 못 써요'
+      : ai.text === 'error'
+        ? '모델 준비 실패'
+        : OFF_TEXT[ai.why] || '모델 꺼짐';
   return (
-    <span class="brand" aria-label="룸꾸">
-      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M4 20V4h16" />
-        <rect x="9" y="11" width="8" height="5" rx="1" />
-      </svg>
-      <span class="brand-name">룸꾸</span>
+    <span class="status-line">
+      <span class={`status-dot is-${ai.text}`} />
+      {text} · 규칙으로 답해요
+      <button
+        type="button"
+        class="link"
+        onClick={() => (ai.text === 'unsupported' ? store.openTool('ai') : store.setModelOn(true))}
+      >
+        {ai.text === 'unsupported' ? '자세히' : ai.text === 'error' ? '다시 시도' : '켜기'}
+      </button>
     </span>
+  );
+}
+
+// 대화 열의 폭. 사용자가 끌어 맞춘 값은 이 브라우저에만 기억한다.
+const WIDTH_KEY = 'room-ggu-chat-width';
+// 방 쪽에 위 도구 줄이 들어갈 폭(520px)은 남긴다.
+const widthLimits = () => [
+  360,
+  Math.max(380, Math.min(760, Math.round(innerWidth * 0.6), innerWidth - 520)),
+];
+function applyWidth(px) {
+  if (px) document.documentElement.style.setProperty('--chat-w', `${px}px`);
+  else document.documentElement.style.removeProperty('--chat-w');
+}
+try {
+  const saved = Number(localStorage.getItem(WIDTH_KEY));
+  if (saved) applyWidth(Math.max(widthLimits()[0], Math.min(widthLimits()[1], saved)));
+} catch {}
+function Resizer({ sheetRef }) {
+  const drag = useRef(null);
+  const [, redraw] = useState(0);
+  const set = (px, save = true) => {
+    const [min, max] = widthLimits(),
+      next = Math.round(Math.max(min, Math.min(max, px)));
+    applyWidth(next);
+    if (save)
+      try {
+        localStorage.setItem(WIDTH_KEY, String(next));
+      } catch {}
+    redraw((n) => n + 1);
+  };
+  const width = () => Math.round(sheetRef.current?.getBoundingClientRect().width || 0);
+  const [min, max] = widthLimits();
+  return (
+    <div
+      class="sheet-resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="대화 폭 조절"
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={width() || undefined}
+      tabIndex={0}
+      title="끌어서 대화 폭 조절 · 두 번 누르면 기본 폭"
+      onPointerDown={(e) => {
+        drag.current = { x: e.clientX, w: width() };
+        e.currentTarget.setPointerCapture(e.pointerId);
+        document.documentElement.classList.add('is-resizing');
+      }}
+      onPointerMove={(e) => drag.current && set(drag.current.w + e.clientX - drag.current.x, false)}
+      onPointerUp={() => {
+        if (!drag.current) return;
+        drag.current = null;
+        document.documentElement.classList.remove('is-resizing');
+        set(width());
+      }}
+      onDblClick={() => {
+        applyWidth(0);
+        try {
+          localStorage.removeItem(WIDTH_KEY);
+        } catch {}
+        redraw((n) => n + 1);
+      }}
+      onKeyDown={(e) => {
+        const next = {
+          ArrowLeft: width() - 24,
+          ArrowRight: width() + 24,
+          Home: min,
+          End: max,
+        }[e.key];
+        if (next === undefined) return;
+        e.preventDefault();
+        set(next);
+      }}
+    />
   );
 }
 
@@ -75,8 +210,14 @@ export function Sheet({ mobile, sheetRef }) {
         </button>
       )}
       <header class="sheet-head">
-        <Brand />
-        <span class="sheet-title">이야기하며 꾸미는 방</span>
+        <BrandMark />
+        <div class="chat-id">
+          <span class="chat-name">
+            <strong>룸꾸</strong>
+            <span class="sheet-title">방 꾸미기 상담</span>
+          </span>
+          <Status />
+        </div>
         <div class="sheet-actions">
           {app.thread.length > 0 &&
             (confirmClear ? (
@@ -122,10 +263,12 @@ export function Sheet({ mobile, sheetRef }) {
       )}
       {!collapsed && <Thread mobile={mobile} />}
       <Composer
+        mobile={mobile}
         onFocusChange={(f) => {
           if (mobile && f && snap === 'peek') store.setSheet('half');
         }}
       />
+      {!mobile && !collapsed && <Resizer sheetRef={sheetRef} />}
     </aside>
   );
 }

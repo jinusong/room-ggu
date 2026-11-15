@@ -360,92 +360,155 @@ for (const size of [
   });
 }
 
-test('모델을 내려받는 동안 다이얼로그로 알리고, 접거나 취소할 수 있다', async ({ page }) => {
+test('모델을 받거나 준비하는 동안 위쪽 아일랜드로 알리고, 펼치거나 취소할 수 있다', async ({
+  page,
+}) => {
   await open(page);
   // 실제 내려받기 대신 로더가 보내는 진행 상태를 그대로 넣어 화면을 확인한다.
-  const progress = (download) =>
-    page.evaluate((download) => {
-      const { app, store } = window.__roomggu;
-      app.ai.text = 'loading';
-      app.ai.download = download;
-      store.emit();
-    }, download);
-  await progress({
+  const progress = (download, expanded = false) =>
+    page.evaluate(
+      ([download, expanded]) => {
+        const { app, store } = window.__roomggu;
+        app.ai.text = download.phase === 'done' ? 'ready' : 'loading';
+        app.ai.download = download;
+        app.view.downloadOpen = expanded;
+        app.view.downloadAuto = false;
+        store.emit();
+      },
+      [download, expanded],
+    );
+  const fetching = {
     task: 'text',
     phase: 'fetch',
     name: 'Gemma 3 1B',
-    mb: 247,
-    totalMB: 574,
+    mb: 258,
+    totalMB: 600,
     progress: 0.43,
-  });
-  const dialog = page.getByRole('dialog', { name: '상담 모델을 내려받는 중' });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '43');
-  await expect(dialog).toContainText('247MB / 약 574MB');
-  await expect(dialog).toContainText('규칙으로 답하니');
-  await page.screenshot({ path: 'test-results/model-download.png' });
-  // 계속 쓰기: 방 위의 작은 진행 표시로 줄고, 앱은 그대로 쓸 수 있다.
-  await dialog.getByRole('button', { name: '계속 쓰기' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(page.locator('#download-pill')).toContainText('43%');
+    at: Date.now(),
+  };
+  await progress(fetching);
+  const island = page.locator('#model-island'),
+    toggle = page.locator('#island-toggle');
+  await expect(island).toBeVisible();
+  await expect(toggle).toContainText('상담 모델 받는 중');
+  await expect(toggle).toContainText('43%');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  // 화면을 막는 다이얼로그가 아니다. 방 위 도구 줄 바로 아래 가운데에 뜬다.
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  // 나타나는 움직임이 끝난 뒤의 자리를 잰다.
+  await page.waitForTimeout(450);
+  const box = await island.boundingBox(),
+    stage = await page.evaluate(() => {
+      const left = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--inset-left'),
+      );
+      return {
+        center: (innerWidth + left) / 2,
+        tools: document.querySelector('.stage-top').getBoundingClientRect().bottom,
+      };
+    });
+  expect(box.y).toBeGreaterThanOrEqual(stage.tools);
+  expect(box.y).toBeLessThan(120);
+  expect(Math.abs(box.x + box.width / 2 - stage.center)).toBeLessThan(2);
+  // 받는 동안에도 상담과 방 위 도구는 그대로 쓸 수 있다.
   await say(page, '거실 가로 5m 세로 4m');
   expect((await stored(page)).room).toMatchObject({ w: 5, d: 4 });
-  await page.locator('#download-pill').click();
-  await expect(dialog).toBeVisible();
+  await page.locator('#scope-house').click();
+  await expect(page.locator('#scope-house')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('#scope-room').click();
+  // 누르면 아래로 펼쳐져 크기·받은 양·안내·취소가 보인다.
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  const panel = page.locator('#island-panel');
+  await expect(panel.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '43');
+  await expect(panel).toContainText('Gemma 3 1B · 약 600MB · 이 기기에서 실행');
+  await expect(panel).toContainText('258MB / 약 600MB');
+  await expect(panel).toContainText('규칙으로 답하니');
+  await page.screenshot({ path: 'test-results/model-island.png' });
+  // 초점이 안에 있을 때 Esc를 누르면 접힌다.
+  await page.keyboard.press('Escape');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  // 처음 받을 때 저절로 펼쳐진 안내는 읽을 시간이 지나면 스스로 접힌다.
+  await page.evaluate(() => {
+    const { app, store } = window.__roomggu;
+    app.view.downloadOpen = true;
+    app.view.downloadAuto = true;
+    store.emit();
+  });
+  await page.mouse.move(700, 700);
+  await page.locator('#chat-input').focus();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false', { timeout: 9000 });
   // 취소하면 모델을 끄고 그 선택을 기억한다.
-  await dialog.getByRole('button', { name: '취소하고 모델 끄기' }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await toggle.click();
+  await panel.getByRole('button', { name: '취소하고 모델 끄기' }).click();
+  await expect(island).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('room-ggu-model'))).toBe('off');
   await expect(page.locator('.status-line')).toContainText('모델 꺼 둠');
-  // 실패하면 이유와 다시 시도를 보여준다.
-  await progress({
-    task: 'text',
-    phase: 'error',
-    name: 'Gemma 4 E2B',
-    totalMB: 2700,
-    error: 'GPU 메모리가 부족해요.',
-  });
-  // 실패는 주의를 끄는 다이얼로그(alertdialog)로 알린다.
-  await expect(
-    page.getByRole('alertdialog', { name: '상담 모델을 준비하지 못했어요' }),
-  ).toContainText('GPU 메모리가 부족해요.');
-  // 다이얼로그가 뜨면 확인 버튼에 초점이 가고, Tab은 다이얼로그 안에서만 돈다.
-  await expect(page.locator('#download-continue')).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: '다시 시도' })).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(page.locator('#download-continue')).toBeFocused();
-  await page.keyboard.press('Escape');
-  await expect(page.locator('#download-dialog')).toHaveCount(0);
+  // 보관해 둔 모델을 불러올 때는 한 줄로 준비 중을 알리고, 끝나면 완료를 알린다.
+  await progress({ task: 'text', phase: 'init', name: 'Gemma 3 1B', cached: true, at: Date.now() });
+  await expect(toggle).toContainText('상담 모델 준비 중');
+  await expect(toggle).not.toContainText('%');
+  await toggle.click();
+  // 끝을 알 수 없는 단계의 진행 막대에는 값을 적지 않는다.
+  await expect(panel.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow');
+  await progress({ task: 'text', phase: 'done', name: 'Gemma 3 1B', progress: 1 });
+  await expect(toggle).toContainText('상담 모델 준비 완료');
+  await expect(page.locator('#island-panel')).toHaveCount(0);
+  // 실패하면 펼쳐서 이유와 다시 시도를 보여 준다.
+  await progress(
+    {
+      task: 'text',
+      phase: 'error',
+      name: 'Gemma 4 E2B',
+      totalMB: 2840,
+      error: 'GPU 메모리가 부족해요.',
+      attempts: 1,
+      retryAt: 0,
+    },
+    true,
+  );
+  await expect(toggle).toContainText('상담 모델 준비 실패');
+  await expect(panel.getByRole('alert')).toContainText('GPU 메모리가 부족해요.');
+  await expect(page.locator('#island-retry')).toHaveText('다시 시도');
   // 이어서 실패하면 다시 시도까지 잠깐 기다리게 하고, 세 번째부터는 나중에 하라고 권한다.
-  await progress({
-    task: 'text',
-    phase: 'error',
-    name: 'Gemma 3 1B',
-    totalMB: 600,
-    error: '모델 파일을 받는 중에 네트워크 연결이 끊겼어요.',
-    attempts: 3,
-    retryAt: Date.now() + 2500,
-  });
-  const retry = page.locator('#download-retry');
+  await progress(
+    {
+      task: 'text',
+      phase: 'error',
+      name: 'Gemma 3 1B',
+      totalMB: 600,
+      error: '모델 파일을 받는 중에 네트워크 연결이 끊겼어요.',
+      attempts: 3,
+      retryAt: Date.now() + 2500,
+    },
+    true,
+  );
+  const retry = page.locator('#island-retry');
   await expect(retry).toHaveAttribute('aria-disabled', 'true');
   await expect(retry).toContainText('초 뒤');
-  await expect(page.getByRole('alertdialog')).toContainText('3번 이어서 실패했어요');
-  // 기다리는 동안에는 눌러도 다시 받지 않는다.
-  await retry.click();
-  await expect(page.getByRole('alertdialog')).toBeVisible();
+  await expect(panel).toContainText('3번 이어서 실패했어요');
+  // 기다리는 동안에는 눌러도 다시 받지 않는다. (자동화 도구는 꺼진 버튼을 기다리므로 바로 누르게 한다.)
+  await retry.click({ force: true });
+  await expect(panel).toBeVisible();
   await expect(retry).toHaveText('다시 시도', { timeout: 6000 });
   await expect(retry).toHaveAttribute('aria-disabled', 'false');
-  await page.keyboard.press('Escape');
-  // 잠깐 뜨는 알림은 포인터를 올려 둔 동안 사라지지 않고, 누르면 닫힌다.
+  // 잠깐 뜨는 알림은 아일랜드 아래에 뜨고, 포인터를 올려 둔 동안 사라지지 않으며 누르면 닫힌다.
   await page.evaluate(() => window.__roomggu.store.toast('공간이 겹쳐요. 빈 곳으로 옮겨 주세요.'));
   const toast = page.locator('#toast');
   await expect(toast).toHaveClass(/is-visible/);
+  await page.locator('#island-toggle').click();
+  await expect(panel).toHaveCount(0);
+  const [toastBox, islandBox] = [await toast.boundingBox(), await island.boundingBox()];
+  expect(toastBox.y).toBeGreaterThanOrEqual(islandBox.y + islandBox.height);
   await toast.hover();
   await page.waitForTimeout(5000);
   await expect(toast).toHaveClass(/is-visible/);
   await toast.click();
   await expect(toast).not.toHaveClass(/is-visible/);
+  await page.locator('#island-toggle').click();
+  await page.locator('#island-close').click();
+  await expect(island).toHaveCount(0);
   // AI 도구에서 두 모델의 크기를 비교해 고를 수 있다. 기본은 가벼운 모델이다.
   await page.getByRole('button', { name: '파일과 설정' }).click();
   await page.getByRole('menuitem', { name: '이 기기의 AI' }).click();

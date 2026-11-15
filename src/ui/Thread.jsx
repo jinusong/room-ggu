@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'preact/hooks';
-import { ROOM_TYPES } from '../catalog.js';
 import * as store from '../app/store.js';
 import { app } from '../app/store.js';
 import { isExampleLike } from '../app/ops.js';
 import { STARTERS, EXAMPLE_PROMPTS } from '../app/planner.js';
 import { Icon } from './icons.js';
 import { Surface } from './surfaces.jsx';
+import { BrandMark } from './widgets.jsx';
 
 const STARTER_ICONS = {
   'room-size': 'ruler',
@@ -15,55 +15,64 @@ const STARTER_ICONS = {
   floorplan: 'house',
 };
 
-function Welcome({ mobile }) {
+// 상담은 룸꾸의 인사로 시작한다. 대화가 비어 있을 때는 시작점과 예시 문장을 답 고르기처럼 붙이고,
+// 대화가 시작되면 인사 한 줄만 맨 위에 남긴다.
+function Greeting({ mobile, full }) {
   const example = isExampleLike(app.state);
   return (
-    <div class="welcome">
-      <p class="welcome-kicker mono">
-        {ROOM_TYPES[app.state.room.type].name} · {app.state.room.w} × {app.state.room.d}m
-      </p>
-      <h1>어떤 방을 꾸밀까요?</h1>
-      <p class="welcome-lede">
-        방 크기나 놓고 싶은 가구를 편하게 말해 주세요. 필요한 도구가 대화 안에 나타나고,{' '}
-        {mobile ? '위' : '옆'}의 방에 바로 반영돼요.
-      </p>
-      {example && (
-        <p class="welcome-note">
-          지금 보이는 방은 예시예요.
-          <button class="link" onClick={() => store.send('빈 방으로 시작할래')}>
-            빈 방으로 시작
-          </button>
+    <div class={`greet ${full ? 'is-full' : ''}`}>
+      <span class="msg-who">
+        <BrandMark />
+        <span class="msg-name">룸꾸</span>
+      </span>
+      <div class="msg-body">
+        <p class="bubble" id="greeting">
+          안녕하세요, 방 꾸미기를 돕는 룸꾸예요. 방 크기나 놓고 싶은 가구를 편하게 말해 주세요.
+          {!mobile && ' 필요한 도구를 대화 안에 꺼내 드리고, 옆의 방에 바로 반영할게요.'}
         </p>
-      )}
-      <div class="starters">
-        {STARTERS.map((s) => (
-          <button
-            key={s.label}
-            class="starter"
-            data-starter={s.arg || s.action}
-            onClick={() =>
-              s.action === 'photo'
-                ? store.pickPhoto()
-                : s.arg === 'avatar' && !store.avatarHere()
-                  ? store.toggleAvatar()
-                  : store.openTool(s.arg)
-            }
-          >
-            <Icon name={s.action === 'photo' ? 'image-plus' : STARTER_ICONS[s.arg]} />
-            <span>
-              <strong>{s.label}</strong>
-              <small>{s.detail}</small>
-            </span>
-          </button>
-        ))}
-      </div>
-      <div class="prompt-examples">
-        <span>이렇게 말해도 돼요</span>
-        {EXAMPLE_PROMPTS.map((p) => (
-          <button key={p} class="chip" onClick={() => store.send(p)}>
-            “{p}”
-          </button>
-        ))}
+        {full && example && (
+          <p class="bubble">
+            지금 보이는 방은 예시예요.
+            <button class="link" onClick={() => store.send('빈 방으로 시작할래')}>
+              빈 방으로 시작
+            </button>
+          </p>
+        )}
+        {full && (
+          <>
+            <p class="greet-label">무엇부터 할까요?</p>
+            <div class="starters">
+              {STARTERS.map((s) => (
+                <button
+                  key={s.label}
+                  class="starter"
+                  data-starter={s.arg || s.action}
+                  onClick={() =>
+                    s.action === 'photo'
+                      ? store.pickPhoto()
+                      : s.arg === 'avatar' && !store.avatarHere()
+                        ? store.toggleAvatar()
+                        : store.openTool(s.arg)
+                  }
+                >
+                  <Icon name={s.action === 'photo' ? 'image-plus' : STARTER_ICONS[s.arg]} />
+                  <span>
+                    <strong>{s.label}</strong>
+                    <small>{s.detail}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div class="prompt-examples">
+              <span>이렇게 말해도 돼요</span>
+              {EXAMPLE_PROMPTS.map((p) => (
+                <button key={p} class="chip" onClick={() => store.send(p)}>
+                  “{p}”
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -118,10 +127,15 @@ function Receipt({ turn, canUndo }) {
   );
 }
 
+// 답을 쓰는 중임을 알리는 말풍선.
 function Thinking() {
   return (
-    <div class="thinking" role="status">
-      <Icon name="loader-circle" size={16} className="spin" />
+    <div class="thinking bubble" role="status">
+      <span class="typing" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
       <span>{store.modelName(app.ai.model)}가 이 기기에서 문장을 해석하는 중</span>
       <button class="link" onClick={() => store.cancelModel()}>
         취소
@@ -152,54 +166,60 @@ function Turn({ turn, live, latest, canUndo }) {
     );
   return (
     <article class={`msg assistant ${turn.tone === 'error' ? 'is-error' : ''}`} data-turn={turn.id}>
-      {turn.text && <p class="msg-text">{turn.text}</p>}
-      {turn.note && <p class="msg-note">{turn.note}</p>}
-      {turn.photoScores && (
-        <p class="vision-caption">
-          <span>SigLIP 후보</span>
-          {turn.photoScores}
-        </p>
-      )}
-      {turn.status === 'thinking' && <Thinking />}
-      {turn.surfaces?.map((s) => (
-        <Surface
-          key={s.id}
-          spec={s}
-          live={live.has(s.id)}
-          onOpen={() => {
-            s.open = true;
-            store.emit();
-          }}
-        />
-      ))}
-      <Receipt turn={turn} canUndo={canUndo} />
-      {latest && turn.suggestions?.length > 0 && (
-        <div class="suggestions" aria-label="이어서 할 일">
-          {turn.suggestions.map((s) => (
-            <button
-              key={s.label}
-              class={`chip ${s.primary ? 'is-primary' : ''}`}
-              onClick={() => store.runSuggestion(s)}
-            >
-              {s.primary && <Icon name="corner-down-right" size={14} />}
-              {s.label}
-            </button>
-          ))}
-        </div>
-      )}
-      {turn.note && <p class="msg-note">{turn.note}</p>}
-      {turn.engine === 'app' ? null : turn.fixes?.length > 0 ? (
-        <details class="msg-meta">
-          <summary>{engineLabel(turn)}</summary>
-          <ul>
-            {turn.fixes.map((f) => (
-              <li key={f}>{f}</li>
+      <span class="msg-who">
+        <BrandMark />
+        <span class="msg-name">룸꾸</span>
+      </span>
+      <div class="msg-body">
+        {turn.text && <p class="msg-text bubble">{turn.text}</p>}
+        {turn.note && <p class="msg-note">{turn.note}</p>}
+        {turn.photoScores && (
+          <p class="vision-caption">
+            <span>SigLIP 후보</span>
+            {turn.photoScores}
+          </p>
+        )}
+        {turn.status === 'thinking' && <Thinking />}
+        {turn.surfaces?.map((s) => (
+          <Surface
+            key={s.id}
+            spec={s}
+            live={live.has(s.id)}
+            onOpen={() => {
+              s.open = true;
+              store.emit();
+            }}
+          />
+        ))}
+        <Receipt turn={turn} canUndo={canUndo} />
+        {latest && turn.suggestions?.length > 0 && (
+          <div class="suggestions" aria-label="이어서 할 일">
+            {turn.suggestions.map((s) => (
+              <button
+                key={s.label}
+                class={`chip ${s.primary ? 'is-primary' : ''}`}
+                onClick={() => store.runSuggestion(s)}
+              >
+                {s.primary && <Icon name="corner-down-right" size={14} />}
+                {s.label}
+              </button>
             ))}
-          </ul>
-        </details>
-      ) : (
-        <span class="msg-meta">{engineLabel(turn)}</span>
-      )}
+          </div>
+        )}
+        {/* 답을 쓰는 중에는 무엇이 처리했는지 아직 정해지지 않았다. */}
+        {turn.engine === 'app' || turn.status === 'thinking' ? null : turn.fixes?.length > 0 ? (
+          <details class="msg-meta">
+            <summary>{engineLabel(turn)}</summary>
+            <ul>
+              {turn.fixes.map((f) => (
+                <li key={f}>{f}</li>
+              ))}
+            </ul>
+          </details>
+        ) : (
+          <span class="msg-meta">{engineLabel(turn)}</span>
+        )}
+      </div>
     </article>
   );
 }
@@ -208,11 +228,13 @@ export function Thread({ mobile }) {
   const ref = useRef(null);
   const thread = app.thread;
   const lastLen = useRef(0);
+  const restoring = useRef(true);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     if (thread.length !== lastLen.current) {
-      const first = !lastLen.current;
+      // 저장해 둔 대화를 처음 펼칠 때만 맨 아래로 바로 간다. 그 뒤로는 새 질문을 위쪽에 둔다.
+      const first = restoring.current;
       lastLen.current = thread.length;
       const users = el.querySelectorAll('.msg.user');
       const last = users[users.length - 1];
@@ -225,10 +247,13 @@ export function Thread({ mobile }) {
       el.scrollTo({ top, behavior: first ? 'auto' : 'smooth' });
     }
   }, [thread.length, app.rev]);
+  useEffect(() => {
+    restoring.current = false;
+  }, []);
   if (!thread.length)
     return (
-      <div class="thread is-empty" ref={ref}>
-        <Welcome mobile={mobile} />
+      <div class="thread is-empty" ref={ref} role="log" aria-label="상담 대화">
+        <Greeting mobile={mobile} full />
       </div>
     );
   const lastWithSurfaces = [...thread].reverse().find((t) => t.surfaces?.length);
@@ -242,6 +267,7 @@ export function Thread({ mobile }) {
     .find((t) => t.role === 'assistant' && t.receipt?.length);
   return (
     <div class="thread" ref={ref} role="log" aria-live="polite" aria-label="상담 대화">
+      <Greeting mobile={mobile} />
       {thread.map((t) => (
         <Turn
           key={t.id}

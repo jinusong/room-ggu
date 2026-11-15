@@ -1,6 +1,6 @@
 // 앱 상태와 동작. 대화 한 줄기(thread)가 모든 공간에 이어지고,
 // 각 턴은 상태 변경 내역(receipt)과 그 순간에 필요한 컴포넌트(surfaces)를 가진다.
-import { TYPES, ROOM_TYPES } from '../catalog.js';
+import { TYPES, ROOM_TYPES, makeRoom } from '../catalog.js';
 import {
   exampleState,
   validateState,
@@ -85,7 +85,11 @@ export const app = {
     avatarBar: false,
     door: null,
     doorList: false,
-    downloadOpen: true,
+    addSide: null,
+    ghostRoom: null,
+    // 위쪽 모델 아일랜드를 펼쳐 둘지. 처음 내려받을 때와 실패했을 때만 저절로 펼친다.
+    downloadOpen: false,
+    downloadAuto: false,
     toast: null,
     menu: null,
     webglError: false,
@@ -674,6 +678,7 @@ export function cancelModel() {
   app.busy = null;
   app.ai.vision = 'off';
   app.ai.model = null;
+  if (app.ai.download?.task === 'vision') app.ai.download = null;
   toast('사진 판별을 취소했어요.');
   // Worker를 다시 만들었으니 기본 설정이면 상담 모델을 다시 준비한다.
   if (!app.ai.why) loadText({ auto: true });
@@ -815,6 +820,8 @@ export function setScope(scope) {
   app.target = { type: 'room' };
   app.view.avatarBar = false;
   app.view.door = null;
+  app.view.addSide = null;
+  app.view.ghostRoom = null;
   commit();
 }
 export function editSpace(id) {
@@ -894,9 +901,11 @@ export function setDoorList(open) {
 // 집 전체 2D에서 고른 문. 고르면 문 위에 폭·방향·막기 막대가 뜬다.
 export function pickDoor(ids) {
   const next = ids ? [...ids] : null;
-  if (!next && !app.view.door) return;
+  if (!next && !app.view.door && !app.view.addSide) return;
   app.view.door = next;
   app.view.avatarBar = false;
+  app.view.addSide = null;
+  app.view.ghostRoom = null;
   emit();
 }
 
@@ -1103,6 +1112,8 @@ export function removeById(id) {
 // ---------- 공간 ----------
 export function switchSpace(id) {
   if (id === app.state.roomId) return;
+  app.view.addSide = null;
+  app.view.ghostRoom = null;
   snapshot();
   ops.switchSpace(app.state, id);
   app.selected = null;
@@ -1111,17 +1122,70 @@ export function switchSpace(id) {
   persist();
   emit();
 }
-export function addSpace(type) {
+// 벽의 + 손잡이로 공간을 붙이는 중인 벽과, 고르기 전에 도면에 미리 보여 줄 자리.
+export function pickAddSide(side) {
+  app.view.addSide = side || null;
+  app.view.ghostRoom = null;
+  app.view.door = null;
+  emit();
+}
+export function previewSpace(type, side = app.view.addSide) {
+  const size = type && side ? makeRoom(type) : null,
+    at = size && ops.sideSlot(app.state, side, size);
+  const next = at ? { type, x: at.x, z: at.z, w: size.w, d: size.d } : null;
+  if (JSON.stringify(next) === JSON.stringify(app.view.ghostRoom)) return;
+  app.view.ghostRoom = next;
+  emit();
+}
+export const spaceSize = (type) => {
+  const r = makeRoom(type);
+  return `${r.w} × ${r.d}m`;
+};
+// 그 벽에 붙일 수 있는 공간 유형.
+export function spaceFits(type, side) {
+  return !!ops.sideSlot(app.state, side, makeRoom(type));
+}
+// 고르는 동안 도면이 미리 보기까지 담도록 비워 둘 자리: 그 벽에 붙일 수 있는 공간 중 가장 큰 가로·세로.
+export function addReserve() {
+  const side = app.view.addSide;
+  if (!side || app.state.scope !== 'house') return null;
+  const sizes = Object.keys(ROOM_TYPES)
+    .map((type) => makeRoom(type))
+    .filter((size) => ops.sideSlot(app.state, side, size));
+  if (!sizes.length) return null;
+  return {
+    side,
+    w: Math.max(...sizes.map((r) => r.w)),
+    d: Math.max(...sizes.map((r) => r.d)),
+  };
+}
+export function freeSides() {
+  if (spaces(app.state).length >= 12) return [];
+  const smallest = makeRoom('bathroom');
+  return Object.keys(ops.SIDES).filter((side) => ops.sideSlot(app.state, side, smallest));
+}
+export function addSpace(type, { side = null } = {}) {
   try {
+    const from = app.state.name;
     snapshot();
-    ops.addSpace(app.state, type);
+    ops.addSpace(app.state, type, side);
     app.state.name = `나의 ${ROOM_TYPES[type].name}`;
     app.selected = null;
+    app.view.addSide = null;
+    app.view.ghostRoom = null;
     app.target = app.draft ? { type: 'draft' } : { type: 'room' };
-    push({ role: 'user', text: `${ROOM_TYPES[type].name} 추가`, action: true });
+    push({
+      role: 'user',
+      text: side
+        ? `${from} ${ops.SIDES[side]}에 ${ROOM_TYPES[type].name} 붙이기`
+        : `${ROOM_TYPES[type].name} 추가`,
+      action: true,
+    });
     push({
       role: 'assistant',
-      text: `${josa(app.state.name, '을/를')} 새로 만들었어요. 크기를 알려주면 바로 맞출게요.`,
+      text: side
+        ? `${josa(app.state.name, '을/를')} ${from} ${ops.SIDES[side]}에 붙였어요. 끌어서 옮길 수 있고, 크기를 알려주면 바로 맞출게요.`
+        : `${josa(app.state.name, '을/를')} 새로 만들었어요. 크기를 알려주면 바로 맞출게요.`,
       surfaces: [{ kind: 'room-size', target: roomTarget() }],
       receipt: [{ label: '새 공간', to: app.state.name }],
       suggestions: [{ label: '가구 고르기', action: 'catalog' }],
@@ -1270,6 +1334,17 @@ export async function analyzePhoto() {
   const photo = app.photo;
   if (!photo || app.busy) return;
   app.busy = { kind: 'vision' };
+  // 사진 판별 모델을 처음 올릴 때만 아일랜드로 알린다. 이미 올라와 있으면 판별은 금방 끝난다.
+  if (app.ai.vision !== 'ready' && !app.ai.download) {
+    app.ai.download = {
+      task: 'vision',
+      phase: 'init',
+      name: 'SigLIP base',
+      cached: true,
+      at: Date.now(),
+    };
+    app.view.downloadOpen = false;
+  }
   app.ai.vision = 'loading';
   app.ai.label = '사진 판별 모델 준비 중';
   app.ai.progress = 0;
@@ -1336,6 +1411,9 @@ export async function analyzePhoto() {
     toast(`사진 판별: ${app.ai.error}`);
   } finally {
     app.busy = null;
+    // 사진을 바꾸거나 취소해 중간에 끝났으면 아일랜드에 준비 중이 남지 않게 지운다.
+    if (app.ai.download?.task === 'vision' && ['init', 'fetch'].includes(app.ai.download.phase))
+      app.ai.download = null;
     persist();
     emit();
   }
@@ -1384,16 +1462,22 @@ export async function loadText({ auto = false } = {}) {
   app.ai.label = '상담 모델 준비 중';
   app.ai.progress = 0;
   app.ai.error = '';
-  app.ai.download = null;
+  // 위쪽 아일랜드에 준비 중임을 알린다. 보관해 둔 모델이면 접힌 채 잠깐 보이고, 새로 받으면 펼쳐진다.
+  app.ai.download = {
+    task: 'text',
+    phase: 'init',
+    name: choice.name,
+    cached: true,
+    at: Date.now(),
+  };
+  app.view.downloadOpen = false;
   emit();
   try {
     const model = await runAI('load-text', { choice: choice.key });
     if (app.ai.text !== 'loading') return;
     app.ai.text = 'ready';
     app.ai.model = model;
-    const shown = !!app.ai.download;
-    finishDownload('text');
-    if (!auto && !shown) toast(`${modelName(model)}를 준비했어요. 이제 모델이 문장을 해석해요.`);
+    finishDownload('text', modelName(model));
   } catch (e) {
     if (app.ai.text !== 'loading') return;
     // 브라우저나 GPU가 아예 지원하지 않을 때만 '쓸 수 없음'으로 둔다. 그 밖의 실패는 다시 시도할 수 있다.
@@ -1466,10 +1550,15 @@ export function unloadAI() {
 // 모델 파일을 실제로 내려받는 동안에는 다이얼로그로 알린다. 이미 보관한 모델을 불러올 때는 띄우지 않는다.
 const visionFiles = new Map();
 function trackDownload(task, patch) {
-  const fresh =
-    !app.ai.download || app.ai.download.task !== task || app.ai.download.phase === 'done';
-  if (fresh) app.view.downloadOpen = true;
-  const before = fresh ? {} : app.ai.download;
+  const now = app.ai.download,
+    // 준비만 하던 중에 실제로 받기 시작하면 새 내려받기로 본다.
+    fresh =
+      !now || now.task !== task || now.phase === 'done' || (patch.phase === 'fetch' && now.cached);
+  if (fresh && patch.phase === 'fetch') {
+    app.view.downloadOpen = true;
+    app.view.downloadAuto = true;
+  }
+  const before = fresh ? {} : now;
   // 받은 양이 늘어난 시각을 적어 둔다. 오래 그대로면 화면에서 네트워크를 확인하라고 알린다.
   const moved = fresh || patch.phase !== before.phase || (patch.mb || 0) > (before.mb || 0);
   app.ai.download = { ...before, task, ...patch, at: moved ? Date.now() : before.at };
@@ -1477,23 +1566,26 @@ function trackDownload(task, patch) {
 // 이어서 실패한 횟수. 다시 시도까지 잠깐 기다리게 해 끊긴 네트워크에 요청이 몰리지 않게 한다.
 const downloadFailures = { text: 0, vision: 0 };
 const RETRY_WAIT = [0, 3000, 6000, 12000];
-function finishDownload(task) {
+function finishDownload(task, name) {
   downloadFailures[task] = 0;
   if (app.ai.download?.task !== task) return;
-  // 안내를 접어 둔 채 끝났으면 다이얼로그를 다시 띄우지 않고 한 줄로만 알린다.
-  if (!app.view.downloadOpen) {
-    const { name } = app.ai.download;
-    app.ai.download = null;
-    return toast(`${name} 준비가 끝났어요.`);
-  }
-  const done = { ...app.ai.download, phase: 'done', progress: 1 };
+  // 준비가 끝나면 아일랜드가 잠깐 완료를 알리고 사라진다. 펼쳐 둔 채였으면 조금 더 둔다.
+  const done = {
+    ...app.ai.download,
+    phase: 'done',
+    progress: 1,
+    name: name || app.ai.download.name,
+  };
   app.ai.download = done;
-  setTimeout(() => {
-    if (app.ai.download === done) {
-      app.ai.download = null;
-      emit();
-    }
-  }, 5000);
+  setTimeout(
+    () => {
+      if (app.ai.download === done) {
+        app.ai.download = null;
+        emit();
+      }
+    },
+    app.view.downloadOpen ? 4200 : 2400,
+  );
 }
 function failDownload(task, message) {
   if (app.ai.download?.task !== task) return;
@@ -1509,6 +1601,7 @@ function failDownload(task, message) {
 }
 export function setDownloadOpen(open) {
   app.view.downloadOpen = open;
+  app.view.downloadAuto = false;
   emit();
 }
 export function closeDownload() {

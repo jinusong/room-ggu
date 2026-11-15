@@ -79,15 +79,14 @@ if (await page.getByRole('button', { name: '새 대화' }).count()) {
 }
 const t0 = Date.now();
 const status0 = await page.evaluate(() => window.__roomggu.app.ai.text);
-// 처음 내려받을 때는 안내 다이얼로그가 뜬다. 화면을 남기고 "계속 쓰기"로 접은 뒤 준비를 기다린다.
-const dialog = page.locator('#download-dialog');
-const seen = await dialog.waitFor({ state: 'visible', timeout: 20000 }).then(() => true, () => false);
+// 모델을 받거나 준비하는 동안 위쪽 아일랜드가 뜬다. 처음 받을 때는 펼쳐진 채 나타난다. 화면을 남긴다.
+const island = page.locator('#model-island');
+const seen = await island.waitFor({ state: 'visible', timeout: 20000 }).then(() => true, () => false);
 if (seen) {
   await page.waitForTimeout(1500);
-  const info = await page.evaluate(() => ({ ...window.__roomggu.app.ai.download }));
-  console.log('download dialog', JSON.stringify(info));
+  const info = await page.evaluate(() => ({ ...window.__roomggu.app.ai.download, open: window.__roomggu.app.view.downloadOpen }));
+  console.log('island', JSON.stringify(info));
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
-  if (info.phase === 'fetch' || info.phase === 'init') await page.locator('#download-continue').click();
 }
 // 준비가 끝나거나 실패할 때까지 기다린다. 받은 양이 3분 넘게 늘지 않으면 멈춘 것으로 본다.
 let lastMb = null,
@@ -104,7 +103,7 @@ for (;;) {
   await page.waitForTimeout(2000);
 }
 await page.waitForTimeout(500);
-if (await dialog.isVisible()) await page.locator('#download-continue').click();
+console.log('island after ready', await island.count() ? await page.locator('#island-toggle').textContent() : 'gone');
 const ai = await page.evaluate(() => ({ ...window.__roomggu.app.ai }));
 console.log('model', status0, '→', ai.text, ai.model, Date.now() - t0, 'ms', ai.error || '');
 const results = [];

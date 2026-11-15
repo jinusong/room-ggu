@@ -21,15 +21,36 @@ test('첫 화면은 대화가 중심이고, 방 설명으로 크기 도구가 �
   await page.goto('/?model=off');
   await ready(page);
   await expect(page.locator('#chat-input')).toBeVisible();
-  await expect(page.getByRole('heading', { name: '어떤 방을 꾸밀까요?' })).toBeVisible();
+  // 상담은 룸꾸의 인사 말풍선으로 시작하고, 누가 답하는지는 대화 머리에 있다.
+  const thread = page.getByRole('log', { name: '상담 대화' });
+  await expect(thread.locator('#greeting')).toContainText('안녕하세요, 방 꾸미기를 돕는 룸꾸예요');
+  await expect(thread.locator('[data-starter]')).toHaveCount(6);
+  await expect(page.locator('.sheet-head')).toContainText('방 꾸미기 상담');
+  await expect(page.locator('.sheet-head .status-line')).toContainText(
+    '모델 꺼 둠 · 규칙으로 답해요',
+  );
   await expect(page.locator('.surface')).toHaveCount(0);
+  // 대화는 화면 높이를 다 쓰는 왼쪽 열이고 화면 폭의 40%를 차지한다.
   const sheet = await page.locator('.sheet').boundingBox();
-  expect(sheet.width).toBeGreaterThan(380);
-  expect(sheet.height).toBeGreaterThan(800);
+  expect(sheet.x).toBe(0);
+  expect(sheet.width).toBeGreaterThanOrEqual(570);
+  expect(sheet.height).toBeGreaterThanOrEqual(959);
   await expect(page.locator('#viewport-3d canvas')).toBeVisible();
-  await expect(page.locator('.status-line')).toContainText('모델 꺼 둠 · 규칙으로 답해요');
   await say(page, '거실 가로 5m 세로 4m 천장 2.6m로 바꿔줘');
   await expect(page.locator('[data-surface=room-size]')).toBeVisible();
+  // 사용자 말은 오른쪽의 먹색 말풍선, 룸꾸의 답은 얼굴이 붙은 왼쪽 말풍선이다.
+  const mine = page.locator('.msg.user p').last(),
+    reply = page.locator('.msg.assistant').last();
+  expect(await mine.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(31, 29, 25)');
+  await expect(reply.locator('.chat-avatar')).toBeVisible();
+  const [mineBox, replyBox] = [
+    await mine.boundingBox(),
+    await reply.locator('.bubble').boundingBox(),
+  ];
+  expect(mineBox.x + mineBox.width).toBeGreaterThan(replyBox.x + replyBox.width - 1);
+  // 인사는 대화 맨 위에 남고 시작점은 접힌다.
+  await expect(thread.locator('#greeting')).toHaveCount(1);
+  await expect(thread.locator('[data-starter]')).toHaveCount(0);
   await expect(page.locator('.msg.assistant .msg-meta').last()).toHaveText(
     '상담 모델을 꺼 둬서 규칙으로 처리',
   );
@@ -269,7 +290,8 @@ test('모바일은 대화로 시작하고 시트를 접고 펴도 입력창이 �
   await page.goto('/?model=off');
   await ready(page);
   await expect(page.locator('#chat-input')).toBeVisible();
-  await expect(page.getByRole('heading', { name: '어떤 방을 꾸밀까요?' })).toBeVisible();
+  await expect(page.locator('#greeting')).toContainText('안녕하세요, 방 꾸미기를 돕는 룸꾸예요');
+  await expect(page.locator('.sheet-head')).toContainText('방 꾸미기 상담');
   await expect(page.locator('#viewport-3d canvas')).toBeVisible();
   await page.locator('#chat-input').fill('입력하던 설명');
   await page.locator('.sheet-handle').click();
@@ -294,4 +316,42 @@ test('모바일은 대화로 시작하고 시트를 접고 펴도 입력창이 �
   await page.setViewportSize({ width: 320, height: 640 });
   expect(await noOverflow(page)).toBe(true);
   await expect(page.locator('#chat-input')).toBeInViewport();
+});
+
+test('대화와 방 사이를 끌거나 방향키로 대화 폭을 바꾸고 다음 방문에도 기억한다', async ({
+  page,
+}) => {
+  await page.goto('/?model=off');
+  await ready(page);
+  const sheet = page.locator('.sheet'),
+    handle = page.getByRole('separator', { name: '대화 폭 조절' });
+  const before = (await sheet.boundingBox()).width;
+  const box = await handle.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, 400);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 60, 400, { steps: 4 });
+  await page.mouse.move(box.x + box.width / 2 + 120, 400, { steps: 4 });
+  await page.mouse.up();
+  const wide = (await sheet.boundingBox()).width;
+  expect(wide).toBeCloseTo(before + 120, 0);
+  // 방은 대화가 넓어진 만큼 비켜 그린다.
+  expect(
+    await page.evaluate(() =>
+      parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inset-left')),
+    ),
+  ).toBeCloseTo(wide + 8, 0);
+  await handle.focus();
+  await page.keyboard.press('ArrowLeft');
+  expect((await sheet.boundingBox()).width).toBeCloseTo(wide - 24, 0);
+  await page.reload();
+  await ready(page);
+  expect((await sheet.boundingBox()).width).toBeCloseTo(wide - 24, 0);
+  // 너무 좁히거나 넓혀도 대화와 방이 모두 쓸 만한 폭을 지킨다.
+  await handle.focus();
+  for (let i = 0; i < 40; i++) await page.keyboard.press('ArrowLeft');
+  expect((await sheet.boundingBox()).width).toBe(360);
+  for (let i = 0; i < 60; i++) await page.keyboard.press('ArrowRight');
+  expect((await sheet.boundingBox()).width).toBeLessThanOrEqual(1440 * 0.6);
+  await handle.dblclick();
+  expect((await sheet.boundingBox()).width).toBeCloseTo(before, 0);
 });

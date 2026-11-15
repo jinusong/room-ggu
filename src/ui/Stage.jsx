@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { TYPES, ROOM_TYPES } from '../catalog.js';
 import { layoutWarnings, spaces } from '../data.js';
 import { roomOpenings, connections, DOOR } from '../floorplan.js';
@@ -52,6 +52,13 @@ function syncScenes(force = false) {
     avatar = JSON.stringify(s.avatar),
     door = JSON.stringify(app.view.door);
   for (const sc of [app.scenes.plan, app.scenes.house]) if (sc) sc.doorSelected = app.view.door;
+  const ghostRoom = s.scope === 'house' ? app.view.ghostRoom : null,
+    ghostRoomSig = JSON.stringify(ghostRoom);
+  if (app.scenes.house) {
+    app.scenes.house.ghostRoom = ghostRoom;
+    app.scenes.house.reserve = store.addReserve();
+  }
+  if (ghostRoomSig !== last.ghostRoom) app.scenes.three?.setRoomGhost?.(ghostRoom);
   for (const sc of [app.scenes.three, app.scenes.plan]) {
     if (!sc) continue;
     const fresh = force || !known.has(sc);
@@ -77,6 +84,7 @@ function syncScenes(force = false) {
     avatar,
     scope: s.scope,
     door,
+    ghostRoom: ghostRoomSig,
   };
 }
 
@@ -269,7 +277,7 @@ function ObjectBar({ barRef, mobile }) {
       class="object-bar"
       ref={barRef}
       id="selection-tools"
-      role="toolbar"
+      role="group"
       aria-label={`${a.name} 도구`}
     >
       <span class="object-name">
@@ -390,7 +398,7 @@ function AvatarTag({ mobile }) {
       </button>
     );
   return (
-    <div class="stage-tag avatar-bar" data-avatar-tag role="toolbar" aria-label="아바타 자세">
+    <div class="stage-tag avatar-bar" data-avatar-tag role="group" aria-label="아바타 자세">
       <button
         class={`tape ${set ? 'is-set' : 'is-draft'}`}
         aria-label={`${text} · 키 바꾸기`}
@@ -489,7 +497,7 @@ function DoorBar() {
     <div
       class="stage-tag door-bar"
       data-door-bar
-      role="toolbar"
+      role="group"
       aria-label={`${link.names[0]}와 ${link.names[1]} 사이 문`}
     >
       <button
@@ -536,6 +544,109 @@ function DoorBar() {
       >
         <Icon name="x" />
       </button>
+    </div>
+  );
+}
+
+const SIDE_NAMES = { right: '오른쪽', left: '왼쪽', back: '위쪽', front: '아래쪽' };
+// 집 전체 위쪽의 공간 추가 버튼. 고른 공간에서 비어 있는 첫 벽의 고르기 창을 연다.
+function AddSpaceButton() {
+  const sides = store.freeSides(),
+    full = spaces(app.state).length >= 12,
+    open = !!app.view.addSide;
+  return (
+    <button
+      class={`add-space on-stage ${open ? 'is-open' : ''}`}
+      id="add-space"
+      aria-label="공간 추가"
+      aria-expanded={open}
+      disabled={!sides.length}
+      title={
+        full
+          ? '공간은 12개까지 만들 수 있어요'
+          : sides.length
+            ? `${app.state.name} 옆에 공간 붙이기`
+            : '고른 공간 둘레에 붙일 자리가 없어요. 다른 공간을 고르거나 옮겨 주세요'
+      }
+      onClick={() => store.pickAddSide(open ? null : sides[0])}
+    >
+      <Icon name="plus" size={16} />
+      <span>공간 추가</span>
+    </button>
+  );
+}
+// 집 전체에서 고른 공간의 벽 바깥에 뜨는 + 손잡이. 누르면 그 벽에 붙일 공간을 고른다.
+function AddHandles({ mobile }) {
+  const s = app.state;
+  if (s.scope !== 'house') return null;
+  const sides = store.freeSides(),
+    picked = app.view.addSide;
+  return (
+    <>
+      {sides.map((side) => (
+        <button
+          key={side}
+          class={`stage-tag add-handle ${picked === side ? 'is-open' : ''}`}
+          data-add-side={side}
+          aria-label={`${s.name} ${SIDE_NAMES[side]}에 공간 붙이기`}
+          aria-expanded={picked === side}
+          title={`${SIDE_NAMES[side]}에 공간 붙이기`}
+          onClick={() => store.pickAddSide(picked === side ? null : side)}
+        >
+          <Icon name="plus" size={16} />
+        </button>
+      ))}
+      {picked && sides.includes(picked) && <AddRoomPop side={picked} mobile={mobile} />}
+    </>
+  );
+}
+// 그 벽에 붙일 공간 고르기. 가리키거나 초점을 두면 도면에 자리와 크기가 점선으로 보인다.
+// 좁은 화면에서는 모형을 가리지 않게 방 아래 도구 줄 위에 옆으로 넘기는 줄로 깐다.
+function AddRoomPop({ side, mobile }) {
+  const ref = useRef(null);
+  // 창이 뜨자마자 Esc가 듣도록 그리기 전에 붙인다.
+  useLayoutEffect(() => {
+    const first = ref.current?.querySelector('button:not(:disabled)');
+    first?.focus({ preventScroll: true });
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      store.pickAddSide(null);
+      document.querySelector(`[data-add-side="${side}"]`)?.focus();
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [side]);
+  return (
+    <div
+      class={`stage-tag add-pop ${mobile ? 'is-strip' : ''}`}
+      data-add-pop={mobile ? undefined : true}
+      data-add-list
+      ref={ref}
+      role="group"
+      aria-label={`${SIDE_NAMES[side]}에 붙일 공간`}
+      onPointerLeave={() => store.previewSpace(null)}
+    >
+      <span class="pop-label">{SIDE_NAMES[side]}에 붙일 공간</span>
+      <div class="add-grid">
+        {Object.entries(ROOM_TYPES).map(([type, t]) => {
+          const fits = store.spaceFits(type, side);
+          return (
+            <button
+              key={type}
+              data-add-type={type}
+              disabled={!fits}
+              onPointerEnter={() => fits && store.previewSpace(type, side)}
+              onFocus={() => fits && store.previewSpace(type, side)}
+              onClick={() => store.addSpace(type, { side })}
+            >
+              <Icon name={t.icon} size={16} />
+              <span>{t.name}</span>
+              <small class="mono">{fits ? store.spaceSize(type) : '자리가 모자라요'}</small>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -601,6 +712,7 @@ export function Stage({ mobile, sheetRef }) {
       r,
       left: (parseFloat(css.getPropertyValue('--inset-left')) || 0) + 8,
       bottom: r.height - (parseFloat(css.getPropertyValue('--inset-bottom')) || 0) - 8,
+      top: 56,
     };
   };
   const placeBar = () => {
@@ -613,11 +725,11 @@ export function Stage({ mobile, sheetRef }) {
       bar.style.opacity = '0';
       return;
     }
-    const { r, left, bottom } = bounds(),
+    const { r, left, bottom, top } = bounds(),
       bw = bar.offsetWidth,
       bh = bar.offsetHeight;
     const x = Math.max(left, Math.min(r.width - bw - 8, p.x - r.left - bw / 2));
-    const y = Math.max(64, Math.min(bottom - bh, p.y - r.top - bh - 12));
+    const y = Math.max(top + 8, Math.min(bottom - bh, p.y - r.top - bh - 12));
     bar.style.opacity = '1';
     bar.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
   };
@@ -626,7 +738,7 @@ export function Stage({ mobile, sheetRef }) {
     const layer = tagsRef.current,
       sc = activeScene();
     if (!layer || !stageRef.current || !sc) return;
-    const { r, left, bottom } = bounds(),
+    const { r, left, bottom, top } = bounds(),
       placed = [];
     // 가구 도구 막대가 떠 있으면 이름표가 그 아래로 숨지 않게 자리를 비켜 준다.
     const bar = barRef.current;
@@ -640,7 +752,7 @@ export function Stage({ mobile, sheetRef }) {
       const w = el.offsetWidth,
         h = el.offsetHeight;
       x = Math.max(left, Math.min(r.width - w - 8, x));
-      y = Math.max(56, Math.min(bottom - h, y));
+      y = Math.max(top, Math.min(bottom - h, y));
       if (
         guard &&
         x < guard.x + guard.w + 4 &&
@@ -681,10 +793,10 @@ export function Stage({ mobile, sheetRef }) {
       );
     const share = (r.width - left - 8) / Math.max(1, tags.length),
       density = share >= 150 ? 0 : share >= 80 ? 1 : 2;
-    for (const { el, p } of tags) {
+    const placeTag = ({ el, p }) => {
       if (!p || !p.visible) {
         el.style.visibility = 'hidden';
-        continue;
+        return;
       }
       // 좁은 공간에서는 크기 표시를 먼저 접고, 더 좁으면 아이콘만 남긴다. 고른 공간은 줄이지 않는다.
       // 2D는 방 폭으로, 방 밖에 놓이는 3D는 공간 수와 화면 폭으로 정해 매 프레임 바뀌지 않게 한다.
@@ -698,7 +810,79 @@ export function Stage({ mobile, sheetRef }) {
         Number.isFinite(room) && room >= 64 ? `${Math.max(44, Math.round(room))}px` : '';
       if (p.corner) put(el, p.x - r.left + 8, p.y - r.top + 8);
       else put(el, p.x - r.left - el.offsetWidth / 2, p.y - r.top - el.offsetHeight - 4);
+    };
+    // 고른 공간의 이름표를 먼저 놓고, + 손잡이가 그 옆으로 비킨 뒤, 나머지 이름표가 빈자리를 찾는다.
+    const chosen = tags.filter((t) => t.el.classList.contains('is-selected'));
+    chosen.forEach(placeTag);
+    // + 손잡이는 벽 가운데 바깥에 둔다. 이름표와 겹치면 벽을 따라 옆으로 비켜 둘 다 누를 수 있게 한다.
+    const sides = sc.sideAnchors?.() || [];
+    // 문은 눌러서 고르고 끌어 옮기는 자리다. 손잡이가 그 위에 놓이지 않게 한다.
+    const doorways = (sc.doorSpots?.() || []).map((d) =>
+      d.vertical
+        ? { x: d.x - r.left - 16, y: d.y - r.top - d.half - 8, w: 32, h: d.half * 2 + 16 }
+        : { x: d.x - r.left - d.half - 8, y: d.y - r.top - 16, w: d.half * 2 + 16, h: 32 },
+    );
+    let popAt = null;
+    for (const el of layer.querySelectorAll('[data-add-side]')) {
+      const p = sides.find((a) => a.side === el.dataset.addSide);
+      if (!p || !p.visible) {
+        el.style.visibility = 'hidden';
+        continue;
+      }
+      const w = el.offsetWidth,
+        h = el.offsetHeight,
+        hits = (x, y) =>
+          [...placed, ...doorways].some(
+            (o) => x < o.x + o.w + 4 && x + w + 4 > o.x && y < o.y + o.h + 4 && y + h + 4 > o.y,
+          );
+      let x = p.x - r.left - w / 2,
+        y = p.y - r.top - h / 2;
+      if (hits(x, y) && p.along) {
+        const reach = Math.max(0, p.span / 2 - w / 2);
+        for (let t = 12; t <= reach; t += 12) {
+          const free = [t, -t].find((n) => !hits(x + p.along[0] * n, y + p.along[1] * n));
+          if (free !== undefined) {
+            x += p.along[0] * free;
+            y += p.along[1] * free;
+            break;
+          }
+        }
+      }
+      // 화면 밖이나 방 위 도구·아래 시트에 가리는 손잡이, 비킬 자리가 없어 문을 덮는 손잡이는 숨긴다.
+      const onDoor = doorways.some(
+        (o) => x < o.x + o.w && x + w > o.x && y < o.y + o.h && y + h > o.y,
+      );
+      if (onDoor || x < left - 4 || x + w > r.width - 4 || y < top || y + h > bottom) {
+        el.style.visibility = 'hidden';
+        continue;
+      }
+      el.style.visibility = '';
+      el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+      placed.push({ x, y, w, h });
+      if (el.classList.contains('is-open')) popAt = { x: x + w / 2, y: y + h / 2, side: p.side };
     }
+    const pop = layer.querySelector('[data-add-pop]');
+    if (pop && !popAt) pop.style.visibility = 'hidden';
+    else if (pop) {
+      // 고르는 창은 손잡이 옆에 두되 미리 보기 자리를 덜 가리는 쪽으로 연다.
+      const w = pop.offsetWidth,
+        h = pop.offsetHeight,
+        x =
+          popAt.side === 'left'
+            ? popAt.x + 24
+            : popAt.side === 'right'
+              ? popAt.x - w - 24
+              : popAt.x - w / 2,
+        y =
+          popAt.side === 'back'
+            ? popAt.y + 24
+            : popAt.side === 'front'
+              ? popAt.y - h - 24
+              : popAt.y - h / 2;
+      pop.style.visibility = '';
+      pop.style.transform = `translate(${Math.round(Math.max(left, Math.min(r.width - w - 8, x)))}px, ${Math.round(Math.max(top, Math.min(bottom - h, y)))}px)`;
+    }
+    tags.filter((t) => !chosen.includes(t)).forEach(placeTag);
     const doors = sc.doorAnchors?.() || [];
     for (const el of layer.querySelectorAll('[data-door-tag]')) {
       const p = doors.find((d) => d.roomId === el.dataset.doorTag);
@@ -785,7 +969,7 @@ export function Stage({ mobile, sheetRef }) {
       if (!sheet) return;
       const r = sheet.getBoundingClientRect();
       const vh = window.visualViewport?.height || innerHeight;
-      const isMobile = innerWidth < 760;
+      const isMobile = innerWidth < 900;
       // 모바일에서는 방 아래 도구 줄만큼 더 띄워 모형이 버튼에 가리지 않게 한다.
       const insets = isMobile
         ? { top: 56, bottom: Math.max(0, vh - r.top) + 48 }
@@ -826,6 +1010,7 @@ export function Stage({ mobile, sheetRef }) {
     app.scenes.three?.invalidate();
     requestAnimationFrame(place);
   }, [app.state.view, app.state.scope, app.view.collapsed, app.view.sheet, mobile]);
+
   const s = app.state,
     warn = layoutWarnings(s);
   const house = s.scope === 'house';
@@ -869,11 +1054,15 @@ export function Stage({ mobile, sheetRef }) {
       />
       <div class="stage-tags" ref={tagsRef}>
         {house ? <RoomTags /> : <DoorTags />}
+        <AddHandles mobile={mobile} />
         <DoorBar />
         <AvatarTag mobile={mobile} />
       </div>
       <div class="stage-top">
-        <ScopeNav />
+        <div class="stage-lead">
+          <ScopeNav />
+          {house && <AddSpaceButton />}
+        </div>
         <div class="stage-tools">
           {!mobile && history}
           <div class="segmented on-stage" role="group" aria-label="보기 방식">
@@ -935,8 +1124,8 @@ export function Stage({ mobile, sheetRef }) {
           <span class="stage-hint">
             {house
               ? s.view === '3d'
-                ? '끌어서 돌려 보기 · 공간을 눌러 고르고 두 번 눌러 편집'
-                : '공간을 끌어 집 모양 맞추기 · 문은 끌어 옮기고 눌러서 폭 바꾸기 · 두 번 눌러 편집'
+                ? '끌어서 돌려 보기 · ＋로 벽에 공간 붙이기 · 두 번 눌러 방 편집'
+                : '＋로 벽에 공간 붙이기 · 공간과 문은 끌어 옮기기 · 두 번 눌러 방 편집'
               : s.view === '2d'
                 ? hasDoor
                   ? '가구와 문을 끌어 옮기기 · 방향키로 5cm씩'

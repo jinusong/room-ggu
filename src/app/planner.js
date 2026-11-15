@@ -1,7 +1,8 @@
 // 규칙 기반 대화 계획기. 상담 모델을 쓸 수 없을 때(준비 중·꺼짐·미지원·실패) 쓰는 대체 경로다.
 // 사용자 문장 하나를 읽고 "무엇을 바꿀지, 어떤 도구를 보여줄지"를 정한다.
 // 상태를 직접 바꾸지 않는다. 적용과 실행 취소 기록은 store가 맡는다.
-import { TYPES, ROOM_TYPES } from '../catalog.js';
+import { TYPES, ROOM_TYPES, FURNITURE_COLORS } from '../catalog.js';
+import { josa } from './text.js';
 import { makeItem, layoutWarnings, clampItem, spaces } from '../data.js';
 import { consult, detectType, extractDimensions } from '../estimator.js';
 import { consultRoom, consultationScope, detectRoomType } from '../room-consult.js';
@@ -212,8 +213,15 @@ function planFurniture(t, ctx, item) {
   const res = consult(t, structuredClone(base));
   const next = res.item,
     color = parseFurnitureColor(t);
-  if (color && /색|컬러|톤|으로\s*(?:바꿔|해)|[가-힣]+색/.test(t)) next.color = color;
+  if (color && /색|컬러|톤|(?:으로|로)\s*(?:바꿔|바꾸|해)|[가-힣]+색/.test(t)) next.color = color;
   else if (color && mode === 'new') next.color = color;
+  // 색만 바꿨으면 치수 이야기를 되풀이하지 않고 바뀐 색을 말한다.
+  const colorName = FURNITURE_COLORS.find(([, hex]) => hex === next.color)?.[0],
+    colorOnly =
+      mode !== 'new' &&
+      colorName &&
+      next.color !== base.color &&
+      next.dims.every((d, i) => d === base.dims[i]);
   const target = mode === 'item' ? { type: 'item', id: item.id } : { type: 'draft' };
   const pick = chooseSurface(t, 'furniture');
   const kind = surfaceKind('furniture', color && pick === 'sizes' ? 'colors' : pick);
@@ -229,8 +237,9 @@ function planFurniture(t, ctx, item) {
     mode,
     target,
     confident: confidentPick('furniture', pick) || !!color,
-    reply:
-      mode === 'new'
+    reply: colorOnly
+      ? `${next.name || TYPES[next.type].name} 색을 ${josa(colorName, '으로/로')} 바꿨어요.`
+      : mode === 'new'
         ? res.reply.replace('치수 초안을 바꿨어요.', '치수 초안을 잡았어요.')
         : res.reply,
     changes: mode === 'item' ? { item: { id: item.id, next } } : { draft: next },

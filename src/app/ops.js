@@ -353,10 +353,53 @@ function adjacentSlot(state, size, align = 'start') {
     );
 }
 
-export function addSpace(state, type = 'studio') {
+// 지금 공간의 한쪽 벽(right·left·front·back)에 맞닿는 빈자리. 벽의 시작 끝에 맞춘 자리부터 보고,
+// 다른 공간에 막히면 벽을 따라 25cm씩 밀어 본다. 문을 낼 수 있게 90cm 넘게 맞닿는 자리만 고른다.
+export const SIDES = { right: '오른쪽', left: '왼쪽', back: '위쪽', front: '아래쪽' };
+export function sideSlot(state, side, size) {
+  if (!Object.hasOwn(SIDES, side)) return null;
+  const list = spaces(state),
+    plan = normalizeFloorplan(state.floorplan, list),
+    origin = plan.positions[state.roomId],
+    { w, d } = state.room,
+    vertical = side === 'right' || side === 'left',
+    sign = side === 'right' || side === 'front' ? 1 : -1,
+    span = vertical ? d : w,
+    length = vertical ? size.d : size.w,
+    reach = (span + length) / 2 - 0.9,
+    start = -(span - length) / 2;
+  if (reach < 0) return null;
+  const offsets = [start, 0, -start];
+  for (let t = 0.25; t <= reach + 1e-9; t += 0.25) offsets.push(start + t, start - t);
+  for (const t of offsets) {
+    if (Math.abs(t) > reach + 1e-9) continue;
+    const p = vertical
+      ? { x: round2(origin.x + (sign * (w + size.w)) / 2), z: round2(origin.z + t) }
+      : { x: round2(origin.x + t), z: round2(origin.z + (sign * (d + size.d)) / 2) };
+    if (
+      Math.abs(p.x) <= 200 &&
+      Math.abs(p.z) <= 200 &&
+      list.every(
+        (r) =>
+          !rectanglesOverlap(
+            roomBounds({ room: size }, p),
+            roomBounds(r, plan.positions[r.roomId]),
+          ),
+      )
+    )
+      return p;
+  }
+  return null;
+}
+
+export function addSpace(state, type = 'studio', side = null) {
   if (!Object.hasOwn(ROOM_TYPES, type)) throw Error('알 수 없는 공간 유형이에요.');
   if (state.otherRooms.length >= 11) throw Error('공간은 최대 12개까지 저장할 수 있어요.');
-  const slot = adjacentSlot(state, makeRoom(type));
+  const slot = side ? sideSlot(state, side, makeRoom(type)) : adjacentSlot(state, makeRoom(type));
+  if (side && !slot)
+    throw Error(
+      `${SIDES[side] || '그쪽'}에는 ${ROOM_TYPES[type].name}을 붙일 자리가 없어요. 다른 벽을 고르거나 공간을 먼저 옮겨 주세요.`,
+    );
   const id = addRoom(state, type);
   if (slot) state.floorplan.positions[id] = slot;
   return id;

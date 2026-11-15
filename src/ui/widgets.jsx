@@ -2,6 +2,18 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { footprint } from '../data.js';
 import { Icon } from './icons.js';
 
+// 상담 상대의 얼굴. 대화 머리와 답마다 같은 표식을 쓴다.
+export function BrandMark() {
+  return (
+    <span class="chat-avatar" aria-hidden="true">
+      <svg class="brand-mark" viewBox="0 0 24 24">
+        <path d="M4 20V4h16" />
+        <rect x="9" y="11" width="8" height="5" rx="1" />
+      </svg>
+    </span>
+  );
+}
+
 // 줄자 칩: 사용자가 정한 값은 노란 줄자, 초안 값은 점선 연필 표시.
 export function Tape({ children, source = '', title }) {
   const user = String(source).startsWith('사용자');

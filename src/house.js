@@ -122,6 +122,24 @@ export class HouseScene extends PlanScene {
       list = spaces(this.state),
       plan = normalizeFloorplan(this.state.floorplan, list);
     const bounds = list.map((r) => roomBounds(r, plan.positions[r.roomId]));
+    // 공간을 붙일 벽을 고르는 동안에는 붙을 자리까지 화면에 담는다. 종류를 바꿔 봐도 축척이 흔들리지 않는다.
+    const reserve = this.reserve,
+      at = reserve && plan.positions[this.state.roomId];
+    if (at) {
+      const { w, d } = this.state.room,
+        b = roomBounds({ room: this.state.room }, at);
+      if (reserve.side === 'right')
+        bounds.push({ ...b, left: b.right, right: b.right + reserve.w });
+      if (reserve.side === 'left') bounds.push({ ...b, right: b.left, left: b.left - reserve.w });
+      if (reserve.side === 'front')
+        bounds.push({ ...b, top: b.bottom, bottom: b.bottom + reserve.d });
+      if (reserve.side === 'back') bounds.push({ ...b, bottom: b.top, top: b.top - reserve.d });
+      // 붙는 공간이 이 방보다 길면 벽을 따라서도 넘친다.
+      const last = bounds[bounds.length - 1];
+      if (reserve.side === 'right' || reserve.side === 'left')
+        last.bottom = Math.max(last.bottom, b.top + Math.max(d, reserve.d));
+      else last.right = Math.max(last.right, b.left + Math.max(w, reserve.w));
+    }
     const minX = Math.min(...bounds.map((b) => b.left)),
       maxX = Math.max(...bounds.map((b) => b.right));
     const minZ = Math.min(...bounds.map((b) => b.top)),
@@ -221,6 +239,50 @@ export class HouseScene extends PlanScene {
         p = plan.positions[home.roomId];
       if (a) drawAvatar(c, a, ox + p.x * scale, oy + p.z * scale, scale);
     }
+    // 붙이려는 공간의 자리와 크기를 점선으로 미리 보여 준다.
+    const g = this.ghostRoom;
+    if (g) {
+      const x = ox + (g.x - g.w / 2) * scale,
+        y = oy + (g.z - g.d / 2) * scale;
+      c.save();
+      c.fillStyle = 'rgba(255,255,255,0.5)';
+      c.fillRect(x, y, g.w * scale, g.d * scale);
+      c.setLineDash([6, 5]);
+      c.strokeStyle = INK;
+      c.lineWidth = 1.5;
+      c.strokeRect(x, y, g.w * scale, g.d * scale);
+      c.setLineDash([]);
+      c.fillStyle = '#545049';
+      c.font = '500 12px "JetBrains Mono", ui-monospace, monospace';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      if (g.w * scale > 64 && g.d * scale > 24)
+        c.fillText(`${g.w} × ${g.d}m`, x + (g.w * scale) / 2, y + (g.d * scale) / 2);
+      c.restore();
+    }
+  }
+  // 고른 공간의 네 벽 바깥. + 손잡이를 여기에 둔다.
+  sideAnchors() {
+    const r = spaces(this.state).find((r) => r.roomId === this.state.roomId),
+      p = this.state.floorplan.positions[this.state.roomId];
+    if (!r || !p || !this.scale) return [];
+    const rect = this.canvas.getBoundingClientRect(),
+      { w, d } = r.room,
+      gap = 22 / this.scale;
+    return [
+      ['right', w / 2 + gap, 0],
+      ['left', -w / 2 - gap, 0],
+      ['back', 0, -d / 2 - gap],
+      ['front', 0, d / 2 + gap],
+    ].map(([side, x, z]) => ({
+      side,
+      x: rect.left + this.ox + (p.x + x) * this.scale,
+      y: rect.top + this.oy + (p.z + z) * this.scale,
+      // 벽을 따라가는 화면 방향과 벽 길이. 이름표와 겹치면 이 방향으로 비킨다.
+      along: x ? [0, 1] : [1, 0],
+      span: (x ? d : w) * this.scale,
+      visible: true,
+    }));
   }
   // 이름표 자리: 공간의 안쪽 왼쪽 위 모서리.
   tagAnchor(id) {
@@ -236,6 +298,19 @@ export class HouseScene extends PlanScene {
       corner: true,
       visible: true,
     };
+  }
+  // 고른 공간의 벽에 난 문들의 화면 자리. + 손잡이가 문을 덮지 않게 비킬 때 쓴다.
+  doorSpots() {
+    if (!this.scale) return [];
+    const rect = this.canvas.getBoundingClientRect();
+    return houseLayout(this.state)
+      .openings.filter((o) => o.roomIds.includes(this.state.roomId))
+      .map((o) => ({
+        x: rect.left + this.ox + o.x * this.scale,
+        y: rect.top + this.oy + o.z * this.scale,
+        half: (o.width / 2) * this.scale,
+        vertical: o.vertical,
+      }));
   }
   // 고른 문의 막대 자리: 문 가운데.
   doorAnchor(ids) {

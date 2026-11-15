@@ -1,5 +1,5 @@
-/* 룸꾸 v5 — 종이 위 실내 모형과 줄자.
-   방 모형이 화면 전체에 놓이고, 대화는 그 위에 떠 있는 시트로 붙는다.
+/* 룸꾸 v5.5 — 종이 위 실내 모형과 줄자.
+   왼쪽은 화면 높이를 다 쓰는 상담 대화, 오른쪽은 방 모형이다. 좁은 화면에서는 대화가 아래 시트가 된다.
    색은 종이·먹 중립색과 줄자 노랑 하나만 쓴다. 노랑은 "직접 정한 치수"에만 쓴다. */
 :root {
   color-scheme: light;
@@ -342,44 +342,127 @@ button[aria-disabled='true'] {
   overflow: hidden;
 }
 .sheet.is-desktop {
-  top: 12px;
-  left: 12px;
-  bottom: 12px;
-  width: clamp(388px, 34vw, 500px);
-  border-radius: var(--r-sheet);
+  top: 0;
+  left: 0;
+  bottom: 0;
+  /* 끌어 맞춘 폭을 쓰되, 창이 줄어도 방 쪽에 도구 줄이 들어갈 폭은 남긴다. */
+  width: min(var(--chat-w, clamp(380px, 40vw, 600px)), calc(100vw - 520px));
+  min-width: 360px;
+  border-width: 0 1px 0 0;
+  box-shadow:
+    1px 0 0 rgba(31, 29, 25, 0.02),
+    8px 0 24px rgba(31, 29, 25, 0.05);
 }
+/* 접으면 입력창만 남은 작은 카드가 왼쪽 아래에 뜬다. */
 .sheet.is-desktop.is-collapsed {
   top: auto;
+  left: 12px;
+  bottom: 12px;
   width: min(440px, calc(100vw - 24px));
+  border-width: 1px;
+  border-radius: var(--r-sheet);
+  box-shadow: var(--shadow-float);
+}
+/* 대화와 방 사이를 끌어 대화 폭을 바꾼다. */
+.sheet-resize {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.sheet-resize::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: var(--ink-3);
+  opacity: 0;
+  transition: opacity 0.15s var(--ease);
+}
+.sheet-resize:hover::after,
+.is-resizing .sheet-resize::after {
+  opacity: 0.5;
+}
+/* 키보드로 잡았을 때는 먹색 굵은 선으로 또렷하게 보인다. */
+.sheet-resize:focus-visible {
+  outline: 0;
+}
+.sheet-resize:focus-visible::after {
+  left: 2px;
+  width: 4px;
+  border-radius: 2px;
+  background: var(--ink);
+  opacity: 1;
+}
+.is-resizing,
+.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+.sheet.is-desktop:has(.sheet-resize) {
+  overflow: visible;
 }
 .sheet-head {
   display: flex;
   align-items: center;
   gap: 12px;
   flex: none;
-  height: 56px;
-  padding: 0 12px 0 20px;
+  height: 68px;
+  /* 대화가 넓으면 머리도 대화 글과 같은 폭 안에 맞춘다. */
+  padding: 0 max(12px, calc((100% - 688px) / 2)) 0 max(20px, calc((100% - 680px) / 2));
   border-bottom: 1px solid var(--line);
 }
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+/* 상담 상대의 얼굴: 종이 원 안의 룸꾸 표식 */
+.chat-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--card);
+}
+.sheet-head .chat-avatar {
+  width: 40px;
+  height: 40px;
 }
 .brand-mark {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   fill: none;
   stroke: var(--ink);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.sheet-head .brand-mark {
+  width: 22px;
+  height: 22px;
+}
 .brand-mark rect {
   fill: var(--tape);
   stroke-width: 1.6;
 }
-.brand-name {
+.chat-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.chat-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.chat-name strong {
   font-weight: 600;
   font-size: 17px;
   letter-spacing: -0.01em;
@@ -390,6 +473,11 @@ button[aria-disabled='true'] {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.chat-id .status-line {
+  font-size: 12px;
+  color: var(--ink-3);
+  white-space: nowrap;
 }
 .sheet-actions {
   display: flex;
@@ -423,53 +511,75 @@ button[aria-disabled='true'] {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 8px 20px 24px;
+  padding: 20px 20px 24px;
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
 }
+/* 대화 폭을 넓혀도 한 줄이 너무 길어지지 않게 한다. */
+.thread > *,
+.composer > * {
+  max-width: 680px;
+  margin-inline: auto;
+}
+/* 비어 있을 때는 인사와 시작점을 입력창 가까이에 둔다. */
 .thread.is-empty {
   display: flex;
   flex-direction: column;
 }
-.thread.is-empty .welcome {
-  margin: auto 0;
+.thread.is-empty .greet {
+  width: 100%;
+  margin-top: auto;
 }
 
-/* 첫 화면 */
-.welcome {
-  padding: 24px 0 8px;
+/* 인사: 상담은 룸꾸의 말풍선으로 시작한다. */
+.greet,
+.msg.assistant {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: start;
+}
+.greet {
   animation: rise 0.4s var(--ease) both;
 }
-.welcome-kicker {
-  margin: 0 0 12px;
-  color: var(--ink-3);
+.greet .bubble + .bubble {
+  margin-top: 6px;
 }
-.welcome h1 {
-  margin: 0;
-  font-weight: 600;
-  font-size: 30px;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+.greet .bubble .link {
+  margin-left: 8px;
 }
-.welcome-lede {
-  max-width: 34em;
-  margin: 12px 0 0;
+.greet-label {
+  margin: 20px 0 0;
+  font-weight: 500;
+  font-size: 13px;
   color: var(--ink-2);
 }
-.welcome-note {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  margin: 12px 0 0;
-  font-size: 13px;
-  color: var(--ink-3);
+.msg-who {
+  display: contents;
+}
+.msg-name {
+  display: none;
+}
+.msg-body {
+  min-width: 0;
+}
+/* 말풍선: 룸꾸는 흰 종이, 사용자는 먹색 */
+.bubble {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px 16px 16px 16px;
+  background: var(--card);
+  box-shadow: var(--shadow-small);
+  overflow-wrap: anywhere;
 }
 .starters {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  margin-top: 24px;
+  margin-top: 8px;
 }
 .starter {
   display: flex;
@@ -513,12 +623,13 @@ button[aria-disabled='true'] {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-top: 20px;
+  margin-top: 16px;
 }
 .prompt-examples > span {
   width: 100%;
-  font-size: 12px;
-  color: var(--ink-3);
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--ink-2);
 }
 .prompt-examples .chip {
   background: transparent;
@@ -542,10 +653,11 @@ button[aria-disabled='true'] {
   margin-top: 24px;
 }
 .msg.user p {
-  max-width: 86%;
-  padding: 10px 14px;
+  max-width: 82%;
+  padding: 8px 12px;
   border-radius: 16px 16px 4px 16px;
-  background: var(--raised-2);
+  background: var(--ink);
+  color: var(--sheet);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -556,6 +668,9 @@ button[aria-disabled='true'] {
   background: transparent;
   font-size: 13px;
   color: var(--ink-2);
+}
+.msg.user + .msg.assistant {
+  margin-top: 12px;
 }
 .msg-photo {
   max-width: 200px;
@@ -621,9 +736,43 @@ button[aria-disabled='true'] {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 10px;
   font-size: 13px;
   color: var(--ink-2);
+}
+.msg-text + .thinking {
+  margin-top: 8px;
+}
+/* 답을 쓰는 중: 차례로 뛰는 점 세 개 */
+.typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+}
+.typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-3);
+  animation: typing 1.1s ease-in-out infinite;
+}
+.typing i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: none;
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
 }
 .event {
   display: flex;
@@ -1487,7 +1636,7 @@ button.row:hover,
 .composer {
   position: relative;
   flex: none;
-  padding: 10px 16px 12px;
+  padding: 12px 20px 14px;
   border-top: 1px solid var(--line);
   background: var(--sheet);
 }
@@ -1563,9 +1712,9 @@ button.row:hover,
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  padding: 4px;
+  padding: 6px;
   border: 1px solid var(--line-strong);
-  border-radius: 16px;
+  border-radius: 22px;
   background: var(--card);
   box-shadow: var(--shadow-small);
   transition:
@@ -1579,9 +1728,9 @@ button.row:hover,
 .composer-box textarea {
   flex: 1;
   min-width: 0;
-  min-height: 40px;
-  max-height: 168px;
-  padding: 8px 4px;
+  min-height: 44px;
+  max-height: 192px;
+  padding: 10px 6px;
   border: 0;
   outline: none;
   resize: none;
@@ -1593,17 +1742,18 @@ button.row:hover,
   color: var(--ink-3);
 }
 .composer-box .icon-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
 }
 .send {
   display: grid;
   place-items: center;
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 50%;
   background: var(--ink);
   color: var(--sheet);
   transition:
@@ -1693,8 +1843,12 @@ button.row:hover,
   justify-content: space-between;
   gap: 12px;
   margin-top: 8px;
+  padding: 0 6px;
   font-size: 12px;
   color: var(--ink-3);
+}
+.composer-foot .save-state {
+  margin-left: auto;
 }
 .status-line {
   display: inline-flex;
@@ -1703,6 +1857,10 @@ button.row:hover,
   min-width: 0;
 }
 .status-line .link {
+  /* 작은 글자 버튼도 누를 자리는 24px를 지킨다. */
+  min-height: 24px;
+  margin: -4px 0;
+  padding: 4px 2px;
   font-size: 12px;
 }
 .save-state {
@@ -1721,14 +1879,67 @@ button.row:hover,
   justify-content: space-between;
   gap: 8px;
   pointer-events: none;
+  /* 대화 폭을 넓히면 방 쪽이 좁아진다. 그 폭에 맞춰 도구 줄의 글자를 줄인다. */
+  container: stage-top / inline-size;
 }
 .stage-top > * {
   pointer-events: auto;
+}
+@container stage-top (max-width: 780px) {
+  .space-dims {
+    display: none;
+  }
+}
+@container stage-top (max-width: 660px) {
+  .add-space {
+    width: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+  .add-space span {
+    display: none;
+  }
+}
+@container stage-top (max-width: 580px) {
+  .scope-house:not(.is-active) .scope-label,
+  .scope-house:not(.is-active) .scope-count,
+  .space-button:not(.is-active) .space-name {
+    display: none;
+  }
 }
 .stage-tools {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.stage-lead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+/* 집 전체에서 공간을 붙이는 버튼 */
+.add-space {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 4px;
+  height: 40px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow-small);
+  font-weight: 500;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.add-space:hover:not(:disabled) {
+  background: var(--sheet);
+  border-color: var(--line-strong);
+}
+.add-space.is-open {
+  border-color: var(--ink);
 }
 .tool-group {
   display: flex;
@@ -1993,6 +2204,80 @@ button.row:hover,
   pointer-events: auto;
   will-change: transform;
 }
+/* 벽 바깥의 + 손잡이: 아직 없는 공간이므로 초안처럼 점선으로 그린다. */
+.add-handle {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1.5px dashed var(--ink-3);
+  border-radius: 50%;
+  background: var(--sheet);
+  color: var(--ink-2);
+  transition:
+    background-color 0.15s var(--ease),
+    border-color 0.15s var(--ease),
+    color 0.15s var(--ease);
+}
+.add-handle:hover {
+  border-style: solid;
+  border-color: var(--ink);
+  background: var(--card);
+  color: var(--ink);
+}
+.add-handle.is-open {
+  border-style: solid;
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--sheet);
+}
+.add-pop {
+  z-index: 3;
+  width: 272px;
+  max-width: calc(100vw - 16px);
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-float);
+  animation: fade 0.16s var(--ease) both;
+}
+.add-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+}
+.add-grid button {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: center;
+  min-height: 44px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+}
+.add-grid button:hover:not(:disabled),
+.add-grid button:focus-visible {
+  background: var(--raised);
+}
+.add-grid button .icon {
+  grid-row: span 2;
+  color: var(--ink-2);
+}
+.add-grid button span {
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.add-grid button small {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--ink-3);
+}
 .room-tag {
   display: flex;
   align-items: stretch;
@@ -2172,8 +2457,12 @@ button.avatar-tag {
   pointer-events: auto;
 }
 .stage-hint {
+  min-width: 0;
   margin-right: auto;
   padding: 4px 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   border-radius: 8px;
   background: rgba(239, 237, 231, 0.85);
   font-size: 12px;
@@ -2182,7 +2471,7 @@ button.avatar-tag {
 .toast {
   position: fixed;
   z-index: 50;
-  top: 16px;
+  top: 62px;
   left: calc((100% + var(--inset-left)) / 2);
   max-width: min(440px, calc(100% - 32px));
   padding: 10px 16px;
@@ -2260,18 +2549,53 @@ button.avatar-tag {
   background: var(--line-strong);
 }
 .sheet.is-mobile .sheet-head {
-  height: 44px;
-  padding: 0 8px 0 16px;
-  border-bottom: 0;
+  height: 52px;
+  padding: 0 max(8px, calc((100% - 696px) / 2)) 0 max(16px, calc((100% - 680px) / 2));
+  gap: 10px;
 }
-.sheet.is-mobile .sheet-title {
-  display: none;
+.sheet.is-mobile .sheet-head .chat-avatar {
+  width: 36px;
+  height: 36px;
 }
 .sheet.is-mobile .thread {
-  padding: 0 16px 16px;
+  padding: 12px 16px 16px;
 }
 .sheet.is-mobile .composer {
   padding: 8px 12px 10px;
+}
+/* 좁은 화면에서는 왼쪽 여백을 아끼려고 얼굴과 이름을 말풍선 위 한 줄로 올린다. */
+.sheet.is-mobile .greet,
+.sheet.is-mobile .msg.assistant {
+  display: block;
+}
+.sheet.is-mobile .msg-who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.sheet.is-mobile .msg-who .chat-avatar {
+  width: 22px;
+  height: 22px;
+}
+.sheet.is-mobile .msg-who .brand-mark {
+  width: 13px;
+  height: 13px;
+}
+.sheet.is-mobile .msg-name {
+  display: inline;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.sheet.is-mobile .composer-box .icon-btn,
+.sheet.is-mobile .send {
+  width: 40px;
+  height: 40px;
+}
+.sheet.is-mobile .composer-box textarea {
+  min-height: 40px;
+  padding: 8px 4px;
 }
 .sheet[data-snap='peek'] .sheet-head,
 .sheet[data-snap='peek'] .thread {
@@ -2287,17 +2611,8 @@ button.avatar-tag {
 .sheet[data-snap='peek'] .collapsed-last span {
   -webkit-line-clamp: 1;
 }
-.sheet.is-mobile .welcome {
-  padding-top: 4px;
-}
-.sheet.is-mobile .welcome-kicker {
-  display: none;
-}
-.sheet.is-mobile .welcome h1 {
-  font-size: 24px;
-}
-.sheet.is-mobile .thread.is-empty {
-  justify-content: flex-start;
+.sheet.is-mobile .thread.is-empty .greet {
+  margin-top: 0;
 }
 .app.is-mobile .stage-top {
   top: 8px;
@@ -2348,6 +2663,42 @@ button.avatar-tag {
 .app.is-mobile .door-tag {
   height: 30px;
   max-width: 150px;
+}
+.app.is-mobile .add-handle {
+  width: 32px;
+  height: 32px;
+}
+/* 좁은 화면에서는 고르는 창을 방 아래 도구 줄 위에 옆으로 넘기는 줄로 깐다. 모형과 미리 보기를 가리지 않는다. */
+.add-pop.is-strip {
+  top: auto;
+  right: 8px;
+  bottom: calc(var(--inset-bottom) + 60px);
+  left: 8px;
+  width: auto;
+  max-width: none;
+  padding: 4px;
+}
+.add-pop.is-strip .pop-label {
+  display: none;
+}
+.add-pop.is-strip .add-grid {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.add-pop.is-strip .add-grid button {
+  flex: none;
+  padding: 4px 10px 4px 8px;
+}
+/* 좁은 화면에서는 공간 추가를 아이콘만 남긴다. */
+.app.is-mobile .add-space {
+  width: 40px;
+  padding: 0;
+  justify-content: center;
+}
+.app.is-mobile .add-space span {
+  display: none;
 }
 .app.is-mobile .bar-btn.bar-pose span {
   display: none;
@@ -2414,6 +2765,10 @@ button.avatar-tag {
   .avatar-bar {
     gap: 4px;
     padding-left: 6px;
+  }
+  /* 위쪽 도구 줄이 넘치므로 공간 추가 버튼은 빼고 벽의 + 손잡이만 쓴다. */
+  .add-space {
+    display: none;
   }
   .avatar-bar .segmented button {
     min-width: 36px;
@@ -2561,61 +2916,116 @@ button.avatar-tag {
   gap: 8px;
 }
 
-/* ---------- 모델 내려받기 안내 ---------- */
-.download-scrim {
+/* ---------- 모델 아일랜드 ---------- */
+/* 방 위 도구 줄 바로 아래 가운데에 뜨는 먹색 캡슐. 접힌 한 줄과 아래로 펼쳐지는 안내가 한 덩어리다.
+   도구 줄과 같은 줄에 두면 화면 폭에 따라 길잡이를 가리므로 항상 한 줄 아래에 둔다. */
+.island {
   position: fixed;
-  z-index: 60;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 16px;
-  background: rgba(31, 29, 25, 0.32);
-  animation: fade 0.2s var(--ease) both;
+  z-index: 55;
+  top: 62px;
+  left: calc((100% + var(--inset-left)) / 2);
+  width: max-content;
+  max-width: calc(100% - 24px);
+  border-radius: 22px;
+  background: var(--ink);
+  color: var(--sheet);
+  box-shadow:
+    0 1px 2px rgba(31, 29, 25, 0.2),
+    0 12px 32px rgba(31, 29, 25, 0.24);
+  transform: translateX(-50%);
+  animation: island-in 0.32s var(--ease) both;
+  overflow: hidden;
 }
-.download-dialog {
-  width: min(420px, 100%);
-  padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sheet);
-  background: var(--sheet);
-  box-shadow: var(--shadow-float);
-  animation: rise 0.28s var(--ease) both;
+.island.is-open {
+  width: min(380px, calc(100% - 24px));
+  border-radius: 24px;
 }
-.download-dialog header {
+@keyframes island-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px) scale(0.92);
+  }
+}
+.island-bar {
+  position: relative;
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 208px;
+  height: 44px;
+  padding: 0 16px 0 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-weight: 500;
+  font-size: 14px;
+  text-align: left;
 }
-.download-icon {
+.island-bar:focus-visible {
+  outline-color: var(--tape);
+  outline-offset: -3px;
+  border-radius: 22px;
+}
+.island-bar > .icon:last-child {
+  opacity: 0.6;
+}
+.island-icon {
   display: grid;
   place-items: center;
   flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--raised);
-  color: var(--ink-2);
+  width: 22px;
+  height: 22px;
 }
-.download-dialog.is-done .download-icon {
-  background: #e3efe6;
-  color: var(--ok);
+.island.is-done .island-icon {
+  border-radius: 50%;
+  background: var(--tape);
+  color: var(--tape-ink);
 }
-.download-dialog.is-error .download-icon {
-  background: var(--warn-soft);
-  color: var(--warn);
+.island.is-error .island-icon {
+  color: #f0a898;
 }
-.download-dialog h2 {
-  margin: 0;
-  font-weight: 600;
-  font-size: 17px;
-  line-height: 1.35;
+.island-ring {
+  width: 18px;
+  height: 18px;
+  transform: rotate(-90deg);
 }
-.download-model {
-  margin: 2px 0 0;
+.island-ring circle {
+  fill: none;
+  stroke: rgba(251, 250, 247, 0.24);
+  stroke-width: 2.5;
+}
+.island-ring circle + circle {
+  stroke: var(--tape);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s var(--ease);
+}
+.island-title {
+  flex: 1;
+  white-space: nowrap;
+}
+.island-title small {
+  font-weight: 400;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.island-value {
   font-size: 13px;
-  color: var(--ink-3);
+  color: var(--tape);
 }
-/* 진행 막대는 눈금이 있는 줄자다. 받은 만큼 노란 줄자가 풀려 나온다. */
+.island-panel {
+  padding: 0 16px 16px;
+  animation: fade 0.2s var(--ease) both;
+}
+.island-model {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(251, 250, 247, 0.72);
+}
+.island .tape-progress {
+  margin-top: 12px;
+  border-color: rgba(251, 250, 247, 0.42);
+}
 .tape-progress {
   position: relative;
   height: 20px;
@@ -2638,58 +3048,75 @@ button.avatar-tag {
   border-right: 2px solid var(--tape-line);
   transition: width 0.3s var(--ease);
 }
-.download-numbers {
+/* 다 받은 뒤 준비하는 동안에는 끝이 정해지지 않았으므로 옅게 둔다. */
+.tape-progress span.is-waiting {
+  border-right: 0;
+  opacity: 0.45;
+}
+.island-numbers {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   margin-top: 8px;
-  color: var(--ink-2);
+  font-size: 12px;
+  color: rgba(251, 250, 247, 0.72);
 }
-.download-numbers b {
+.island-numbers b {
   font-weight: 500;
-  color: var(--ink);
+  color: var(--sheet);
 }
-.download-desc {
+.island-desc {
   margin: 12px 0 0;
   font-size: 13px;
-  line-height: 1.6;
-  color: var(--ink-2);
+  line-height: 1.5;
+  color: rgba(251, 250, 247, 0.86);
 }
-.download-stalled {
+.island-stalled {
   margin: 8px 0 0;
   font-size: 13px;
-  line-height: 1.6;
-  color: var(--amber);
+  line-height: 1.5;
+  color: var(--tape);
 }
-.download-dialog footer {
+.island-panel footer {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 20px;
+  margin-top: 16px;
 }
-.download-pill {
-  position: fixed;
-  z-index: 20;
-  top: 60px;
-  left: calc((100% + var(--inset-left)) / 2);
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: calc(100% - var(--inset-left) - 24px);
-  height: 32px;
+.island-btn {
+  height: 36px;
   padding: 0 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  background: var(--card);
-  box-shadow: var(--shadow-small);
+  border: 1px solid rgba(251, 250, 247, 0.42);
+  border-radius: 10px;
+  background: none;
+  color: var(--sheet);
+  font-weight: 500;
   font-size: 13px;
-  white-space: nowrap;
+}
+.island-btn:hover {
+  background: rgba(251, 250, 247, 0.1);
+}
+.island-btn.is-primary {
+  border-color: var(--sheet);
+  background: var(--sheet);
   color: var(--ink);
 }
-.download-pill b {
-  font-weight: 500;
+.island-btn:focus-visible {
+  outline-color: var(--tape);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* 아일랜드가 떠 있으면 잠깐 뜨는 알림은 그 아래에 둔다. */
+.has-island .toast {
+  top: 116px;
 }
 .model-choices {
   display: grid;

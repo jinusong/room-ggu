@@ -121,7 +121,7 @@ export class RoomScene {
     this.scene = new T.Scene();
     this.scene.background = new T.Color(PAPER);
     this.renderer = new T.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, innerWidth < 760 ? 1.5 : 2));
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, innerWidth < 900 ? 1.5 : 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = T.PCFSoftShadowMap;
     this.renderer.outputColorSpace = T.SRGBColorSpace;
@@ -747,6 +747,65 @@ export class RoomScene {
       inside: true,
       visible: edges.some((e) => e.at.visible),
     };
+  }
+  // 집 전체 3D에서 고른 공간의 네 벽 바깥 바닥. + 손잡이를 여기에 둔다.
+  sideAnchors() {
+    if (this.state.scope !== 'house') return [];
+    const r = spaces(this.state).find((r) => r.roomId === this.state.roomId),
+      p = this.state.floorplan.positions[this.state.roomId];
+    if (!r || !p) return [];
+    const { w, d } = r.room;
+    return [
+      ['right', w / 2 + 0.4, 0],
+      ['left', -w / 2 - 0.4, 0],
+      ['back', 0, -d / 2 - 0.4],
+      ['front', 0, d / 2 + 0.4],
+    ].map(([side, x, z]) => {
+      // 벽의 두 끝을 화면에 옮겨 벽을 따라가는 방향과 길이를 구한다.
+      const a = this.project(
+          new T.Vector3(p.x + x - (x ? 0 : w / 2), 0.02, p.z + z - (x ? d / 2 : 0)),
+        ),
+        b = this.project(new T.Vector3(p.x + x + (x ? 0 : w / 2), 0.02, p.z + z + (x ? d / 2 : 0))),
+        span = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      return {
+        side,
+        ...this.project(new T.Vector3(p.x + x, 0.02, p.z + z)),
+        along: [(b.x - a.x) / span, (b.y - a.y) / span],
+        span,
+      };
+    });
+  }
+  // 붙이려는 공간의 자리를 바닥에 점선 테두리로 미리 보여 준다.
+  setRoomGhost(g) {
+    if (this.roomGhost) {
+      this.scene.remove(this.roomGhost);
+      this.roomGhost.geometry.dispose();
+      this.roomGhost.material.dispose();
+      this.roomGhost = null;
+    }
+    if (g && this.state.scope === 'house') {
+      const x0 = g.x - g.w / 2,
+        x1 = g.x + g.w / 2,
+        z0 = g.z - g.d / 2,
+        z1 = g.z + g.d / 2,
+        y = 0.02;
+      const line = new T.Line(
+        new T.BufferGeometry().setFromPoints(
+          [
+            [x0, z0],
+            [x1, z0],
+            [x1, z1],
+            [x0, z1],
+            [x0, z0],
+          ].map(([x, z]) => new T.Vector3(x, y, z)),
+        ),
+        new T.LineDashedMaterial({ color: '#2a2824', dashSize: 0.14, gapSize: 0.1 }),
+      );
+      line.computeLineDistances();
+      this.roomGhost = line;
+      this.scene.add(line);
+    }
+    this.dirty = true;
   }
   doorAnchors() {
     if (this.state.scope === 'house') return [];

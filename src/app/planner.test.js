@@ -131,3 +131,27 @@ test('예시 방 요청은 파일 불러오기보다 먼저 해석한다', () =>
     'files',
   );
 });
+
+test('받침 없는 색 이름도 “~로 바꿔줘”로 바꾸고, 색만 바꿨으면 바뀐 색을 말한다', () => {
+  const s = exampleState();
+  const sofa = makeItem('sofa');
+  s.items.push(sofa);
+  for (const [text, hex, name] of [
+    ['네이비로 바꿔줘', '#3f4d63', '네이비'],
+    ['차콜로 해줘', '#575c58', '차콜'],
+    ['월넛으로 바꿔줘', '#7a5c43', '월넛'],
+  ]) {
+    const p = planTurn(text, { state: s, target: { type: 'item', id: sofa.id } });
+    assert.equal(p.changes.item.next.color, hex, text);
+    assert.deepEqual(p.changes.item.next.dims, sofa.dims);
+    assert.match(p.reply, new RegExp(`색을 ${name}(으로|로) 바꿨어요`));
+  }
+  // 치수를 함께 말하면 치수 답을 그대로 쓴다.
+  const both = planTurn('네이비로 바꾸고 가로 200cm', {
+    state: s,
+    target: { type: 'item', id: sofa.id },
+  });
+  assert.equal(both.changes.item.next.color, '#3f4d63');
+  assert.equal(both.changes.item.next.dims[0], 200);
+  assert.doesNotMatch(both.reply, /색을 네이비로 바꿨어요/);
+});

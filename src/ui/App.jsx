@@ -3,10 +3,11 @@ import * as store from '../app/store.js';
 import { app } from '../app/store.js';
 import { Stage } from './Stage.jsx';
 import { Sheet } from './Sheet.jsx';
-import { ModelDownload } from './ModelDownload.jsx';
+import { ModelIsland } from './ModelIsland.jsx';
 import { Icon } from './icons.js';
 
-const MOBILE = 760;
+// 대화 열과 방이 나란히 설 폭이 안 되면 대화를 아래 시트로 내린다.
+export const MOBILE = 900;
 
 function useStore() {
   const [, force] = useReducer((x) => x + 1, 0);
@@ -137,7 +138,9 @@ export function App() {
   }, []);
   return (
     <div
-      class={`app ${mobile ? 'is-mobile' : 'is-desktop'} ${dragging ? 'is-dropping' : ''}`}
+      class={`app ${mobile ? 'is-mobile' : 'is-desktop'} ${dragging ? 'is-dropping' : ''} ${
+        app.ai.download ? 'has-island' : ''
+      }`}
       onDragOver={(e) => {
         if ([...(e.dataTransfer?.items || [])].some((i) => i.kind === 'file')) {
           e.preventDefault();
@@ -164,7 +167,7 @@ export function App() {
           가구 사진을 놓으면 대화에 붙어요
         </div>
       )}
-      <ModelDownload />
+      <ModelIsland />
       <Toast />
       <input
         id="photo-file"
