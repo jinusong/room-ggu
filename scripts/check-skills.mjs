@@ -10,4 +10,4 @@ for(const name of [...lock.skills.map(s=>s.name),'room-ggu-pipeline']){
  if(!existsSync(mirror)||realpathSync(path)!==realpathSync(mirror))throw Error('Claude·Codex 원본 연결 실패: '+name);
 }
 if(!existsSync(join(root,'.agents/skills/answer-me-with-html/scripts/am.mjs')))throw Error('HTML CLI 없음');
-console.log('공용 스킬 4개와 Claude·Codex 연결 확인');
+console.log(`공용 스킬 ${lock.skills.length+1}개와 Claude·Codex 연결 확인`);

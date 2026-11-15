@@ -1,11 +1,11 @@
 {
-  "installed_on": "2026-11-10",
+  "installed_on": "2026-11-16",
   "scope": "project-local",
   "skills": [
     {
       "name": "unslop",
       "repository": "https://github.com/heydamir/unslop",
-      "ref": "97daa3eb365670ea3f87ed85356cbfcee18105a5",
+      "ref": "620163eedb3529d9cd23a3994ed8d287d06f760d",
       "path": "skills/unslop",
       "license": "CC-BY-4.0",
       "credit": "Damir Sokolovsky (@heydamir)"
@@ -13,16 +13,35 @@
     {
       "name": "humanizer",
       "repository": "https://github.com/blader/humanizer",
-      "ref": "0ef9fe5bc3572734fd3ae6c448fe00a30cd5dcf0",
+      "ref": "b48c832f0f809c1b5658edbb838c2521b72f2413",
       "path": ".",
-      "license": "MIT"
+      "license": "MIT",
+      "note": "plugin manifests, CI files and the package validator are not copied"
     },
     {
       "name": "answer-me-with-html",
       "repository": "https://github.com/QingYunA/answer-me-with-html",
-      "ref": "5bebfd3974b20b7a89e039cae0fba5e11d933678",
+      "ref": "2966455ba8028993e0f2ebe87f31ec0b1c0690e8",
       "path": "skills/answer-me-with-html",
-      "license": "MIT"
+      "license": "MIT",
+      "note": "argument-hint moved under metadata for Codex frontmatter"
+    },
+    {
+      "name": "humanize-korean",
+      "repository": "https://github.com/epoko77-ai/im-not-ai",
+      "ref": "333b35c18d99c34b31c7e1ebfef1931c075b649b",
+      "path": "codex/skills/humanize-korean",
+      "license": "MIT",
+      "version": "2.4.4",
+      "note": "self-contained package (references and scripts materialized)"
+    },
+    {
+      "name": "open-design",
+      "repository": "https://github.com/nexu-io/open-design",
+      "ref": "59e4f2ae85de7e7318a5e6bdcf3a34584c4b7582",
+      "path": "craft, docs/design-systems.md",
+      "license": "Apache-2.0",
+      "note": "craft rulebooks and the DESIGN.md guide only; SKILL.md and NOTICE.md are local"
     }
   ]
 }
