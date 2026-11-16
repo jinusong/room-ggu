@@ -1,6 +1,7 @@
 import { UI_SURFACES } from './ui-schema.js';
 import { detectType } from './estimator.js';
 import { ROOM_TYPES, makeRoom } from './catalog.js';
+import { josa } from './app/text.js';
 const roomAliases = {
   studio: /원룸|스튜디오/,
   bathroom: /화장실|욕실/,
@@ -157,7 +158,7 @@ export function consultRoom(text, previous) {
   }
   let reply =
     changed || add
-      ? `${ROOM_TYPES[room.type].name}을 가로 ${room.w}m, 세로 ${room.d}m, 천장 ${room.h}m로 ${add ? '새로 만들었어요' : '반영했어요'}.`
+      ? `${josa(ROOM_TYPES[room.type].name, '을/를')} 가로 ${room.w}m, 세로 ${room.d}m, 천장 ${room.h}m로 ${add ? '새로 만들었어요' : '반영했어요'}.`
       : '방 유형과 가로·세로를 알려주세요. “거실 가로 5m 세로 4m”처럼 말하면 도면에 바로 반영해요.';
   if (areaBased)
     reply +=

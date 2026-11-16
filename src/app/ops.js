@@ -31,6 +31,7 @@ import {
   findDoor,
   DOOR,
 } from '../floorplan.js';
+import { josa } from './text.js';
 
 export const round2 = (n) => Math.round(n * 100) / 100;
 export const fmtM = (n) => `${round2(n)}m`;
@@ -398,7 +399,7 @@ export function addSpace(state, type = 'studio', side = null) {
   const slot = side ? sideSlot(state, side, makeRoom(type)) : adjacentSlot(state, makeRoom(type));
   if (side && !slot)
     throw Error(
-      `${SIDES[side] || '그쪽'}에는 ${ROOM_TYPES[type].name}을 붙일 자리가 없어요. 다른 벽을 고르거나 공간을 먼저 옮겨 주세요.`,
+      `${SIDES[side] || '그쪽'}에는 ${josa(ROOM_TYPES[type].name, '을/를')} 붙일 자리가 없어요. 다른 벽을 고르거나 공간을 먼저 옮겨 주세요.`,
     );
   const id = addRoom(state, type);
   if (slot) state.floorplan.positions[id] = slot;
