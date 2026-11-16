@@ -1,4 +1,4 @@
-// 상태 변경 연산. 모든 함수는 앱 상태(v4)를 직접 바꾸고, 대화에 보여줄 변경 내역을 돌려준다.
+// 상태 변경 연산. 모든 함수는 앱 상태(v5)를 직접 바꾸고, 대화에 보여줄 변경 내역을 돌려준다.
 // 숫자 범위·경계·충돌 검사는 여기서 끝낸다. AI와 UI는 이 함수만 호출한다.
 import {
   TYPES,
@@ -6,7 +6,9 @@ import {
   WALL_COLORS,
   FLOOR_COLORS,
   FURNITURE_COLORS,
+  FIXTURE_TYPES,
   makeRoom,
+  retypeRoom,
 } from '../catalog.js';
 import {
   clampItem,
@@ -29,11 +31,16 @@ import {
   sharedOpening,
   doorPlacement,
   findDoor,
+  roomOpenings,
+  floorplanWarnings,
   DOOR,
 } from '../floorplan.js';
+import { bathroomFixtures } from '../house-geometry.js';
 import { josa } from './text.js';
 
 export const round2 = (n) => Math.round(n * 100) / 100;
+// 공간 위치는 mm까지 둔다. 벽을 맞붙일 때 폭의 절반(5mm 단위)이 그대로 맞아야 겹침으로 잡히지 않는다.
+const round3 = (n) => Math.round(n * 1000) / 1000;
 export const fmtM = (n) => `${round2(n)}m`;
 export const fmtCm = (n) => `${Math.round(n * 10) / 10}cm`;
 export const pyeong = (w, d) => (w * d) / 3.3058;
@@ -118,8 +125,114 @@ export function setRoom(state, room) {
     throw Error('마감 색상이 올바르지 않아요.');
   const before = state.room;
   state.room = room;
+  const rows = diffRoom(before, room);
+  // 화장실로 바꾸면 설비를 채우고, 화장실이 아니게 되면 손대지 않은 설비 초안은 치운다.
+  if (before.type !== room.type) {
+    if (before.type === 'bathroom') {
+      const kept = state.items.filter((a) => !isDraftFixture(a));
+      if (kept.length !== state.items.length) {
+        rows.push({ label: '설비', to: `${state.items.length - kept.length}개 치움` });
+        state.items = kept;
+        syncAvatar(state);
+      }
+    }
+    const renamed = syncSpaceName(state);
+    if (renamed) rows.push(renamed);
+  }
   for (const a of state.items) clampItem(a, room);
-  return diffRoom(before, room);
+  // 크기가 바뀌면 이웃 공간과 맞닿은 벽은 그대로 두고, 겹치는 공간은 밀어낸다.
+  const moved = reseatSpace(state, state.roomId, before);
+  if (moved.length)
+    rows.push({ label: '집 배치', to: `${moved.length}개 공간을 겹치지 않게 옮김` });
+  if (before.type !== room.type && room.type === 'bathroom') {
+    const n = fillBathroom(state);
+    if (n) rows.push({ label: '설비', to: `변기·세면대·샤워부스 ${n}개` });
+  }
+  return rows;
+}
+
+// ---------- 공간 이름 ----------
+const AUTO_NAME = new RegExp(
+  `^나의 (${Object.values(ROOM_TYPES)
+    .map((t) => t.name)
+    .join('|')})(?: \\d+)?$`,
+);
+// 유형 이름을 딴 기본 이름. 같은 이름이 있으면 뒤에 번호를 붙인다.
+export function autoSpaceName(state, type, exceptId = null) {
+  const base = `나의 ${ROOM_TYPES[type].name}`,
+    taken = new Set(
+      spaces(state)
+        .filter((r) => r.roomId !== exceptId)
+        .map((r) => r.name),
+    );
+  if (!taken.has(base)) return base;
+  for (let n = 2; n < 100; n++) if (!taken.has(`${base} ${n}`)) return `${base} ${n}`;
+  return base;
+}
+// 기본 이름이 지금 유형과 어긋나면 유형에 맞춘다. 직접 지은 이름은 건드리지 않는다.
+export function syncSpaceName(state) {
+  const m = AUTO_NAME.exec(state.name);
+  if (!m || m[1] === ROOM_TYPES[state.room.type].name) return null;
+  const from = state.name;
+  state.name = autoSpaceName(state, state.room.type, state.roomId);
+  return { label: '이름', from, to: state.name };
+}
+
+// ---------- 화장실 설비 ----------
+export const FIXTURE_SOURCE = '설비 초안';
+const isDraftFixture = (a) =>
+  FIXTURE_TYPES.includes(a.type) && a.sources.every((x) => x === FIXTURE_SOURCE);
+// 화장실에 변기·세면대·샤워부스를 가구로 놓는다. 문 맞은편 벽부터 채우는 배치 초안이며,
+// 놓인 뒤에는 다른 가구처럼 옮기고 돌리고 뺄 수 있다. 이미 설비가 있으면 두지 않는다.
+export function fillBathroom(state, id = state.roomId) {
+  const list = spaces(state),
+    space = list.find((r) => r.roomId === id);
+  if (
+    !space ||
+    space.room.type !== 'bathroom' ||
+    space.items.some((a) => FIXTURE_TYPES.includes(a.type))
+  )
+    return 0;
+  const plan = normalizeFloorplan(state.floorplan, list),
+    made = bathroomFixtures(space.room, roomOpenings(list, plan, id)).map((f) => {
+      // 좌우를 뒤집은 샤워부스는 90° 돌려 유리가 방 안쪽을 보게 한다. 차지하는 자리는 같다.
+      const dims = f.flip ? [f.d, f.h, f.w] : [f.w, f.h, f.d];
+      const item = sanitizeItem({
+        type: f.type,
+        name: TYPES[f.type].name,
+        dims: dims.map((n) => Math.round(n * 1000) / 10),
+        sources: [FIXTURE_SOURCE, FIXTURE_SOURCE, FIXTURE_SOURCE],
+        color: '#efede7',
+        x: round3(f.x),
+        z: round3(f.z),
+        angle: f.angle + (f.flip ? 90 : 0),
+      });
+      clampItem(item, space.room);
+      return item;
+    });
+  space.items.push(...made);
+  return made.length;
+}
+// 예전 저장본(v4 이하)을 불러올 때 한 번 손본다. 그때의 화장실은 설비를 그림으로만 그렸으므로
+// 가구로 옮기고, 그림과 같던 타일 바닥도 바닥 색으로 옮긴다.
+export function migrateLegacy(state) {
+  // 유형을 바꿔도 이름이 따라오지 않던 때의 기본 이름("나의 화장실"인 거실)을 유형에 맞춘다.
+  for (const r of spaces(state)) {
+    const m = AUTO_NAME.exec(r.name);
+    if (!m || m[1] === ROOM_TYPES[r.room.type].name) continue;
+    const name = autoSpaceName(state, r.room.type, r.roomId);
+    if (r.roomId === state.roomId) state.name = name;
+    else state.otherRooms.find((o) => o.roomId === r.roomId).name = name;
+  }
+  // 크기를 바꾸다 겹친 채 저장된 공간을 떼어 놓는다.
+  separateSpaces(state);
+  for (const r of spaces(state)) {
+    if (r.room.type !== 'bathroom') continue;
+    if (r.room.floorColor === FLOOR_COLORS[0][1])
+      r.room.floorColor = makeRoom('bathroom').floorColor;
+    fillBathroom(state, r.roomId);
+  }
+  return state;
 }
 
 export function roomWithDims(room, patch, source = '사용자 설정') {
@@ -136,15 +249,7 @@ export function roomWithDims(room, patch, source = '사용자 설정') {
 // 공간 유형만 바꾸고, 사용자가 정한 치수는 남긴다.
 export function roomWithType(room, type) {
   if (!Object.hasOwn(ROOM_TYPES, type)) throw Error('알 수 없는 공간 유형이에요.');
-  const next = structuredClone(room),
-    base = makeRoom(type);
-  next.type = type;
-  for (const k of ['w', 'd', 'h'])
-    if (!isUserSource(room.sources[k])) {
-      next[k] = base[k];
-      next.sources[k] = '공간 유형 기본값';
-    }
-  return next;
+  return retypeRoom(room, type, isUserSource);
 }
 
 export function roomWithPreset(room, index) {
@@ -326,11 +431,12 @@ export function relocateConflicts(state) {
 }
 
 // 지금 공간의 벽에 맞닿는 빈자리. 집 전체에서 바로 이어져 보이도록 새 공간을 여기에 둔다.
-function adjacentSlot(state, size, align = 'start') {
+function adjacentSlot(state, size, align = 'start', anchorId = state.roomId) {
   const list = spaces(state),
     plan = normalizeFloorplan(state.floorplan, list),
-    origin = plan.positions[state.roomId],
-    { w, d } = state.room;
+    anchor = list.find((r) => r.roomId === anchorId) || list.find((r) => r.roomId === state.roomId),
+    origin = plan.positions[anchor.roomId],
+    { w, d } = anchor.room;
   const dz = ((d - size.d) / 2) * (align === 'end' ? 1 : -1),
     dx = -(w - size.w) / 2;
   return [
@@ -357,12 +463,13 @@ function adjacentSlot(state, size, align = 'start') {
 // 지금 공간의 한쪽 벽(right·left·front·back)에 맞닿는 빈자리. 벽의 시작 끝에 맞춘 자리부터 보고,
 // 다른 공간에 막히면 벽을 따라 25cm씩 밀어 본다. 문을 낼 수 있게 90cm 넘게 맞닿는 자리만 고른다.
 export const SIDES = { right: '오른쪽', left: '왼쪽', back: '위쪽', front: '아래쪽' };
-export function sideSlot(state, side, size) {
+export function sideSlot(state, side, size, anchorId = state.roomId) {
   if (!Object.hasOwn(SIDES, side)) return null;
   const list = spaces(state),
     plan = normalizeFloorplan(state.floorplan, list),
-    origin = plan.positions[state.roomId],
-    { w, d } = state.room,
+    anchor = list.find((r) => r.roomId === anchorId) || list.find((r) => r.roomId === state.roomId),
+    origin = plan.positions[anchor.roomId],
+    { w, d } = anchor.room,
     vertical = side === 'right' || side === 'left',
     sign = side === 'right' || side === 'front' ? 1 : -1,
     span = vertical ? d : w,
@@ -393,17 +500,210 @@ export function sideSlot(state, side, size) {
   return null;
 }
 
-export function addSpace(state, type = 'studio', side = null) {
+// 새 공간을 만들어 그 공간으로 옮겨 간다. room을 주면 그 크기로 자리를 잡고, anchor를 주면 그 공간의 벽에 붙인다.
+// 고른 벽에 자리가 없을 때: strict(벽의 + 손잡이)면 거절하고, 아니면 다른 벽을 찾는다.
+export function addSpace(
+  state,
+  type = 'studio',
+  side = null,
+  { room = null, anchor = null, strict = true } = {},
+) {
   if (!Object.hasOwn(ROOM_TYPES, type)) throw Error('알 수 없는 공간 유형이에요.');
   if (state.otherRooms.length >= 11) throw Error('공간은 최대 12개까지 저장할 수 있어요.');
-  const slot = side ? sideSlot(state, side, makeRoom(type)) : adjacentSlot(state, makeRoom(type));
-  if (side && !slot)
+  const size = room || makeRoom(type),
+    from = spaces(state).find((r) => r.roomId === anchor) || null,
+    anchorId = from?.roomId || state.roomId;
+  for (const k of ['w', 'd', 'h'])
+    if (!validRoomNumber(size[k])) throw Error('방 치수는 1~15m 범위로 알려주세요.');
+  let slot = side ? sideSlot(state, side, size, anchorId) : null;
+  if (side && !slot && strict)
     throw Error(
       `${SIDES[side] || '그쪽'}에는 ${josa(ROOM_TYPES[type].name, '을/를')} 붙일 자리가 없어요. 다른 벽을 고르거나 공간을 먼저 옮겨 주세요.`,
     );
+  slot ||= adjacentSlot(state, size, 'start', anchorId);
   const id = addRoom(state, type);
+  if (room) state.room = { ...structuredClone(room), type };
+  state.name = autoSpaceName(state, type, id);
   if (slot) state.floorplan.positions[id] = slot;
+  // 붙일 벽이 모두 막혔으면 맨 오른쪽 기본 자리에 놓인다. 크기가 달라 겹치면 밀어낸다.
+  else separateSpaces(state);
+  fillBathroom(state, id);
   return id;
+}
+// 새 공간이 어느 공간의 어느 쪽에 붙었는지. 대화에서 알려 줄 때 쓴다.
+export function attachedTo(state, id = state.roomId, preferId = null) {
+  const list = spaces(state),
+    plan = normalizeFloorplan(state.floorplan, list),
+    self = list.find((r) => r.roomId === id);
+  if (!self) return null;
+  const mine = roomBounds(self, plan.positions[id]),
+    order = [...list].sort((a, b) => (b.roomId === preferId) - (a.roomId === preferId));
+  for (const r of order) {
+    if (r.roomId === id) continue;
+    const side = touching(roomBounds(r, plan.positions[r.roomId]), mine);
+    if (side) return { roomId: r.roomId, name: r.name, side };
+  }
+  return null;
+}
+
+// ---------- 집 배치 맞추기 ----------
+const EPS = 0.02;
+// b가 a의 어느 벽에 맞닿아 있는지(left·right·back·front). 맞닿지 않으면 null.
+function touching(a, b) {
+  const zs = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > EPS,
+    xs = Math.min(a.right, b.right) - Math.max(a.left, b.left) > EPS;
+  if (zs && Math.abs(b.right - a.left) < EPS) return 'left';
+  if (zs && Math.abs(b.left - a.right) < EPS) return 'right';
+  if (xs && Math.abs(b.bottom - a.top) < EPS) return 'back';
+  if (xs && Math.abs(b.top - a.bottom) < EPS) return 'front';
+  return null;
+}
+// 겹친 공간을 가장 적게 움직여 떼어 놓는다. first에 든 공간은 제자리에 두고 나머지를 차례로 민다.
+// 한 번 자리를 잡은 공간은 다시 밀지 않으므로 반드시 끝난다. 옮긴 공간의 id를 돌려준다.
+function pushApart(list, pos, first) {
+  const rect = (r) => roomBounds(r, pos[r.roomId]),
+    settled = new Set(),
+    moved = new Set(),
+    queue = list.filter((r) => first.includes(r.roomId));
+  const next = () => {
+    if (queue.length) return queue.shift();
+    // 아직 보지 않은 공간끼리 겹친 곳이 남았으면 그중 하나를 기준으로 삼는다.
+    for (const a of list)
+      if (!settled.has(a.roomId))
+        for (const b of list)
+          if (a !== b && !settled.has(b.roomId) && rectanglesOverlap(rect(a), rect(b))) return a;
+    return null;
+  };
+  for (let a = next(); a; a = next()) {
+    if (settled.has(a.roomId)) continue;
+    settled.add(a.roomId);
+    const A = rect(a);
+    for (const b of list) {
+      if (settled.has(b.roomId)) continue;
+      const B = rect(b);
+      if (!rectanglesOverlap(A, B)) continue;
+      const moves = [
+        ['x', -(B.right - A.left)],
+        ['x', A.right - B.left],
+        ['z', -(B.bottom - A.top)],
+        ['z', A.bottom - B.top],
+      ].sort((m, n) => Math.abs(m[1]) - Math.abs(n[1]));
+      const [axis, by] = moves[0];
+      pos[b.roomId][axis] = round3(pos[b.roomId][axis] + by);
+      moved.add(b.roomId);
+      queue.push(b);
+    }
+  }
+  return [...moved];
+}
+// 공간 크기가 바뀐 뒤 집 배치를 다시 맞춘다. before는 바뀌기 전의 { w, d }다.
+// 이웃이 맞닿아 있던 벽은 그 자리에 두고 반대쪽으로 늘이거나 줄인다. 양쪽에 이웃이 있으면
+// 먼 쪽 이웃과 거기에 이어진 공간을 달라진 길이만큼 함께 옮긴다. 그래도 겹치면 밀어낸다.
+export function reseatSpace(state, id, before) {
+  const list = spaces(state),
+    self = list.find((r) => r.roomId === id);
+  if (list.length < 2 || !self || (self.room.w === before.w && self.room.d === before.d)) return [];
+  const plan = normalizeFloorplan(state.floorplan, list),
+    pos = plan.positions,
+    start = structuredClone(pos),
+    others = list.filter((r) => r.roomId !== id),
+    rect = (r) => roomBounds(r, pos[r.roomId]),
+    old = roomBounds({ room: before }, pos[id]),
+    sides = { left: [], right: [], back: [], front: [] };
+  for (const r of others) {
+    const side = touching(old, rect(r));
+    if (side) sides[side].push(r);
+  }
+  // start에 든 공간에서 벽을 타고 이어진 공간들. stop에 닿으면(집을 한 바퀴 돌아 이어지면) 함께 옮길 수 없다.
+  const chain = (from, stop) => {
+    const seen = new Set(from.map((r) => r.roomId)),
+      queue = [...from];
+    while (queue.length) {
+      const r = queue.shift();
+      for (const o of others)
+        if (!seen.has(o.roomId) && touching(rect(r), rect(o))) {
+          seen.add(o.roomId);
+          queue.push(o);
+        }
+    }
+    return stop.some((r) => seen.has(r.roomId)) ? [] : others.filter((r) => seen.has(r.roomId));
+  };
+  const shifts = [];
+  for (const axis of ['x', 'z']) {
+    const [lo, hi, size, was, near, far, across] =
+      axis === 'x'
+        ? [old.left, old.right, self.room.w, before.w, sides.left, sides.right, 'back front']
+        : [old.top, old.bottom, self.room.d, before.d, sides.back, sides.front, 'left right'];
+    if (size === was) continue;
+    const beside = across.split(' ').flatMap((k) => sides[k]),
+      edge = (r, end) => {
+        const b = rect(r);
+        return axis === 'x' ? (end ? b.right : b.left) : end ? b.bottom : b.top;
+      };
+    let keep = 'center';
+    if (near.length) keep = 'lo';
+    else if (far.length) keep = 'hi';
+    else if (beside.some((r) => Math.abs(edge(r, false) - lo) < EPS)) keep = 'lo';
+    else if (beside.some((r) => Math.abs(edge(r, true) - hi) < EPS)) keep = 'hi';
+    pos[id][axis] = round3(
+      keep === 'lo' ? lo + size / 2 : keep === 'hi' ? hi - size / 2 : (lo + hi) / 2,
+    );
+    if (keep === 'lo' && far.length) shifts.push([axis, size - was, chain(far, near)]);
+  }
+  for (const [axis, by, group] of shifts)
+    for (const r of group) pos[r.roomId][axis] = round3(pos[r.roomId][axis] + by);
+  pushApart(list, pos, [id]);
+  // 줄어든 쪽 이웃을 당겨 오다 다른 공간과 겹치게 됐으면 이웃은 제자리에 둔다.
+  if (floorplanWarnings(list, plan).size) {
+    for (const r of others) pos[r.roomId] = { ...start[r.roomId] };
+    pushApart(list, pos, [id]);
+  }
+  state.floorplan = plan;
+  return others
+    .filter((r) => pos[r.roomId].x !== start[r.roomId].x || pos[r.roomId].z !== start[r.roomId].z)
+    .map((r) => r.roomId);
+}
+// 이미 겹쳐 있는 공간을 떼어 놓는다. 지금 방은 제자리에 둔다. 겹친 쌍과 옮긴 공간을 돌려준다.
+export function separateSpaces(state) {
+  const list = spaces(state),
+    plan = normalizeFloorplan(state.floorplan, list),
+    names = (ids) => list.filter((r) => ids.includes(r.roomId)).map((r) => r.name),
+    overlapped = [...floorplanWarnings(list, plan)];
+  if (!overlapped.length) return { overlapped: [], moved: [], remaining: 0 };
+  const moved = pushApart(list, plan.positions, [state.roomId]);
+  state.floorplan = plan;
+  return {
+    overlapped: names(overlapped),
+    moved: names(moved),
+    remaining: floorplanWarnings(list, plan).size,
+  };
+}
+// 공간을 통째로 오른쪽으로 90° 돌린다. 가로·세로가 바뀌고 가구와 아바타도 함께 돈다.
+// 벽이 달라지므로 이 공간에 직접 정해 둔 문은 자동 문으로 돌아간다.
+export function rotateSpace(state, id = state.roomId) {
+  const space = spaces(state).find((r) => r.roomId === id);
+  if (!space) throw Error('공간을 찾지 못했어요.');
+  const { room } = space,
+    before = { w: room.w, d: room.d };
+  [room.w, room.d] = [before.d, before.w];
+  [room.sources.w, room.sources.d] = [room.sources.d, room.sources.w];
+  const turn = (a) => {
+    [a.x, a.z] = [-a.z, a.x];
+    a.angle = (((a.angle - 90) % 360) + 360) % 360;
+  };
+  for (const a of space.items) {
+    turn(a);
+    clampItem(a, room);
+  }
+  const av = state.avatar;
+  if (av && (av.roomId ? av.roomId === id : id === state.roomId)) turn(av);
+  if (state.floorplan?.doors)
+    state.floorplan = {
+      ...state.floorplan,
+      doors: state.floorplan.doors.filter((d) => !d.rooms.includes(id)),
+    };
+  const moved = reseatSpace(state, id, before);
+  return { name: space.name, w: room.w, d: room.d, moved };
 }
 
 export function switchSpace(state, id) {
@@ -594,7 +894,9 @@ export function attachBathroom(state) {
   if (!position)
     throw Error('방 옆에 화장실을 붙일 자리가 없어요. 집 전체에서 공간 위치를 먼저 조정해 주세요.');
   const id = addRoom(state, 'bathroom');
+  state.name = autoSpaceName(state, 'bathroom', id);
   state.floorplan.positions[id] = position;
+  fillBathroom(state, id);
   switchSpace(state, original);
   state.scope = 'house';
   return id;

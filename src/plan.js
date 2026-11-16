@@ -2,7 +2,6 @@ import { TYPES, footprint, spaces } from './data.js';
 import { tapeCanvas, drawTags, PAPER } from './tape.js';
 import { avatarLayout, avatarHit, avatarReach, avatarApron, LIMBS } from './avatar.js';
 import { roomOpenings, doorSwing } from './floorplan.js';
-import { bathroomFixtures } from './house-geometry.js';
 
 // 건축 평면도 방식의 2D 도면. 벽은 먹색 단면, 가구는 위에서 본 기호와 이름으로 그린다.
 const INK = '#2a2824';
@@ -51,37 +50,6 @@ export function drawAvatar(c, a, ox, oy, s) {
   c.beginPath();
   c.arc(...at(j.head), Math.max(3, h * 0.062 * s), 0, Math.PI * 2);
   c.fill();
-  c.restore();
-}
-
-// 화장실 설비 기호. 3D 모형과 같은 위치·방향을 쓴다.
-export function drawFixtures(c, room, openings, cx, cy, s) {
-  c.save();
-  c.strokeStyle = '#737d77';
-  c.fillStyle = '#fbfaf7';
-  c.lineWidth = 1.5;
-  for (const f of bathroomFixtures(room, openings)) {
-    const w = f.w * s,
-      d = f.d * s;
-    c.save();
-    c.translate(cx + f.x * s, cy + f.z * s);
-    c.rotate((-f.angle * Math.PI) / 180);
-    c.setLineDash(f.type === 'shower' ? [3, 3] : []);
-    c.beginPath();
-    if (f.type === 'basin') c.ellipse(0, 0, w / 2, d / 2, 0, 0, Math.PI * 2);
-    else if (f.type === 'toilet') c.ellipse(0, d * 0.12, w / 2, d * 0.38, 0, 0, Math.PI * 2);
-    else c.roundRect(-w / 2, -d / 2, w, d, 3);
-    c.fill();
-    c.stroke();
-    if (f.type === 'toilet') {
-      // 물탱크는 벽 쪽에 따로 그린다.
-      c.beginPath();
-      c.roundRect(-w * 0.45, -d / 2, w * 0.9, d * 0.26, 2);
-      c.fill();
-      c.stroke();
-    }
-    c.restore();
-  }
   c.restore();
 }
 
@@ -485,7 +453,6 @@ export class PlanScene {
     const doors = roomOpenings(spaces(this.state), this.state.floorplan, this.state.roomId);
     for (const o of doors)
       drawDoor(c, o, this.ox, this.oy, s, wt * 2 + 2, !!this.doorSelected?.includes(o.roomId));
-    if (room.type === 'bathroom') drawFixtures(c, room, doors, this.ox, this.oy, s);
     const items = [...this.state.items].sort((a, b) => (b.type === 'rug') - (a.type === 'rug'));
     for (const a of items)
       this.item(c, a, { warn: this.warnings.has(a.id), selected: a.id === this.selected });
@@ -503,8 +470,14 @@ export class PlanScene {
     c.globalAlpha = ghost ? 0.55 : 1;
     c.fillStyle = a.color;
     c.beginPath();
-    if (a.type === 'lamp' || a.type === 'plant') c.ellipse(0, 0, fw / 2, fd / 2, 0, 0, Math.PI * 2);
-    else c.roundRect(-fw / 2, -fd / 2, fw, fd, Math.min(4, fw / 6, fd / 6));
+    if (a.type === 'lamp' || a.type === 'plant' || a.type === 'basin')
+      c.ellipse(0, 0, fw / 2, fd / 2, 0, 0, Math.PI * 2);
+    else if (a.type === 'toilet') {
+      // 벽 쪽 물탱크와 앞으로 나온 변기.
+      c.roundRect(-fw * 0.45, -fd / 2, fw * 0.9, fd * 0.26, 2);
+      c.moveTo(fw / 2, fd * 0.12);
+      c.ellipse(0, fd * 0.12, fw / 2, fd * 0.38, 0, 0, Math.PI * 2);
+    } else c.roundRect(-fw / 2, -fd / 2, fw, fd, Math.min(4, fw / 6, fd / 6));
     c.fill();
     c.globalAlpha = 1;
     c.lineWidth = 1;
@@ -550,6 +523,22 @@ export class PlanScene {
         break;
       case 'washer':
         c.arc(0, 0, Math.min(fw, fd) * 0.3, 0, Math.PI * 2);
+        break;
+      case 'basin':
+        c.strokeStyle = 'rgba(42,40,36,0.35)';
+        c.ellipse(0, fd * 0.04, fw * 0.32, fd * 0.3, 0, 0, Math.PI * 2);
+        break;
+      case 'toilet':
+        c.strokeStyle = 'rgba(42,40,36,0.35)';
+        c.ellipse(0, fd * 0.16, fw * 0.3, fd * 0.24, 0, 0, Math.PI * 2);
+        break;
+      case 'shower':
+        // 유리 가림막(왼쪽)과 배수구.
+        c.strokeStyle = 'rgba(42,40,36,0.45)';
+        c.setLineDash([3, 3]);
+        c.rect(-fw / 2 + 3, -fd / 2 + 3, fw - 6, fd - 6);
+        c.moveTo(Math.min(fw, fd) * 0.08, 0);
+        c.arc(0, 0, Math.min(fw, fd) * 0.08, 0, Math.PI * 2);
         break;
       case 'cabinet':
       case 'side':

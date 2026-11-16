@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshState, exampleState, makeItem } from '../data.js';
 import { planFromModel, readModel } from './interpret.js';
+import { setRoom, roomWithType } from './ops.js';
+import { planTurn } from './planner.js';
+import { makeRoom } from '../catalog.js';
 import { photoCandidates, PHOTO_CONFIDENT } from './photo.js';
 
 const room = { type: 'room' };
@@ -257,4 +260,291 @@ test('모델이 삭제를 골라도 문장에 적은 가구를 뺀다', () => {
   );
   assert.equal(p.action, 'delete');
   assert.equal(p.arg.id, bed.id);
+});
+
+// ---------- 실제 대화에서 틀렸던 문장들(Gemma 4 E2B가 맞게 골랐는데 앱이 뒤집던 경우 포함) ----------
+const bathroomHome = () => {
+  const s = freshState();
+  setRoom(s, roomWithType(s.room, 'bathroom'));
+  s.name = '나의 화장실';
+  return s;
+};
+test('모델이 고른 새 공간 유형을 자리로 쓴 이름("화장실 옆에") 때문에 뒤집지 않는다', () => {
+  const s = bathroomHome();
+  const p = planFromModel(
+    model({
+      intent: 'action',
+      action: 'new_space',
+      room_type: 'living',
+      reply: '화장실 옆에 거실 공간을 추가했어요. 거실의 크기와 가구를 정해볼까요?',
+    }),
+    '화장실 옆에 방하나 추가하자. 거기는 거실임',
+    { state: s, target: room },
+  );
+  assert.deepEqual(p.fixes, []);
+  assert.equal(p.changes.addSpace, 'living');
+  assert.equal(p.changes.near.roomId, s.roomId);
+  // 새 공간의 답은 붙은 자리를 넣어 앱이 쓴다. 모델 답은 쓰지 않는다.
+  assert.notEqual(p.replyBy, 'model');
+  // 모델이 자리로 쓴 이름을 유형으로 골랐으면 문장의 유형으로 바로잡고, 모델이 쓴 답은 쓰지 않는다.
+  const q = planFromModel(
+    model({
+      intent: 'action',
+      action: 'new_space',
+      room_type: 'bathroom',
+      reply: '화장실을 추가했어요. 크기를 정해볼까요?',
+    }),
+    '화장실 옆에 방하나 추가하자. 거기는 거실임',
+    { state: s, target: room },
+  );
+  assert.equal(q.changes.addSpace, 'living');
+  assert.equal(q.fixes.length, 1);
+  assert.notEqual(q.replyBy, 'model');
+  assert.doesNotMatch(q.reply, /화장실을 추가/);
+  // 유형을 말하지 않았는데 모델이 자리로 쓴 이름을 고르면 만들지 않고 되묻는다.
+  const r = planFromModel(
+    model({
+      intent: 'action',
+      action: 'new_space',
+      room_type: 'bathroom',
+      reply: '화장실을 추가했어요.',
+    }),
+    '화장실 옆에 방 하나 더 만들어줘',
+    { state: s, target: room },
+  );
+  assert.equal(r.changes.addSpace, undefined);
+  assert.match(r.reply, /어떤 공간을 추가할까요/);
+});
+test('따지는 문장에서 아니라고 한 유형을 지키지 않고 바라는 유형으로 바꾼다', () => {
+  const s = bathroomHome();
+  const p = planFromModel(
+    model({ intent: 'room', room_type: 'living', ui: 'room_type', reply: '거실로 바꿨어요.' }),
+    '아니 거실이라니까 왜 자꾸 화장실로 고정하냐고!!!!',
+    { state: s, target: room },
+  );
+  assert.equal(p.changes.room.type, 'living');
+  assert.deepEqual(p.fixes, []);
+  // 모델이 아니라고 한 유형을 골라도 따르지 않는다.
+  const q = planFromModel(
+    model({ intent: 'room', room_type: 'bathroom', reply: '화장실로 유지했어요.' }),
+    '아니 거실이라니까 왜 자꾸 화장실로 고정하냐고!!!!',
+    { state: s, target: room },
+  );
+  assert.equal(q.changes.room.type, 'living');
+  // 바라는 유형을 말하지 않았으면 앞 대화에서 찾는다.
+  const r = planFromModel(
+    model({
+      intent: 'room',
+      room_type: 'bathroom',
+      ui: 'room_type',
+      reply: '화장실 크기를 알려 주세요.',
+    }),
+    '왜 화장실로 생성하는거야',
+    { state: s, target: room, said: ['화장실 옆에 방하나 추가하자. 거기는 거실임'] },
+  );
+  assert.equal(r.changes.room.type, 'living');
+  assert.equal(r.fixes.length, 1);
+  assert.match(r.reply, /잘못 읽었어요/);
+});
+test('모델이 가구 하나만 골라도 문장의 방 이야기와 나머지 가구를 함께 처리한다', () => {
+  const s = bathroomHome();
+  const p = planFromModel(
+    model({ furniture: 'dining', ui: 'furniture_sizes', reply: '식탁 초안을 잡았어요.' }),
+    '거실이라고 그리고 거기에 소파랑 밥먹을 수 있는 식탁이 있었으면 좋겠어. 거실 평수는 대략 6평정도야',
+    { state: s, target: room },
+  );
+  assert.equal(p.intent, 'compound');
+  assert.equal(p.changes.room.type, 'living');
+  assert.ok(Math.abs(p.changes.room.w * p.changes.room.d - 6 * 3.3058) < 0.1);
+  assert.deepEqual(
+    [p.changes.draft.type, ...p.changes.queue.map((a) => a.type)],
+    ['sofa', 'dining'],
+  );
+  assert.ok(p.fixes.some((f) => /나눠 처리/.test(f)));
+  assert.match(p.reply, /거실로 바꾸고 6평\(약 19\.8m²\)에 맞춰.*소파와 식탁 초안/);
+  // 모델이 방 이야기로 읽었어도 말한 면적을 답에서 받아 준다.
+  const asRoom = planFromModel(
+    model({ intent: 'room', room_type: 'living', ui: 'room_size', reply: '거실 크기를 맞췄어요.' }),
+    '거실이라고 그리고 거기에 소파랑 밥먹을 수 있는 식탁이 있었으면 좋겠어. 거실 평수는 대략 6평정도야',
+    { state: s, target: room },
+  );
+  assert.match(asRoom.reply, /6평\(약 19\.8m²\)에 맞춰/);
+  assert.equal(asRoom.changes.queue[0].type, 'dining');
+  // 모델의 단서(두 명·낮게)는 모델이 고른 가구에만 쓴다.
+  const q = planFromModel(
+    model({ furniture: 'sofa', seats: 2, height: 'low', reply: '소파를 잡았어요.' }),
+    '두 명이 앉는 낮은 소파랑 책상',
+    { state: freshState(), target: room },
+  );
+  assert.equal(q.changes.draft.type, 'sofa');
+  assert.equal(q.changes.draft.dims[0], 170);
+  assert.match(q.changes.draft.sources[1], /AI 단서/);
+  assert.deepEqual(q.changes.queue[0].dims, makeItem('desk').dims);
+});
+test('하지 않은 일을 했다고 하는 모델 답은 보여 주지 않는다', () => {
+  // 문장에 없는 동작을 막았는데 모델 답은 "비웠습니다"라고 한다.
+  const p = planFromModel(
+    model({ intent: 'action', action: 'delete', reply: '모든 가구를 비웠습니다.' }),
+    '오늘 날씨 좋다',
+    { state: exampleState(), target: room },
+  );
+  assert.equal(p.action, undefined);
+  assert.doesNotMatch(p.reply, /비웠/);
+  // 바로잡은 것이 없어도, 바뀐 것 없이 "했어요"라고 하면 쓰지 않는다.
+  const q = planFromModel(
+    model({ intent: 'chat', reply: '소파를 방에 놓았어요.' }),
+    '음 뭐가 좋을까',
+    { state: freshState(), target: room },
+  );
+  assert.doesNotMatch(q.reply, /놓았어요/);
+  // 실제로 바꾼 턴의 모델 답과, 완료를 말하지 않는 답은 그대로 쓴다.
+  const r = planFromModel(
+    model({ intent: 'chat', reply: '안녕하세요! 어떤 방을 꾸미고 싶으세요?' }),
+    '안녕',
+    { state: freshState(), target: room },
+  );
+  assert.equal(r.reply, '안녕하세요! 어떤 방을 꾸미고 싶으세요?');
+  assert.equal(r.replyBy, 'model');
+  // "방 초기화"는 가구 비우기로 읽는다.
+  const c = planFromModel(
+    model({ intent: 'action', action: 'clear', reply: '모든 가구를 비웠습니다.' }),
+    '방 초기화할래',
+    { state: exampleState(), target: room },
+  );
+  assert.equal(c.action, 'clear');
+});
+test('겹친다는 말과 방 돌리기는 모델이 다른 것을 골라도 명령으로 처리한다', () => {
+  const s = bathroomHome();
+  const p = planFromModel(
+    model({ intent: 'action', action: 'relocate', reply: '겹친 가구를 정리했어요.' }),
+    '거실로 바꿨는데 겹치잖아...',
+    { state: s, target: room },
+  );
+  assert.equal(p.action, 'relocate');
+  const q = planFromModel(
+    model({ intent: 'action', action: 'rotate', reply: '돌렸어요.' }),
+    '이 방 통째로 90도 돌려줘',
+    { state: s, target: room },
+  );
+  assert.equal(q.action, 'rotate-space');
+  assert.match(q.fixes[0], /방 돌리기/);
+});
+test('면적만 말한 문장에는 말한 면적을 받아 주는 앱의 답을 쓰고 경고를 붙이지 않는다', () => {
+  const s = freshState();
+  setRoom(s, roomWithType(s.room, 'living'));
+  const p = planFromModel(
+    model({ intent: 'room', ui: 'room_size', reply: '거실 크기를 맞췄어요. 가구도 놓아 볼까요?' }),
+    '한 6평정도 됨',
+    { state: s, target: room },
+  );
+  assert.deepEqual(p.fixes, []);
+  assert.deepEqual([p.changes.room.w, p.changes.room.d], [4.9, 4.05]);
+  assert.match(p.reply, /^6평\(약 19\.8m²\)에 맞춰 거실을 가로 4\.9m, 세로 4\.05m로 잡았어요/);
+  assert.equal(p.note, undefined);
+  assert.notEqual(p.replyBy, 'model');
+  assert.deepEqual(
+    p.suggestions.slice(0, 2).map((c) => c.text),
+    ['6평, 가로 5m', '6평 정사각형'],
+  );
+});
+test('실제 Gemma 4 E2B가 틀린 두 문장: 엉뚱한 공간으로 옮기지 않고, 유형 없는 새 공간은 되묻는다', () => {
+  const s = freshState();
+  setRoom(s, roomWithType(s.room, 'living'));
+  s.name = '나의 거실';
+  s.otherRooms.push({ roomId: 'bath', name: '나의 화장실', room: makeRoom('bathroom'), items: [] });
+  s.roomOrder.push('bath');
+  // 모델이 "바꿔"를 보고 공간 이동을 골랐다. 문장에 화장실은 없다.
+  const p = planFromModel(
+    model({
+      intent: 'action',
+      action: 'switch_space',
+      space: '나의 화장실',
+      room_type: 'bedroom',
+      reply: '옮겼어요.',
+    }),
+    '거실 말고 침실로 바꿔줘',
+    { state: s, target: room },
+  );
+  assert.notEqual(p.action, 'switch');
+  assert.equal(p.changes.room.type, 'bedroom');
+  // 그 공간의 유형을 말하며 옮기자고 하면 옮긴다.
+  const go = planFromModel(
+    model({ intent: 'action', action: 'switch_space', space: '나의 화장실', reply: '옮겼어요.' }),
+    '화장실 보여줘',
+    { state: s, target: room },
+  );
+  assert.equal(go.action, 'switch');
+  // 초안을 띄워 둔 중에 "방 하나 더 만들어줘": 초안 도구가 아니라 어떤 공간인지 묻는다.
+  const draft = makeItem('desk');
+  const ask = planFromModel(
+    model({
+      intent: 'action',
+      action: 'new_space',
+      reply: '새로운 공간을 만들게요. 방의 크기를 정해주세요.',
+    }),
+    '방 하나 더 만들어줘',
+    { state: s, target: { type: 'draft' }, draft },
+  );
+  assert.deepEqual(ask.changes, {});
+  assert.match(ask.reply, /어떤 공간을 추가할까요/);
+  assert.deepEqual(ask.surfaces, []);
+  // 모델이 용도에서 유형을 읽어 냈으면 따른다.
+  const sleep = planFromModel(
+    model({
+      intent: 'action',
+      action: 'new_space',
+      room_type: 'bedroom',
+      reply: '침실을 만들었어요.',
+    }),
+    '잠잘 방 하나 추가해줘',
+    { state: s, target: room },
+  );
+  assert.equal(sleep.changes.addSpace, 'bedroom');
+  // 규칙 경로도 같다.
+  const ruleAsk = planTurn('방 하나 더 만들어줘', { state: s, target: { type: 'draft' }, draft });
+  assert.equal(ruleAsk.ask, 'space-type');
+  assert.equal(
+    planTurn('의자 하나 더 추가해줘', { state: s, target: room }).changes.draft.type,
+    'chair',
+  );
+});
+test('모델 답을 쓸 수 없을 때도 색만 바꾼 턴은 치수가 아니라 바뀐 색을 말한다', () => {
+  const s = freshState();
+  const draft = makeItem('sofa');
+  // 모델이 문장에 없는 회전을 골라 바로잡은 턴(실제 Gemma 4 E2B의 "네이비로 바꿔줘").
+  const p = planFromModel(
+    model({
+      intent: 'action',
+      action: 'rotate',
+      furniture: 'sofa',
+      color: '네이비',
+      reply: '돌렸어요.',
+    }),
+    '네이비로 바꿔줘',
+    { state: s, target: { type: 'draft' }, draft },
+  );
+  assert.equal(p.changes.draft.color, '#3f4d63');
+  assert.equal(p.reply, '나의 소파 색을 네이비로 바꿨어요.');
+  assert.equal(p.surfaces[0].kind, 'furniture-color');
+});
+test('가리키는 것 없는 불만은 떠 있는 초안 이야기로 받지 않고 되묻는다', () => {
+  const s = freshState();
+  const draft = makeItem('desk');
+  const ctx = { state: s, target: { type: 'draft' }, draft };
+  // 실제 Gemma 3 1B는 놓기를 골랐다.
+  const p = planFromModel(
+    model({ intent: 'action', action: 'place', furniture: 'desk', reply: '책상을 놓았어요.' }),
+    '아니 그게 아니라',
+    ctx,
+  );
+  assert.equal(p.action, undefined);
+  assert.equal(p.changes.draft, undefined);
+  assert.match(p.reply, /어디가 다르게 됐는지/);
+  // 모델이 되묻는 답을 썼으면 그 답을 쓴다.
+  const q = planFromModel(
+    model({ intent: 'chat', reply: '무엇을 말씀하고 싶으신가요?' }),
+    '아니 그게 아니라',
+    ctx,
+  );
+  assert.equal(q.reply, '무엇을 말씀하고 싶으신가요?');
 });

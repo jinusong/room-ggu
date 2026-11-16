@@ -29,11 +29,14 @@ function woodGrain() {
 }
 const FABRIC = new Set(['sofa', 'armchair', 'bed', 'rug', 'bench', 'chair']);
 const APPLIANCE = new Set(['fridge', 'washer']);
+// 화장실 설비. 도기처럼 매끈하게 그린다.
+const CERAMIC = new Set(['toilet', 'basin', 'shower']);
 
 export function furniture(item, { ghost = false } = {}) {
   const g = new T.Group(),
     [w, h, d] = item.dims.map((n) => n / 100);
   g.userData.id = item.id;
+  if (CERAMIC.has(item.type)) g.userData.fixture = item.type;
   const finish = (color, roughness, extra = {}) =>
     new T.MeshStandardMaterial({
       color,
@@ -44,7 +47,13 @@ export function furniture(item, { ghost = false } = {}) {
     });
   const main = finish(
     item.color,
-    FABRIC.has(item.type) ? 0.92 : APPLIANCE.has(item.type) ? 0.35 : 0.62,
+    FABRIC.has(item.type)
+      ? 0.92
+      : APPLIANCE.has(item.type)
+        ? 0.35
+        : CERAMIC.has(item.type)
+          ? 0.28
+          : 0.62,
   );
   const wood = finish('#c09a72', 0.7, { map: woodGrain() });
   const dark = finish('#3d3b37', 0.45, { metalness: 0.35 });
@@ -82,7 +91,54 @@ export function furniture(item, { ghost = false } = {}) {
     g.add(mesh);
     return mesh;
   }
+  function ellipsoid(x, y, z, a, b, c, m = main) {
+    const mesh = new T.Mesh(new T.SphereGeometry(1, 24, 14), m);
+    mesh.position.set(x, y, z);
+    mesh.scale.set(a / 2, b / 2, c / 2);
+    mesh.castShadow = !ghost;
+    g.add(mesh);
+    return mesh;
+  }
   switch (item.type) {
+    case 'toilet': {
+      // 뒤쪽 물탱크와 앞쪽 변기. 높이 비율은 전체 높이 75cm 기준이다.
+      const k = h / 0.75,
+        seat = finish('#c5cec5', 0.5);
+      ellipsoid(0, 0.22 * k, 0.05, w * 0.7, 0.4 * k, d * 0.6);
+      ellipsoid(0, 0.4 * k, 0.06, w, 0.24 * k, d * 0.78);
+      ellipsoid(0, 0.515 * k, 0.07, w * 0.65, 0.015, d * 0.48, seat);
+      box(0, 0.5 * k, -d / 2 + 0.08, w * 0.9, 0.5 * k, Math.min(0.15, d * 0.3), main, false);
+      box(0.08, 0.758 * k, -d / 2 + 0.08, 0.07, 0.015, 0.04, dark, false);
+      break;
+    }
+    case 'basin': {
+      // 기둥 위 세면기. 수전은 뒤쪽(벽 쪽)에 둔다.
+      const k = h / 0.82,
+        water = finish('#c5cec5', 0.3);
+      box(0, 0.35 * k, 0, Math.min(0.15, w * 0.3), 0.7 * k, Math.min(0.16, d * 0.4), main, false);
+      ellipsoid(0, 0.76 * k, 0, w, 0.16 * k, d);
+      ellipsoid(0, 0.837 * k, 0.015, w * 0.72, 0.016, d * 0.62, water);
+      box(0, 0.86 * k, -d * 0.32, 0.025, 0.15 * k, 0.025, dark, false);
+      box(0, 0.93 * k, -d * 0.2, 0.025, 0.025, 0.1, dark, false);
+      break;
+    }
+    case 'shower': {
+      // 바닥 트레이, 왼쪽 유리 가림막, 뒤쪽 오른 모서리의 샤워기.
+      const k = h / 1.7,
+        glass = finish('#cadbd2', 0.12, {
+          transparent: true,
+          opacity: ghost ? 0.14 : 0.22,
+          depthWrite: false,
+          side: T.DoubleSide,
+        });
+      box(0, 0.03, 0, w, 0.06, d, main);
+      box(0, 0.063, 0, w * 0.8, 0.005, d * 0.8, finish('#d6ded6', 0.4), false);
+      box(-w / 2, 0.685 * k, 0, 0.012, 1.25 * k, d, glass, false);
+      box(w / 2 - 0.04, 1.1 * k, -d / 2 + 0.04, 0.025, 1.1 * k, 0.025, dark, false);
+      box(w / 2 - 0.04, 1.65 * k, -d / 2 + 0.12, 0.025, 0.025, 0.2, dark, false);
+      box(w / 2 - 0.04, 1.64 * k, -d / 2 + 0.23, 0.12, 0.02, 0.12, dark, false);
+      break;
+    }
     case 'desk':
       box(0, h - 0.02, 0, w, 0.04, d);
       for (const x of [-1, 1])

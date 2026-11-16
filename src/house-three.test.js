@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Vector3 } from 'three';
 import { exampleState, spaces } from './data.js';
-import { attachBathroom, moveSpace } from './app/ops.js';
+import { attachBathroom, moveSpace, fillBathroom, FIXTURE_SOURCE } from './app/ops.js';
 import { houseLayout, bathroomFixtures, fixtureFootprint } from './house-geometry.js';
-import { houseStructure, houseFurniture, bathroomModel } from './house-three.js';
-import { disposeGroup } from './furniture.js';
+import { houseStructure, houseFurniture } from './house-three.js';
+import { furniture, disposeGroup } from './furniture.js';
+import { freshState, footprint } from './data.js';
+import { makeRoom } from './catalog.js';
 import { parseComparisonCommand } from './avatar.js';
 
 test('집 전체 3D 명령은 아바타·가구 치수를 건드리지 않고 보기를 지정한다', () => {
@@ -62,24 +64,33 @@ test('소수 치수의 스냅 반올림 오차에서도 공유 벽과 문을 유
   assert.ok(walls.some((w) => w.shared));
   assert.ok(walls.every((w) => w.end <= door.z - 0.4 + 1e-9 || w.start >= door.z + 0.4 - 1e-9));
 });
-test('화장실 세 설비가 2D와 같은 위치에 생성되고 작은 화장실 안에 들어간다', () => {
-  const room = { w: 1.5, d: 1.8 },
-    defs = bathroomFixtures(room),
-    model = bathroomModel(room);
+test('화장실 세 설비가 배치 초안 자리에 가구로 놓이고 작은 화장실 안에 들어간다', () => {
+  const s = freshState();
+  s.room = makeRoom('bathroom', 0);
+  const defs = bathroomFixtures(s.room);
+  assert.equal(fillBathroom(s), 3);
   assert.deepEqual(
-    model.children.map((g) => g.userData.fixture),
+    s.items.map((a) => a.type),
     ['toilet', 'basin', 'shower'],
   );
   for (const f of defs) {
-    const g = model.children.find((g) => g.userData.fixture === f.type);
-    const size = fixtureFootprint(f);
-    assert.deepEqual([g.position.x, g.position.z], [f.x, f.z]);
-    assert.equal(g.rotation.y, (f.angle * Math.PI) / 180);
-    assert.ok(Math.abs(f.x) + size.w / 2 <= room.w / 2 + 1e-9);
-    assert.ok(Math.abs(f.z) + size.d / 2 <= room.d / 2 + 1e-9);
-    assert.equal(g.userData.draft, true);
+    const item = s.items.find((a) => a.type === f.type),
+      size = fixtureFootprint(f),
+      mine = footprint(item),
+      g = furniture(item);
+    // 그림으로 그리던 때와 같은 자리·같은 차지 면적이고, 3D 모형이 그 자리에 선다.
+    assert.ok(Math.abs(item.x - f.x) < 1e-3 && Math.abs(item.z - f.z) < 1e-3, f.type);
+    assert.ok(Math.abs(mine.w - size.w) < 2e-3 && Math.abs(mine.d - size.d) < 2e-3, f.type);
+    assert.deepEqual([g.position.x, g.position.z], [item.x, item.z]);
+    assert.equal(g.userData.fixture, f.type);
+    assert.ok(Math.abs(item.x) + mine.w / 2 <= s.room.w / 2 + 1e-9);
+    assert.ok(Math.abs(item.z) + mine.d / 2 <= s.room.d / 2 + 1e-9);
+    assert.ok(item.sources.every((x) => x === FIXTURE_SOURCE));
+    disposeGroup(g);
   }
-  disposeGroup(model);
+  // 이미 설비가 있거나 사용자가 일부만 남겨 둔 화장실은 다시 채우지 않는다.
+  s.items = s.items.filter((a) => a.type !== 'shower');
+  assert.equal(fillBathroom(s), 0);
 });
 test('전체 구조에 모든 공간·화장실·문을 포함하고 상태를 수정하지 않는다', () => {
   const s = exampleState();
@@ -92,11 +103,17 @@ test('전체 구조에 모든 공간·화장실·문을 포함하고 상태를 �
   );
   assert.equal(rooms.length, 2);
   assert.equal(root.children.filter((g) => g.userData.opening).length, 1);
+  // 설비는 가구라서 구조가 아니라 가구 묶음에 들어 있다.
+  const things = houseFurniture(s);
   let fixtures = 0;
   root.traverse((g) => {
+    if (g.userData.fixture) fixtures += 10;
+  });
+  things.traverse((g) => {
     if (g.userData.fixture) fixtures++;
   });
   assert.equal(fixtures, 3);
   assert.equal(JSON.stringify(s), before);
   disposeGroup(root);
+  disposeGroup(things);
 });

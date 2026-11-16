@@ -1,4 +1,4 @@
-import { PlanScene, drawAvatar, drawDoor, drawFixtures, doorHit } from './plan.js';
+import { PlanScene, drawAvatar, drawDoor, doorHit } from './plan.js';
 import { spaces } from './data.js';
 import { floorplanWarnings, normalizeFloorplan, roomBounds } from './floorplan.js';
 import { PAPER } from './tape.js';
@@ -186,7 +186,7 @@ export class HouseScene extends PlanScene {
         y = oy + b.top * scale,
         w = r.room.w * scale,
         d = r.room.d * scale;
-      c.fillStyle = r.room.type === 'bathroom' ? '#dce1dc' : r.room.floorColor;
+      c.fillStyle = r.room.floorColor;
       c.fillRect(x, y, w, d);
       c.fillStyle = 'rgba(255,255,255,0.34)';
       c.fillRect(x, y, w, d);
@@ -207,7 +207,6 @@ export class HouseScene extends PlanScene {
       }
       this.ox = ox + p.x * scale;
       this.oy = oy + p.z * scale;
-      if (r.room.type === 'bathroom') drawFixtures(c, r.room, r.openings, this.ox, this.oy, scale);
       for (const a of [...r.items].sort((a, b) => (b.type === 'rug') - (a.type === 'rug')))
         this.item(c, a, { named: names });
       this.ox = ox;

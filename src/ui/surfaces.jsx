@@ -258,9 +258,17 @@ function Floorplan() {
         </button>
       </div>
       {conflicts.size > 0 && (
-        <p class="warn-text" role="status">
-          공간 {conflicts.size}개가 겹쳐요. 2D에서 끌어 떼어 놓거나 크기를 줄여 주세요.
-        </p>
+        <div class="warn-row" role="status">
+          <p class="warn-text">공간 {conflicts.size}개가 겹쳐요.</p>
+          <button
+            class="btn small"
+            data-separate
+            onClick={() => store.relocate('겹친 공간 떼어 놓기')}
+          >
+            <Icon name="move" size={16} />
+            겹치지 않게 떼어 놓기
+          </button>
+        </div>
       )}
       <ul class="rows house-rooms">
         {list.map((r) => (
@@ -273,6 +281,14 @@ function Floorplan() {
                   {r.room.w} × {r.room.d}m · 가구 {r.items.length}개
                   {conflicts.has(r.roomId) ? ' · 겹침' : ''}
                 </small>
+              </button>
+              <button
+                class="icon-btn"
+                aria-label={`${r.name} 90도 돌리기`}
+                title="방 돌리기 · 가구도 함께 돌아요"
+                onClick={() => store.rotateSpace(r.roomId)}
+              >
+                <Icon name="rotate-cw" size={16} />
               </button>
               <button
                 class="btn small"
@@ -343,7 +359,8 @@ function Floorplan() {
       )}
       <p class="surface-hint">
         벽이 맞닿으면 가운데에 80cm 문을 자동으로 그려요. 폭 80cm는 가정값이니 실제 문에 맞게 바꿔
-        주세요. 화장실 설비와 낮춘 안쪽 벽은 배치를 가늠하기 위한 초안이에요.
+        주세요. 낮춘 안쪽 벽은 배치를 가늠하기 위한 초안이에요. 화장실 설비는 다른 가구처럼 옮기거나
+        뺄 수 있어요.
       </p>
     </>
   );
@@ -765,7 +782,11 @@ function Catalog() {
   const total = Object.values(TYPES).reduce((n, t) => n + t.presets.length, 0);
   return (
     <>
-      <Head icon="armchair" title="가구 고르기" meta={`20종 · ${total}가지 크기`} />
+      <Head
+        icon="armchair"
+        title="가구 고르기"
+        meta={`${Object.keys(TYPES).length}종 · ${total}가지 크기`}
+      />
       <label class="search">
         <Icon name="search" size={16} />
         <input
@@ -814,13 +835,43 @@ function Impact() {
   const s = app.state,
     warn = layoutWarnings(s);
   const rows = s.items.filter((a) => warn.all.has(a.id));
+  // 겹친 공간도 여기서 함께 알린다. "겹친다"는 말이 가구가 아니라 방을 가리킬 때가 있다.
+  const list = spaces(s),
+    clash = floorplanWarnings(list, s.floorplan),
+    rooms = list.filter((r) => clash.has(r.roomId)),
+    total = rows.length + rooms.length;
   return (
     <>
       <Head
         icon="triangle-alert"
         title="배치 확인"
-        meta={rows.length ? `확인 필요 ${rows.length}개` : '문제 없음'}
+        meta={total ? `확인 필요 ${total}개` : '문제 없음'}
       />
+      {rooms.length > 0 && (
+        <ul class="rows">
+          {rooms.map((r) => (
+            <li key={r.roomId}>
+              <button class="row" onClick={() => store.switchSpace(r.roomId)}>
+                <Icon name={ROOM_TYPES[r.room.type].icon} size={16} />
+                <span class="row-main">
+                  <strong>{r.name}</strong>
+                  <small>다른 공간과 겹쳐요</small>
+                </span>
+                <Icon name="chevron-right" size={16} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {rooms.length > 0 && (
+        <footer class="surface-foot">
+          <span class="foot-note">지금 방은 그대로 두고 겹친 공간을 옆으로 옮겨요</span>
+          <button class="btn" data-separate onClick={() => store.relocate('겹친 공간 떼어 놓기')}>
+            <Icon name="move" size={16} />
+            공간 떼어 놓기
+          </button>
+        </footer>
+      )}
       {rows.length ? (
         <ul class="rows">
           {rows.map((a) => (
@@ -839,10 +890,12 @@ function Impact() {
           ))}
         </ul>
       ) : (
-        <p class="surface-ok">
-          <Icon name="check" size={16} />
-          겹치거나 벽을 넘은 가구가 없어요.
-        </p>
+        !rooms.length && (
+          <p class="surface-ok">
+            <Icon name="check" size={16} />
+            겹친 공간도, 겹치거나 벽을 넘은 가구도 없어요.
+          </p>
+        )
       )}
       {rows.length > 0 && (
         <footer class="surface-foot">
@@ -1324,8 +1377,11 @@ export function surfaceSummary(spec) {
         : '지금 없음';
     case 'furniture-color':
       return item ? item.name : '지금 없음';
-    case 'impact':
-      return `확인 필요 ${layoutWarnings(s).all.size}개`;
+    case 'impact': {
+      // 겹친 공간도 함께 센다.
+      const n = layoutWarnings(s).all.size + floorplanWarnings(spaces(s), s.floorplan).size;
+      return n ? `확인 필요 ${n}개` : '문제 없음';
+    }
     case 'spaces':
       return `${spaces(s).length}개`;
     case 'items':

@@ -966,6 +966,18 @@ button[aria-disabled='true'] {
   font-style: normal;
   color: var(--warn);
 }
+/* 경고와 그 자리에서 고치는 단추를 한 줄에 둔다. 좁으면 단추가 아래로 내려간다. */
+.warn-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin: 12px 0 0;
+}
+.warn-row .warn-text {
+  margin: 0;
+}
 .surface-hint {
   margin: 12px 0 0;
   font-size: 12px;
@@ -2336,6 +2348,7 @@ button.row:hover,
 }
 .room-tag.is-selected {
   z-index: 1;
+  max-width: 292px;
   border-color: var(--ink);
   box-shadow: var(--shadow-float);
 }
@@ -2391,8 +2404,20 @@ button.row:hover,
   font-size: 12px;
   color: var(--ink);
 }
-.tag-edit:hover {
+.tag-edit:hover,
+.tag-turn:hover {
   background: var(--raised);
+}
+/* 고른 공간을 통째로 돌리는 단추. 방 편집 단추와 가는 선으로 나눈다. */
+.tag-turn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
 }
 .door-tag {
   display: flex;

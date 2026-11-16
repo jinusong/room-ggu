@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { exampleState, freshState, makeItem } from '../data.js';
-import { planTurn, resolveScope, parseFurnitureColor } from './planner.js';
+import { exampleState, freshState, makeItem, spaces } from '../data.js';
+import { planTurn, resolveScope, parseFurnitureColor, splitRequest, objectsOf } from './planner.js';
+import { setRoom, roomWithType, addSpace, switchSpace } from './ops.js';
+import { roomMentions } from '../room-consult.js';
 import { usableReply } from './model-turn.js';
 
 const room = { type: 'room' };
@@ -263,4 +265,180 @@ test('색 이름만 말해도 고른 가구의 색을 바꾸고, 바뀐 것이 �
   assert.equal(navy.changes.item.next.color, '#3f4d63');
   assert.equal(navy.reply, '책상 색을 네이비로 바꿨어요.');
   assert.match(planTurn('크게', { state: s, target: t }).reply, /^책상은 그대로예요/);
+});
+
+// ---------- 실제 대화에서 틀렸던 문장들 ----------
+const bathroomHome = () => {
+  const s = freshState();
+  setRoom(s, roomWithType(s.room, 'bathroom'));
+  s.name = '나의 화장실';
+  return s;
+};
+test('자리를 가리킨 공간 이름은 새 공간 유형으로 읽지 않고 그 공간 옆에 붙인다', () => {
+  const s = bathroomHome();
+  const p = planTurn('화장실 옆에 방하나 추가하자. 거기는 거실임', { state: s, target: room });
+  assert.equal(p.changes.addSpace, 'living');
+  assert.equal(p.changes.room.type, 'living');
+  assert.deepEqual(p.changes.near, { roomId: s.roomId, name: '나의 화장실', side: null });
+  const q = planTurn('침실 오른쪽에 서재 붙여줘', { state: s, target: room });
+  assert.equal(q.changes.addSpace, 'office');
+  assert.equal(q.changes.near.side, 'right');
+  // 침실이 아직 없으면 지금 방을 기준으로 하고 그 사실을 알린다.
+  assert.equal(q.changes.near.missing, '침실');
+  assert.deepEqual(
+    roomMentions('화장실 옆에 방하나 추가하자. 거기는 거실임').map((m) => [m.type, m.role]),
+    [
+      ['bathroom', 'ref'],
+      ['living', 'new'],
+    ],
+  );
+});
+test('아니라고 한 유형은 고르지 않고 앞에서 말한 유형으로 바로잡거나 되묻는다', () => {
+  const s = bathroomHome();
+  const said = ['화장실 옆에 방하나 추가하자. 거기는 거실임'];
+  const p = planTurn('왜 화장실로 생성하는거야', { state: s, target: room, said });
+  assert.equal(p.repaired, true);
+  assert.equal(p.changes.room.type, 'living');
+  assert.match(p.reply, /잘못 읽었어요.*거실로 바꿨어요/);
+  // 앞에서 말한 유형이 없으면 바꾸지 않고 묻는다.
+  const q = planTurn('왜 화장실로 생성하는거야', { state: s, target: room, said: [] });
+  assert.deepEqual(q.changes, {});
+  assert.equal(q.surfaces[0].kind, 'room-type');
+  assert.ok(q.suggestions.every((c) => !c.label.includes('화장실')));
+  // 바라는 유형을 함께 말하면 그 유형으로 바꾼다.
+  const r = planTurn('아니 거실이라니까 왜 자꾸 화장실로 고정하냐고!!!!', {
+    state: s,
+    target: room,
+  });
+  assert.equal(r.changes.room.type, 'living');
+  assert.match(r.reply, /^제가 잘못 읽었어요/);
+  assert.equal(
+    planTurn('거실 말고 침실로 바꿔줘', { state: s, target: room }).changes.room.type,
+    'bedroom',
+  );
+  assert.equal(
+    planTurn('화장실이 아니라 거실', { state: s, target: room }).changes.room.type,
+    'living',
+  );
+  // 이미 그 유형이면 다시 바꾸지 않는다.
+  const same = planTurn('화장실이라니까', { state: s, target: room });
+  assert.deepEqual(same.changes, {});
+  assert.match(same.reply, /이미 화장실이에요/);
+});
+test('한 문장의 방 이야기와 가구 여럿을 나눠 한 번에 처리한다', () => {
+  const s = bathroomHome();
+  const p = planTurn(
+    '거실이라고 그리고 거기에 소파랑 밥먹을 수 있는 식탁이 있었으면 좋겠어. 거실 평수는 대략 6평정도야',
+    { state: s, target: room },
+  );
+  assert.equal(p.intent, 'compound');
+  assert.equal(p.changes.room.type, 'living');
+  // 6평 ≈ 19.8m²를 거실 기본 비율로 나눈다.
+  assert.ok(Math.abs(p.changes.room.w * p.changes.room.d - 6 * 3.3058) < 0.1);
+  assert.equal(p.changes.draft.type, 'sofa');
+  assert.deepEqual(
+    p.changes.queue.map((a) => a.type),
+    ['dining'],
+  );
+  assert.deepEqual(
+    p.surfaces.map((x) => x.kind),
+    ['furniture-size', 'room-size'],
+  );
+  assert.equal(p.suggestions[0].action, 'place-all');
+  // 가구마다 자기 마디의 치수만 읽는다.
+  const q = planTurn('소파는 가로 200cm, 식탁은 가로 150cm', { state: freshState(), target: room });
+  assert.equal(q.changes.draft.dims[0], 200);
+  assert.equal(q.changes.queue[0].dims[0], 150);
+  // 방 마디의 숫자는 방에, 가구 마디의 숫자는 가구에 쓴다.
+  const r = planTurn('방 가로 5m 세로 4m로 바꾸고 책상 가로 140cm 놓고 싶어', {
+    state: freshState(),
+    target: room,
+  });
+  assert.deepEqual([r.changes.room.w, r.changes.room.d], [5, 4]);
+  assert.equal(r.changes.draft.dims[0], 140);
+});
+test('자리를 가리키는 가구 이름이나 한 덩어리 이름은 여러 가구로 나누지 않는다', () => {
+  assert.equal(splitRequest('침대 옆에 협탁 하나'), null);
+  assert.equal(splitRequest('책상에 놓을 스탠드'), null);
+  assert.equal(splitRequest('소파 테이블 하나 놓고 싶어'), null);
+  assert.equal(splitRequest('두 명이 앉는 소파'), null);
+  assert.equal(splitRequest('거실에 놓을 소파'), null);
+  assert.deepEqual(
+    splitRequest('책상이랑 의자 놓고 싶어').pieces.map((x) => x.type),
+    ['desk', 'chair'],
+  );
+  const p = planTurn('침대 옆에 협탁 하나', { state: freshState(), target: room });
+  assert.equal(p.changes.draft.type, 'side');
+  assert.equal(p.changes.queue, undefined);
+});
+test('겹친다는 말·방을 돌리라는 말·초기화는 명령으로 읽고, 유형 없는 새 공간은 되묻는다', () => {
+  const s = bathroomHome();
+  assert.equal(
+    planTurn('거실로 바꿨는데 겹치잖아...', { state: s, target: room }).action,
+    'relocate',
+  );
+  assert.equal(planTurn('방이 겹쳤어', { state: s, target: room }).action, 'relocate');
+  assert.equal(planTurn('이 방 90도 돌려줘', { state: s, target: room }).action, 'rotate-space');
+  assert.equal(
+    planTurn('방 자체를 돌리고 싶어', { state: s, target: room }).action,
+    'rotate-space',
+  );
+  assert.equal(planTurn('방 초기화할래', { state: s, target: room }).action, 'clear');
+  // 가구를 골라 둔 채 "돌려줘"라고만 하면 가구를 돌린다. "방향"은 방이 아니다.
+  const t = exampleState(),
+    target = { type: 'item', id: t.items[0].id };
+  assert.equal(planTurn('90도 돌려줘', { state: t, target }).action, 'rotate');
+  assert.equal(planTurn('방향 돌려줘', { state: t, target }).action, 'rotate');
+  assert.equal(planTurn('방을 돌려줘', { state: t, target }).action, 'rotate-space');
+  const ask = planTurn('방 하나 더 만들어줘', { state: s, target: room });
+  assert.deepEqual(ask.changes, {});
+  assert.match(ask.reply, /어떤 공간을 추가할까요/);
+  assert.ok(ask.suggestions.length >= 3);
+  const vague = planTurn('아니 그게 아니라', { state: s, target: room });
+  assert.equal(vague.intent, 'chat');
+  assert.match(vague.reply, /되돌릴 수 있어요/);
+});
+test('이미 바로잡힌 방에 따지면 지금 유형을 알리고, 기다리는 초안은 한꺼번에 놓을 수 있다', () => {
+  const s = freshState();
+  setRoom(s, roomWithType(s.room, 'living'));
+  const p = planTurn('왜 화장실로 생성하는거야', {
+    state: s,
+    target: room,
+    said: ['거기는 거실임'],
+  });
+  assert.deepEqual(p.changes, {});
+  assert.match(p.reply, /화장실이 아니라 거실이에요/);
+  const draft = makeItem('sofa'),
+    queue = [makeItem('dining')];
+  const ctx = { state: s, target: { type: 'draft' }, draft, queue };
+  assert.equal(planTurn('둘 다 놓아줘', ctx).action, 'place-all');
+  assert.equal(planTurn('모두 놓자', ctx).action, 'place-all');
+  assert.equal(planTurn('방에 놓아줘', ctx).action, 'place');
+  assert.equal(planTurn('둘 다 놓아줘', { ...ctx, queue: [] }).action, 'place');
+});
+test('가구를 골라 둔 채 공간 이름으로 돌리라고 하면 그 공간을 돌린다', () => {
+  const s = exampleState(),
+    bath = addSpace(s, 'bathroom');
+  switchSpace(s, spaces(s)[0].roomId);
+  const target = { type: 'item', id: s.items[0].id };
+  const p = planTurn('화장실 돌려줘', { state: s, target });
+  assert.equal(p.action, 'rotate-space');
+  assert.equal(p.arg.id, bath);
+  assert.equal(planTurn('침대 돌려줘', { state: s, target }).action, 'rotate');
+});
+test('"앉을 만한 거 하나"의 "거"처럼 물건을 대신하는 말은 목록에 없는 물건으로 읽지 않는다', () => {
+  const s = freshState();
+  for (const t of [
+    '책 읽을 때 푹 기대 앉을 만한 거 하나 놓고 싶어',
+    '앉을 것 하나 놓아줘',
+    '왜 자꾸 이상하게 만들어',
+    '방향 돌려줘',
+  ])
+    assert.equal(objectsOf(t)?.unlisted.length || 0, 0, t);
+  // 진짜 목록에 없는 물건은 그대로 잡는다.
+  assert.deepEqual(
+    objectsOf('트램펄린 하나 놓아줘').unlisted.map((x) => x.name),
+    ['트램펄린'],
+  );
+  assert.equal(planTurn('컴퓨터 하나 놓아줘', { state: s, target: room }).intent, 'chat');
 });

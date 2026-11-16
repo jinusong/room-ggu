@@ -1,24 +1,81 @@
 import { UI_SURFACES } from './ui-schema.js';
 import { detectType } from './estimator.js';
-import { ROOM_TYPES, makeRoom } from './catalog.js';
+import { ROOM_TYPES, makeRoom, retypeRoom } from './catalog.js';
 import { josa } from './app/text.js';
 const roomAliases = {
   studio: /원룸|스튜디오/,
   bathroom: /화장실|욕실/,
-  living: /거실|리빙룸/,
+  living: /거실(?!장)|리빙룸/,
   bedroom: /침실|안방/,
   office: /서재|작업실|홈\s*오피스/,
   dining: /다이닝룸|식사\s*공간/,
   kitchen: /주방|부엌/,
   kids: /아이\s*방|어린이\s*방/,
 };
-export const detectRoomType = (text) =>
-  Object.entries(roomAliases).find(([, re]) => re.test(text))?.[0] || null;
+// 문장에 나온 공간 이름은 같은 낱말이어도 하는 일이 다르다.
+// - ref: "화장실 옆에"처럼 자리를 가리킨다. 새로 만들거나 바꿀 유형이 아니다.
+// - neg: "화장실 말고", "왜 화장실로 만들어"처럼 아니라고 한 유형이다.
+// - new: 그 밖의 경우. 만들거나 바꾸려는 유형이다. strong은 "거실이라니까", "거실로 바꿔"처럼 못 박은 말이다.
+const REF_AFTER =
+  /^\s*(?:바로\s*)?(?:옆|앞|뒤|근처|맞은\s*편|건너편|왼쪽|오른쪽|위쪽|아래쪽|위에|아래에|쪽에|(?:이랑|랑|과|와|하고)\s*(?:붙|연결|이어|맞닿|나란)|에\s*(?:붙|이어|맞닿|연결))/;
+const NEG_AFTER =
+  /^\s*(?:이|가|은|는|으로|로)?\s*(?:말고|아니|아닌|아냐|아님|빼고|대신|(?:하지|만들지|바꾸지|넣지)\s*(?:말|마))/;
+const BLAME_BEFORE = /왜|어째서|자꾸|계속|또\s/;
+const BLAME_AFTER =
+  /^\s*(?:(?:으로|로)\s*(?:자꾸\s*|계속\s*)?(?:생성|고정|만들|만든|바꾸|바꿔|바꿨|해\s*놨|했|하냐|하는|되|돼|됐|나오|나와|잡|설정|인식|읽)|(?:이|가)\s*(?:됐|돼|된|되))/;
+const STRONG_AFTER =
+  /^\s*(?:이라니까|라니까|이라고|라고|이라구|라구|임(?![가-힣])|이야|야(?![가-힣])|이에요|예요|입니다|이다(?![가-힣])|인데|이지|(?:으로|로)\s*(?:바꿔|바꾸|해\s*줘|해줘|하자|할래|만들|변경|수정))/;
+const SIDE_AFTER = [
+  ['right', /^\s*(?:의\s*)?(?:바로\s*)?오른쪽/],
+  ['left', /^\s*(?:의\s*)?(?:바로\s*)?왼쪽/],
+  ['back', /^\s*(?:의\s*)?(?:바로\s*)?(?:위쪽|위에|뒤쪽|뒤에|뒤)/],
+  ['front', /^\s*(?:의\s*)?(?:바로\s*)?(?:아래쪽|아래에|앞쪽|앞에|앞)/],
+];
+export function roomMentions(text) {
+  const t = String(text),
+    found = [];
+  for (const [type, re] of Object.entries(roomAliases))
+    for (const m of t.matchAll(new RegExp(re.source, 'g'))) {
+      const end = m.index + m[0].length,
+        after = t.slice(end, end + 24),
+        // 같은 문장 안에서만 "왜 … 로 만들어" 같은 따지는 말을 찾는다.
+        before = t
+          .slice(0, m.index)
+          .split(/[.!?\n]/)
+          .pop();
+      let role = 'new';
+      if (REF_AFTER.test(after)) role = 'ref';
+      else if (NEG_AFTER.test(after) || (BLAME_BEFORE.test(before) && BLAME_AFTER.test(after)))
+        role = 'neg';
+      found.push({
+        type,
+        index: m.index,
+        role,
+        strong: role === 'new' && STRONG_AFTER.test(after),
+        side: role === 'ref' ? SIDE_AFTER.find(([, r]) => r.test(after))?.[0] || null : null,
+      });
+    }
+  return found.sort((a, b) => a.index - b.index);
+}
+// 만들거나 바꾸려는 유형. 못 박은 말이 있으면 그중 마지막을, 없으면 처음 나온 유형을 고른다.
+export function assertedType(mentions) {
+  const wanted = mentions.filter((m) => m.role === 'new');
+  return (wanted.filter((m) => m.strong).at(-1) || wanted[0])?.type || null;
+}
+export const detectRoomType = (text) => assertedType(roomMentions(text));
+// 어떤 뜻으로든 공간 이름이 나왔는지. 방 이야기인지 가를 때 쓴다.
+export const mentionsRoom = (text) => roomMentions(text).length > 0;
+// 새 공간을 만들자는 말인지. "옆에"로 자리를 짚었으면 "만들어", "붙여", "하나"만 있어도 그렇게 읽는다.
+const ADD_WORDS = /추가|하나\s*더|새로\s*만들|새\s*(?:방|공간)/;
+const ADD_NEAR = /붙여|붙이|만들|놓|두자|둬|하나|있었으면|필요|생성|달아|이어/;
+export function wantsNewSpace(text, mentions = roomMentions(text)) {
+  return ADD_WORDS.test(text) || (mentions.some((m) => m.role === 'ref') && ADD_NEAR.test(text));
+}
 export function isRoomIntent(text) {
   return (
     /(?:방|공간|거실|침실|서재|주방|원룸|다이닝룸).*(?:가로|세로|천장|평|제곱|넓|좁|크기|추가|만들|바꿔|변경|꾸미)|(?:벽|바닥).*(?:색|흰|화이트|오크|월넛|그레이|세이지)|(?:가로|세로|천장).*\d+\s*(?:m|미터)|\d+\s*(?:평|m²|제곱미터)/i.test(
       text,
-    ) || !!detectRoomType(text)
+    ) || mentionsRoom(text)
   );
 }
 export function consultationScope(text, requested = 'auto') {
@@ -72,23 +129,22 @@ export function parseRoomDimensions(text) {
   return dims;
 }
 export function consultRoom(text, previous) {
-  const type = detectRoomType(text),
-    add = /(?:추가|하나\s*더|새로\s*만들|새\s*(?:방|공간))/.test(text) && !!type;
-  const room = add ? makeRoom(type) : structuredClone(previous),
-    explicit = parseRoomDimensions(text);
+  const mentions = roomMentions(text),
+    type = assertedType(mentions),
+    wantsAdd = wantsNewSpace(text, mentions),
+    add = wantsAdd && !!type;
+  let room = add ? makeRoom(type) : structuredClone(previous);
+  const explicit = parseRoomDimensions(text);
   let changed = false,
-    areaBased = false;
+    areaSaid = null;
   const set = (key, value, source) => {
     room[key] = round(value);
     room.sources[key] = source;
     changed = true;
   };
   if (type && type !== room.type) {
-    room.type = type;
+    room = retypeRoom(room, type);
     changed = true;
-    const base = makeRoom(type);
-    for (const k of ['w', 'd', 'h'])
-      if (!room.sources[k].startsWith('사용자')) set(k, base[k], '공간 유형 기본값');
   }
   const size = /아담|작은|작게|좁은|컴팩트/.test(text)
     ? 0
@@ -104,20 +160,38 @@ export function consultRoom(text, previous) {
   if (area && !(explicit.w && explicit.d)) {
     const square = +area[1] * (area[2] === '평' ? 3.3058 : 1);
     if (square < 1 || square > 225) throw Error('면적은 1~225m² 범위로 알려주세요.');
+    // 면적만으로는 가로·세로가 정해지지 않는다. 한쪽 길이를 말했으면 나머지를 면적으로 구하고,
+    // 아니면 지금 방의 비율("정사각형"이라고 했으면 1:1)로 나눈다. "6평 정도"에 4.92m 같은 값을 내놓지 않게
+    // 5cm 단위로 다듬되, 다듬은 넓이가 말한 면적에서 2% 넘게 벗어나면 다듬지 않는다.
+    const nice = (n) => Math.round(n * 20) / 20,
+      fits = (a, b) => Math.abs(a * b - square) / square <= 0.02,
+      square1 = /정사각|정방형/.test(text);
     let w = explicit.w,
       d = explicit.d;
-    if (w) d = square / w;
-    else if (d) w = square / d;
+    if (w) d = fits(w, nice(square / w)) ? nice(square / w) : square / w;
+    else if (d) w = fits(nice(square / d), d) ? nice(square / d) : square / d;
     else {
-      const ratio = room.w / room.d;
-      w = Math.sqrt(square * ratio);
-      d = square / w;
+      const ratio = square1 ? 1 : room.w / room.d,
+        exact = Math.sqrt(square * ratio);
+      w = nice(exact);
+      d = nice(square / w);
+      if (!fits(w, d)) [w, d] = [exact, square / exact];
     }
     if (w < 1 || w > 15 || d < 1 || d > 15)
       throw Error('그 면적과 치수를 조합하면 방 치수가 범위를 벗어나요.');
     set('w', w, '대화 추정 · 면적에서 가정');
     set('d', d, '대화 추정 · 면적에서 가정');
-    areaBased = true;
+    // 답에서 사용자가 말한 면적을 그대로 받아 준다: "6평(약 19.8m²)".
+    const pyeong = area[2] === '평';
+    areaSaid = {
+      text: `${area[1]}${pyeong ? '평' : 'm²'}`,
+      about: pyeong
+        ? `약 ${Math.round(square * 10) / 10}m²`
+        : `약 ${(square / 3.3058).toFixed(1)}평`,
+      // 가로·세로를 앱이 가정했는지. 그렇다면 한쪽 길이를 물어본다.
+      assumed: !explicit.w && !explicit.d,
+      square: square1,
+    };
   }
   for (const [k, n] of Object.entries(explicit)) set(k, n, '사용자 설정 · 대화');
   for (const [key, pattern] of [
@@ -156,14 +230,31 @@ export function consultRoom(text, previous) {
       changed = true;
     }
   }
+  const name = ROOM_TYPES[room.type].name;
   let reply =
     changed || add
-      ? `${josa(ROOM_TYPES[room.type].name, '을/를')} 가로 ${room.w}m, 세로 ${room.d}m, 천장 ${room.h}m로 ${add ? '새로 만들었어요' : '반영했어요'}.`
+      ? `${josa(name, '을/를')} 가로 ${room.w}m, 세로 ${room.d}m, 천장 ${room.h}m로 ${add ? '새로 만들었어요' : '반영했어요'}.`
       : '방 유형과 가로·세로를 알려주세요. “거실 가로 5m 세로 4m”처럼 말하면 도면에 바로 반영해요.';
-  if (areaBased)
-    reply +=
-      ' 면적만으로 가로·세로는 알 수 없어 현재 비율로 나눈 초안이에요. 벽 하나의 길이를 알면 더 조절할 수 있어요.';
-  return { room, reply, add, changed };
+  if (areaSaid)
+    reply =
+      `${areaSaid.text}(${areaSaid.about})에 맞춰 ${josa(name, '을/를')} 가로 ${room.w}m, 세로 ${room.d}m로 ${add ? '새로 만들었어요' : '잡았어요'}.` +
+      (areaSaid.assumed
+        ? areaSaid.square
+          ? ' 정사각형에 가깝게 나눴어요.'
+          : ' 한쪽 벽 길이를 알려주면 그 길이에 맞춰 다시 나눌게요.'
+        : '');
+  return {
+    room,
+    reply,
+    add,
+    changed,
+    // 면적으로 크기를 잡았으면 말한 면적과 가정 여부.
+    area: areaSaid,
+    // 새 공간을 만들자고 했지만 어떤 공간인지는 말하지 않았다.
+    askType: wantsAdd && !type && /방|공간|룸/.test(text),
+    // 지금 방이 이미 그 유형이다.
+    same: !add && !changed && !!type && type === previous.type ? type : null,
+  };
 }
 export function applyRoomModel(raw, previous, options = {}) {
   const match = raw.match(/\{[\s\S]*\}/);

@@ -26,7 +26,8 @@ test('화장실 포함 집 전체 3D: 회전·선택·편집·복원·PNG', asyn
   const geometry = await page.evaluate(() => {
     const sc = window.__roomggu.app.scenes.three;
     let fixtures = 0;
-    sc.room.traverse((o) => {
+    // 화장실 설비는 가구라서 구조(room)가 아니라 가구 묶음(objects)에 있다.
+    sc.objects.traverse((o) => {
       if (o.userData.fixture) fixtures++;
     });
     return { fixtures, rooms: sc.objects.children[0].children.length, extent: sc.extent() };

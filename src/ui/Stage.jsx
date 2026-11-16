@@ -680,6 +680,17 @@ function RoomTags() {
         </button>
         {selected && (
           <button
+            class="tag-turn"
+            aria-label="선택한 방 90도 돌리기"
+            title="방 돌리기 · 가구도 함께 돌아요"
+            data-room-turn
+            onClick={() => store.rotateSpace(r.roomId)}
+          >
+            <Icon name="rotate-cw" size={14} />
+          </button>
+        )}
+        {selected && (
+          <button
             class="tag-edit"
             aria-label="선택한 방 편집"
             onClick={() => store.editSpace(r.roomId)}
@@ -1020,8 +1031,7 @@ export function Stage({ mobile, sheetRef }) {
   const s = app.state,
     warn = layoutWarnings(s);
   const house = s.scope === 'house';
-  // 화장실은 설비 초안이 이미 놓여 있으므로 빈 방 안내를 띄우지 않는다.
-  const empty = !house && !s.items.length && !app.draft && s.room.type !== 'bathroom';
+  const empty = !house && !s.items.length && !app.draft;
   const avatarOn = !!avatarLayout(s);
   const hasDoor = !house && roomOpenings(spaces(s), s.floorplan, s.roomId).length > 0;
   const history = (

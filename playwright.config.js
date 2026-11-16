@@ -4,6 +4,8 @@ import { defineConfig } from '@playwright/test';
 const browserName = ['firefox', 'webkit'].includes(process.env.BROWSER)
   ? process.env.BROWSER
   : 'chromium';
+// 4180을 다른 작업이 쓰고 있으면 PORT로 다른 포트에서 미리보기 서버를 띄운다.
+const port = Number(process.env.PORT) || 4180;
 export default defineConfig({
   testDir: './tests',
   fullyParallel: false,
@@ -11,7 +13,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [['list']],
   use: {
-    baseURL: 'http://127.0.0.1:4180',
+    baseURL: `http://127.0.0.1:${port}`,
     viewport: { width: 1440, height: 960 },
     headless: true,
     browserName,
@@ -24,8 +26,8 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'npm run preview -- --host 127.0.0.1 --port 4180',
-    url: 'http://127.0.0.1:4180',
+    command: `npm run preview -- --host 127.0.0.1 --port ${port} --strictPort`,
+    url: `http://127.0.0.1:${port}`,
     reuseExistingServer: !process.env.CI,
   },
 });

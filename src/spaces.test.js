@@ -13,9 +13,12 @@ import {
 } from './data.js';
 import { furniture, disposeGroup } from './furniture.js';
 import { detectType, applyModelResult } from './estimator.js';
-test('20종 가구의 60개 이상 초안이 유효하며 실제 3D 형상이 있다', () => {
-  assert.equal(Object.keys(TYPES).length, 20);
-  assert.ok(Object.values(TYPES).reduce((n, t) => n + t.presets.length, 0) >= 60);
+test('욕실 설비 3종을 포함한 23종 가구의 72개 초안이 유효하며 실제 3D 형상이 있다', () => {
+  assert.equal(Object.keys(TYPES).length, 23);
+  assert.equal(
+    Object.values(TYPES).reduce((n, t) => n + t.presets.length, 0),
+    72,
+  );
   for (const [type, t] of Object.entries(TYPES))
     for (const preset of t.presets) {
       const item = { ...makeItem(type), dims: preset.dims };
@@ -49,7 +52,7 @@ test('공간 전환·저장·복원 시 방별 치수와 가구를 보존한다'
 });
 test('이전 배치 파일을 이동하고 손상된 공간 모음과 13번째 공간을 거절한다', () => {
   const old = { version: 2, name: '이전 방', room: { w: 4, d: 3, h: 2.4 }, items: [] };
-  assert.equal(validateState(old).version, 4);
+  assert.equal(validateState(old).version, 5);
   assert.equal(validateState(old).room.d, 3);
   const s = freshState();
   assert.throws(() => validateState({ ...s, otherRooms: [{ ...s }] }));

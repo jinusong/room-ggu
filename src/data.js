@@ -23,7 +23,7 @@ export function freshState() {
   const roomId = newId();
   return {
     roomOrder: [roomId],
-    version: 4,
+    version: 5,
     roomId,
     otherRooms: [],
     name: '나의 첫 번째 방',
@@ -112,7 +112,7 @@ function validateSpace(v, roomIds) {
   };
 }
 export function validateState(v) {
-  if (!v || ![1, 2, 3, 4].includes(v.version)) throw Error('룸꾸 배치 파일인지 확인해주세요.');
+  if (!v || ![1, 2, 3, 4, 5].includes(v.version)) throw Error('룸꾸 배치 파일인지 확인해주세요.');
   if (v.otherRooms !== undefined && (!Array.isArray(v.otherRooms) || v.otherRooms.length > 11))
     throw Error('공간은 최대 12개까지 저장할 수 있어요.');
   const ids = new Set(),

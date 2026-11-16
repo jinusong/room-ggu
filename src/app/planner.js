@@ -1,11 +1,31 @@
 // 규칙 기반 대화 계획기. 상담 모델을 쓸 수 없을 때(준비 중·꺼짐·미지원·실패) 쓰는 대체 경로다.
 // 사용자 문장 하나를 읽고 "무엇을 바꿀지, 어떤 도구를 보여줄지"를 정한다.
 // 상태를 직접 바꾸지 않는다. 적용과 실행 취소 기록은 store가 맡는다.
-import { TYPES, ROOM_TYPES, FURNITURE_COLORS, WALL_COLORS, FLOOR_COLORS } from '../catalog.js';
-import { josa } from './text.js';
+import {
+  TYPES,
+  ROOM_TYPES,
+  FURNITURE_COLORS,
+  WALL_COLORS,
+  FLOOR_COLORS,
+  retypeRoom,
+} from '../catalog.js';
+import { josa, dimsText } from './text.js';
 import { makeItem, layoutWarnings, clampItem, spaces } from '../data.js';
-import { consult, detectType, extractDimensions, unlistedInfo } from '../estimator.js';
-import { consultRoom, consultationScope, detectRoomType } from '../room-consult.js';
+import {
+  consult,
+  detectType,
+  extractDimensions,
+  furnitureMentions,
+  unlistedInfo,
+} from '../estimator.js';
+import {
+  consultRoom,
+  consultationScope,
+  mentionsRoom,
+  roomMentions,
+  assertedType,
+  wantsNewSpace,
+} from '../room-consult.js';
 import { chooseSurface, surfaceKind } from '../ui-schema.js';
 
 // 규칙이 기본값으로 물러난 경우(방: 유형, 가구: 규격)가 아니면 요청 단어로 도구를 확신한 것이다.
@@ -39,7 +59,7 @@ export const ROOM_TALK =
 export function resolveScope(text, target = { type: 'room' }) {
   if (target.type === 'item' || target.type === 'draft') {
     if (!detectType(text) && ROOM_TALK.test(text)) return 'room';
-    if (detectRoomType(text) || ROOM_REFERENCE.test(text)) {
+    if (mentionsRoom(text) || ROOM_REFERENCE.test(text)) {
       const scope = consultationScope(text, 'auto');
       return detectType(text) && !/벽|바닥|천장/.test(text) ? 'furniture' : scope;
     }
@@ -123,7 +143,7 @@ function planMeta(t, ctx, item) {
     return metaPlan('switch', `${space.name}(으)로 옮겼어요.`, { arg: { id: space.roomId } });
   if (
     /(?:공간|방)\s*(?:목록|전환|이동|관리)|다른\s*(?:방|공간)(?!\s*(?:추가|만들))/.test(t) &&
-    !detectRoomType(t)
+    !mentionsRoom(t)
   )
     return surfacePlan('spaces', `저장된 공간은 ${spaces(state).length}개예요.`);
   if (
@@ -136,9 +156,31 @@ function planMeta(t, ctx, item) {
       'catalog',
       '놓고 싶은 가구를 골라 주세요. 고르면 크기 초안부터 보여드릴게요.',
     );
-  if (/겹치지\s*않게|겹친\s*(?:거|것|가구)|빈\s*(?:곳|자리)으로|자동\s*(?:정리|배치)/.test(t))
+  // 방을 통째로 돌리기: "방을 돌려줘", "화장실 돌려줘". 가구 이름을 말했거나, 가구를 골라 둔 채
+  // "돌려줘"라고만 하면 가구를 돌린다.
+  if (
+    /돌려|돌리|회전/.test(t) &&
+    !type &&
+    (/(?:방(?!향)|공간|룸)[^.!?]{0,14}(?:돌려|돌리|회전)/.test(t) || mentionsRoom(t))
+  ) {
+    const named = spaces(state).find((r) => r.name.length >= 2 && t.includes(r.name)),
+      kind = roomMentions(t)[0]?.type,
+      hit =
+        named ||
+        (kind && state.room.type !== kind && spaces(state).find((r) => r.room.type === kind));
+    return metaPlan('rotate-space', '', { arg: { id: hit ? hit.roomId : state.roomId } });
+  }
+  if (
+    /겹치지\s*않게|겹친\s*(?:거|것|가구|방|공간)|겹치잖|겹쳐\s*(?:있|요|서|버|[.!?~]|$)|겹쳤|겹침|빈\s*(?:곳|자리)으로|자동\s*(?:정리|배치)/.test(
+      t,
+    )
+  )
     return metaPlan('relocate', '');
-  if (/빈\s*방(?:으로|에서)|가구\s*(?:를\s*)?(?:다|모두|전부)\s*(?:치워|비워|빼)/.test(t))
+  if (
+    /빈\s*방(?:으로|에서)|가구\s*(?:를\s*)?(?:다|모두|전부)\s*(?:치워|비워|빼)|(?:방|가구|배치)[^.!?]{0,6}(?:초기화|리셋)|^(?:초기화|리셋)/.test(
+      t,
+    )
+  )
     return metaPlan('clear', '');
   const rotate = /회전|돌려/.test(t);
   if (rotate || /삭제|지워|빼\s*줘|없애|치워\s*줘/.test(t)) {
@@ -152,6 +194,14 @@ function planMeta(t, ctx, item) {
   }
   if (item && !type && /복제|하나\s*더|똑같은\s*(?:거|것)/.test(t))
     return metaPlan('duplicate', '');
+  // 초안이 여럿 기다릴 때 "둘 다 놓아줘", "모두 놓자"는 한꺼번에 놓는다.
+  if (
+    draft &&
+    ctx.queue?.length &&
+    !type &&
+    /(?:모두|전부|둘\s*다|셋\s*다|다)\s*(?:놓|놔|배치|넣)/.test(t)
+  )
+    return metaPlan('place-all', '');
   if (
     draft &&
     (!type || type === draft.type) &&
@@ -190,6 +240,35 @@ export function planRoom(t, ctx) {
       suggestions: [],
     };
   }
+  const typeChips = (skip, phrase) =>
+    ['living', 'bedroom', 'office', 'kitchen', 'bathroom', 'studio']
+      .filter((k) => !skip.includes(k))
+      .slice(0, 4)
+      .map((k) => say(ROOM_TYPES[k].name, phrase(ROOM_TYPES[k].name)));
+  if (r.askType) {
+    const near = refSpace(t, state),
+      where = near?.name ? `${near.name} 옆에 ` : '';
+    return {
+      intent: 'room',
+      scope: 'room',
+      ask: 'space-type',
+      reply: `${where}어떤 공간을 추가할까요? 아래에서 고르거나 “거실 추가해줘”처럼 말해 주세요.`,
+      changes: {},
+      surfaces: [],
+      suggestions: typeChips([], (name) => `${where}${name} 추가해줘`),
+    };
+  }
+  if (r.same)
+    return {
+      intent: 'room',
+      scope: 'room',
+      settled: true,
+      reply: `이 공간은 이미 ${josa(ROOM_TYPES[r.same].name, '이에요/예요')}. 크기나 가구를 정해 볼까요?`,
+      changes: {},
+      surfaces: [surface('room-size')],
+      suggestions: [say('크기 알려주기', '가로 4m 세로 3m'), act('가구 고르기', 'catalog')],
+    };
+  if (r.changed && !r.add && COMPLAINT.test(t)) r.reply = `제가 잘못 읽었어요. ${r.reply}`;
   const picked = chooseSurface(t, 'room');
   // 새 공간을 만들었으면 다음 할 일은 크기 정하기다.
   const kind = surfaceKind('room', r.add && picked === 'types' ? 'dimensions' : picked);
@@ -204,6 +283,17 @@ export function planRoom(t, ctx) {
       surfaces.push(surface('impact'));
   }
   const suggestions = [];
+  // 면적만 말했으면 다음에 정할 것(한쪽 벽 길이, 정사각형)을 한 번에 고르게 한다.
+  if (r.area?.assumed && !r.area.square) {
+    // 지금 잡은 가로와 가까운 50cm 단위. 이미 그 값이면 한 칸 더 넓은 쪽을 권한다.
+    let side = Math.round(r.room.w * 2) / 2;
+    if (Math.abs(side - r.room.w) < 0.01) side += 0.5;
+    side = Math.max(1, Math.min(15, side));
+    suggestions.push(
+      say(`가로 ${side}m로`, `${r.area.text}, 가로 ${side}m`),
+      say('정사각형에 가깝게', `${r.area.text} 정사각형`),
+    );
+  }
   const userSet = ['w', 'd'].every((k) => r.room.sources[k].startsWith('사용자'));
   if (!userSet && kind !== 'room-size') suggestions.push(say('크기 알려주기', '가로 4m 세로 3m'));
   if (kind !== 'finishes') suggestions.push(say('벽·바닥 색', '벽과 바닥 색을 바꾸고 싶어'));
@@ -213,11 +303,206 @@ export function planRoom(t, ctx) {
     scope: 'room',
     confident: confidentPick('room', picked),
     reply: r.reply,
+    area: r.area,
     changed: r.changed || r.add,
-    changes: r.add ? { addSpace: r.room.type, room: r.room } : r.changed ? { room: r.room } : {},
+    changes: r.add
+      ? { addSpace: r.room.type, room: r.room, near: refSpace(t, state) }
+      : r.changed
+        ? { room: r.room }
+        : {},
     surfaces,
     suggestions,
   };
+}
+
+// 따지거나 고쳐 달라는 말투. 이런 문장은 명령으로 읽기 전에 무엇이 틀렸다는 뜻인지부터 본다.
+export const COMPLAINT = /왜|아니\s|아니[,.]|라니까|잖아|했잖|냐고|하냐|!!|ㅡㅡ|;;|틀렸|잘못/;
+
+// "화장실 옆에", "이 방 오른쪽에"처럼 새 공간을 붙일 기준 공간과 벽. 말하지 않았으면 null.
+export function refSpace(text, state) {
+  const list = spaces(state),
+    ref = roomMentions(text).find((m) => m.role === 'ref');
+  if (!ref) {
+    const here = text.match(
+      /(?:이\s*방|여기|지금\s*방)\s*(?:바로\s*)?(오른쪽|왼쪽|위쪽|뒤쪽|아래쪽|앞쪽|옆|뒤|앞)/,
+    );
+    if (!here) return null;
+    const side = { 오른쪽: 'right', 왼쪽: 'left', 위쪽: 'back', 뒤쪽: 'back', 뒤: 'back' }[here[1]];
+    return {
+      roomId: state.roomId,
+      name: state.name,
+      side: side || (/아래쪽|앞쪽|앞/.test(here[1]) ? 'front' : null),
+    };
+  }
+  const same = list.filter((r) => r.room.type === ref.type),
+    hit =
+      same.find((r) => r.name.length >= 2 && text.includes(r.name)) ||
+      same.find((r) => r.roomId === state.roomId) ||
+      same[0];
+  // 그런 공간이 없으면 지금 방에 붙이고, 없었다는 것을 답에서 알린다.
+  return hit
+    ? { roomId: hit.roomId, name: hit.name, side: ref.side }
+    : {
+        roomId: state.roomId,
+        name: state.name,
+        side: ref.side,
+        missing: ROOM_TYPES[ref.type].name,
+      };
+}
+
+// 아니라고 한 유형만 있고 바라는 유형은 말하지 않은 문장("왜 화장실로 만들어?", "화장실 아니야").
+// 앞에서 말한 유형이 있으면 그 유형으로 바로잡고, 없으면 어떤 공간인지 묻는다.
+export function repairPlan(t, ctx) {
+  const mentions = roomMentions(t),
+    denied = mentions.filter((m) => m.role === 'neg').map((m) => m.type);
+  if (!denied.length || assertedType(mentions)) return null;
+  const { state } = ctx,
+    now = state.room.type;
+  let want = null;
+  for (const said of [...(ctx.said || [])].reverse()) {
+    want = assertedType(roomMentions(said).filter((m) => !denied.includes(m.type)));
+    if (want) break;
+  }
+  if (want && want !== now && denied.includes(now)) {
+    const room = retypeRoom(state.room, want);
+    return {
+      intent: 'room',
+      scope: 'room',
+      repaired: true,
+      reply: `제가 잘못 읽었어요. 앞에서 말한 대로 이 공간을 ${josa(ROOM_TYPES[want].name, '으로/로')} 바꿨어요. 가로 ${room.w}m, 세로 ${room.d}m 기본 크기예요.`,
+      changes: { room },
+      surfaces: [surface('room-size')],
+      suggestions: [
+        say('크기 알려주기', '가로 4m 세로 3m'),
+        act('가구 고르기', 'catalog'),
+        say('되돌리기', '되돌려줘'),
+      ],
+    };
+  }
+  const name = ROOM_TYPES[denied[0]].name;
+  return {
+    intent: 'room',
+    scope: 'room',
+    repaired: true,
+    // 지금 방이 그 유형이 아니면(이미 바로잡혔으면) 지금 무엇인지부터 알린다.
+    reply: denied.includes(now)
+      ? `${josa(name, '이/가')} 아니라면 어떤 공간으로 바꿀까요? 아래에서 고르거나 “거실로 바꿔줘”처럼 말해 주세요.`
+      : `이 공간은 지금 ${josa(name, '이/가')} 아니라 ${josa(ROOM_TYPES[now].name, '이에요/예요')}. 다른 공간으로 바꾸려면 아래에서 골라 주세요.`,
+    changes: {},
+    surfaces: [surface('room-type')],
+    suggestions: ['living', 'bedroom', 'office', 'kitchen', 'bathroom', 'studio']
+      .filter((k) => !denied.includes(k) && k !== now)
+      .slice(0, 4)
+      .map((k) => say(ROOM_TYPES[k].name, `${josa(ROOM_TYPES[k].name, '으로/로')} 바꿔줘`)),
+  };
+}
+
+// ---------- 한 문장의 여러 요청 ----------
+const ROOM_FACT = /\d\s*평|평수|m²|제곱미터/;
+const COORDINATOR = /^\s*(?:이랑|랑|하고|과|와|및|그리고|\+|&|\/)\s*/;
+// 문장을 방 이야기와 가구 이야기로 나누고, 가구가 여럿이면 하나씩 떼어 낸다.
+// 방과 가구가 서로 다른 마디에 있거나 가구가 둘 이상일 때만 값을 돌려준다. 아니면 null(보통 경로).
+export function splitRequest(text) {
+  const clauses = String(text)
+    .replace(/((?:바꾸|바꿔\s?주|만들|추가하|넓히|줄이|늘리|정하|잡|해\s?주)고)\s+/g, '$1\n')
+    .split(/[.!?\n]+|,\s*|\s+그리고(?:\s+|$)/)
+    .map((c) => c.trim())
+    .filter(Boolean);
+  const kinds = clauses.map((c) =>
+    furnitureMentions(c).some((m) => !m.ref)
+      ? 'F'
+      : mentionsRoom(c) || ROOM_FACT.test(c) || ROOM_REFERENCE.test(c)
+        ? 'R'
+        : 'U',
+  );
+  // 어느 쪽인지 알 수 없는 마디는 앞 마디(첫 마디면 뒤 마디)를 따른다.
+  for (let i = 0; i < kinds.length; i++) if (kinds[i] === 'U' && i > 0) kinds[i] = kinds[i - 1];
+  for (let i = kinds.length - 2; i >= 0; i--) if (kinds[i] === 'U') kinds[i] = kinds[i + 1];
+  const pick = (k) => clauses.filter((_, i) => kinds[i] === k),
+    roomText = pick('R').join('. '),
+    parts = pick('F'),
+    pieces = [];
+  for (const part of parts) {
+    const names = furnitureMentions(part).filter((m) => !m.ref);
+    let from = 0;
+    names.forEach((m, i) => {
+      const next = names[i + 1],
+        joined = next && COORDINATOR.exec(part.slice(m.end));
+      // 이름 사이를 "랑", "하고"로 이었을 때만 따로 놓을 가구로 본다("책상 의자"는 하나로 둔다).
+      if (next && !joined) return;
+      pieces.push({ type: m.type, text: part.slice(from, next ? m.end : part.length).trim() });
+      if (joined) from = m.end + joined[0].length;
+    });
+  }
+  if (!pieces.length || (!roomText && pieces.length < 2)) return null;
+  return { roomText, furnitureText: parts.join(', '), pieces: pieces.slice(0, 4) };
+}
+const roomChanged = (plan) => !!(plan?.changes?.room || plan?.changes?.addSpace);
+// 방 계획과 가구 초안들을 한 턴으로 합친다. drafts[0]이 방에 먼저 뜨고 나머지는 차례를 기다린다.
+export function mergePlans(roomPlan, drafts, ctx) {
+  const room = roomChanged(roomPlan) ? roomPlan : null,
+    [first, ...queue] = drafts,
+    names = drafts.map((d) => TYPES[d.type].name),
+    lines = [];
+  if (room?.changes.addSpace) {
+    const r = room.changes.room;
+    lines.push(
+      `${josa(ROOM_TYPES[r.type].name, '을/를')} 가로 ${r.w}m, 세로 ${r.d}m로 새로 만들었어요.`,
+    );
+  } else if (room) {
+    const r = room.changes.room,
+      was = ctx.state.room,
+      typed = r.type !== was.type,
+      sized = r.w !== was.w || r.d !== was.d || r.h !== was.h;
+    const how = room.area ? `${room.area.text}(${room.area.about})에 맞춰 ` : '';
+    lines.push(
+      typed || sized
+        ? `${typed ? `${josa(ROOM_TYPES[r.type].name, '으로/로')} 바꾸고 ` : how ? '' : '방을 '}${how}가로 ${r.w}m, 세로 ${r.d}m로 잡았어요.`
+        : '벽과 바닥을 바꿨어요.',
+    );
+  }
+  lines.push(
+    queue.length
+      ? `${names.map((n, i) => (i < names.length - 1 ? josa(n, '과/와') : n)).join(' ')} 초안을 준비했어요. ${names[0]}부터 규격을 골라 보세요. 놓으면 다음 초안이 이어져요.`
+      : `${names[0]} 초안은 ${dimsText(first.dims)}cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.`,
+  );
+  return {
+    intent: 'compound',
+    scope: room ? 'room' : 'furniture',
+    mode: 'new',
+    target: { type: 'draft' },
+    confident: true,
+    reply: lines.join(' '),
+    changes: { ...(room ? room.changes : {}), draft: first, queue },
+    surfaces: [
+      surface('furniture-size', { type: 'draft' }),
+      ...(room ? [surface('room-size')] : []),
+    ],
+    suggestions: queue.length
+      ? [act('모두 놓기', 'place-all', { primary: true }), act(`${names[0]}만 놓기`, 'place')]
+      : furnitureChips(first, 'new'),
+  };
+}
+function draftFrom(piece, ctx) {
+  const base = ctx.draft?.type === piece.type ? ctx.draft : makeItem(piece.type),
+    next = consult(piece.text, structuredClone(base), '', { keepType: true }).item,
+    color = parseFurnitureColor(piece.text);
+  if (color) next.color = color;
+  return next;
+}
+function planCompound(t, ctx, item) {
+  const req = splitRequest(t);
+  if (!req) return null;
+  const room = req.roomText ? planRoom(req.roomText, ctx) : null;
+  if (room?.error) return room;
+  // 가구가 하나뿐이고 방에서 바뀔 것도 없으면 보통 경로가 더 잘 처리한다(선택한 가구 고치기 등).
+  if (!roomChanged(room) && req.pieces.length < 2) return null;
+  if (req.pieces.length === 1 && item) return null;
+  return mergePlans(
+    room,
+    req.pieces.map((p) => draftFrom(p, ctx)),
+    ctx,
+  );
 }
 
 function planFurniture(t, ctx, item) {
@@ -296,8 +581,9 @@ const PARTICLE = /(?:이랑|랑|하고|와|과|을|를|은|는|이|가|도|만)$
 const AND_TAIL = /(?:이랑|랑|하고|와|과|,)$/;
 const PLACE_TAIL = /에(?:다가?)?$/;
 const PLACE_WORD = /^(?:위|옆|앞|아래|밑|안)/;
+// 물건 이름이 아닌 말: 지시어, 방·집의 부분, "방하나"처럼 붙여 쓴 수량, 방향·크기 같은 속성, 따지거나 꾸미는 부사.
 const NOT_THING =
-  /^(?:(?:이|그|저)(?:거|것|걸|건|게)|여기|거기|저기|이쪽|그쪽|가구|물건|초안|아바타|사람|공간|방|집|벽|바닥|천장|문|창문|크기|색|자리)$/;
+  /^(?:(?:이|그|저)?(?:거|것|걸|건|게)|여기|거기|저기|이쪽|그쪽|가구|물건|초안|아바타|사람|(?:공간|방)(?:하나|한개|두개)?|집|벽|바닥|천장|문|창문|크기|색|자리|방향|위치|각도|반대|이름|높이|가로|세로|깊이|너비|폭|색깔|색상|사이즈|치수|배치|순서|간격|왜|자꾸|계속|또|진짜|정말|제발|이렇게|그렇게|저렇게|어떻게|빨리|일단|먼저|혹시|근데|그럼|이제|아니|다|모두|전부|나|내가|너|네가|니가|우리|뭐|뭘|무엇|어디|언제|누가|한번|아무것도)$/;
 
 export function objectsOf(t) {
   const words = String(t)
@@ -320,7 +606,7 @@ export function objectsOf(t) {
     const type = !odd && detectType(w);
     if (odd) unlisted.push(odd);
     else if (type) known.push(type);
-    else if (!NOT_THING.test(w) && !detectRoomType(w) && /[가-힣a-z]/i.test(w))
+    else if (!NOT_THING.test(w) && !mentionsRoom(w) && /[가-힣a-z]/i.test(w))
       unlisted.push({ name: w, on: false, alt: [] });
   }
   // 놓을 곳은 목적어 앞(“책상에 컴퓨터”)에도 뒤(“컴퓨터를 책상 위에”)에도 온다.
@@ -405,7 +691,7 @@ function loneName(t) {
     SIZE_WORD.test(w) ||
     PREDICATE.test(raw) ||
     NOT_THING.test(w) ||
-    detectRoomType(w) ||
+    mentionsRoom(w) ||
     parseFurnitureColor(w) ||
     COLOR_NAMES.some((n) => w.includes(n)) ||
     !/[가-힣a-z]/i.test(w)
@@ -428,10 +714,38 @@ export function planTurn(text, ctx) {
   const target = ctx.target || roomTarget;
   const item = target.type === 'item' ? ctx.state.items.find((a) => a.id === target.id) : null;
   const meta = planMeta(t, ctx, item);
-  const unlisted = unlistedPlan(t);
+  // 목록에 없는 물건 찾기는 동사 앞 낱말을 물건으로 읽는다. 방을 만들거나 고쳐 달라는 말("방하나 추가하자",
+  // "왜 화장실로 만들어")을 물건 이름으로 읽지 않도록, 방 이야기가 분명하면 건너뛴다.
+  const roomTalk = wantsNewSpace(t) && (mentionsRoom(t) || /방|공간/.test(t));
+  const unlisted = roomTalk ? null : unlistedPlan(t);
   if (meta && !(unlisted && SUBJECT_ACTIONS.includes(meta.action))) return meta;
+  const repair = repairPlan(t, ctx);
+  if (repair) return repair;
   if (unlisted) return unlisted;
-  const scope = resolveScope(t, item || target.type === 'draft' ? target : roomTarget);
+  const compound = planCompound(t, ctx, item);
+  if (compound) return compound;
+  // 무엇을 가리키는지 없는 불만은 가구 이야기로 넘기지 않고 되묻는다.
+  if (
+    COMPLAINT.test(t) &&
+    !mentionsRoom(t) &&
+    !detectType(t) &&
+    !ROOM_REFERENCE.test(t) &&
+    !Object.keys(extractDimensions(t)).length
+  )
+    return {
+      intent: 'chat',
+      scope: null,
+      vague: true,
+      reply: '어디가 다르게 됐는지 알려 주세요. 방금 바꾼 내용은 되돌릴 수 있어요.',
+      changes: {},
+      surfaces: [],
+      suggestions: [say('되돌리기', '되돌려줘')],
+    };
+  // 방을 추가하자는 말은 가구를 고르거나 초안을 띄워 둔 중에도 방 이야기다.
+  const scope =
+    roomTalk && !detectType(t)
+      ? 'room'
+      : resolveScope(t, item || target.type === 'draft' ? target : roomTarget);
   const plan = noteUnlisted(scope === 'room' ? planRoom(t, ctx) : planFurniture(t, ctx, item), t);
   // 이름 하나만 말했는데 아무것도 바뀌지 않으면 목록에 없는 물건이다(“퀸”, “네이비”는 바뀌므로 그대로).
   const lone = loneName(t);
@@ -443,7 +757,12 @@ export function planTurn(text, ctx) {
 // 첫 화면과 빈 대화에서 보여줄 시작점.
 export const STARTERS = [
   { label: '방 크기부터', detail: '가로·세로·천장 높이', action: 'tool', arg: 'room-size' },
-  { label: '가구 고르기', detail: '20종 · 63가지 크기', action: 'tool', arg: 'catalog' },
+  {
+    label: '가구 고르기',
+    detail: `${Object.keys(TYPES).length}종 · ${Object.values(TYPES).reduce((n, t) => n + t.presets.length, 0)}가지 크기`,
+    action: 'tool',
+    arg: 'catalog',
+  },
   { label: '사진으로 시작', detail: '가구 사진에서 종류부터 잡기', action: 'photo' },
   { label: '벽과 바닥', detail: '마감 색 비교하기', action: 'tool', arg: 'finishes' },
   { label: '내 키로 가늠하기', detail: '같은 축척의 아바타 세우기', action: 'tool', arg: 'avatar' },

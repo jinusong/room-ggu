@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { freshState, exampleState, spaces, validateState } from './data.js';
+import { freshState, exampleState, spaces, validateState, layoutWarnings } from './data.js';
+import { makeRoom } from './catalog.js';
 import { avatarLayout, parseComparisonCommand } from './avatar.js';
-import { floorplanWarnings, sharedOpening, roomBounds } from './floorplan.js';
+import { floorplanWarnings, sharedOpening, roomBounds, connections } from './floorplan.js';
 import {
   setAvatar,
   attachBathroom,
@@ -11,6 +12,13 @@ import {
   deleteSpace,
   setRoom,
   roomWithDims,
+  roomWithType,
+  addSpace,
+  attachedTo,
+  separateSpaces,
+  rotateSpace,
+  setDoor,
+  migrateLegacy,
 } from './app/ops.js';
 
 test('키 명령은 cm·m를 읽고 가구 높이와 구별한다', () => {
@@ -53,7 +61,7 @@ test('앉기·눕기는 실제 가구에 연결하고 이동·회전을 따라�
   assert.equal(avatarLayout(s).pose, 'standing');
   assert.equal(validateState(s).avatar.pose, 'standing');
 });
-test('이전 v3 배치를 가구 손실 없이 집 도면으로 옮기고 v4를 왕복한다', () => {
+test('이전 v3 배치를 가구 손실 없이 집 도면으로 옮기고 v5를 왕복한다', () => {
   const original = exampleState();
   const old = structuredClone(original);
   old.version = 3;
@@ -61,7 +69,7 @@ test('이전 v3 배치를 가구 손실 없이 집 도면으로 옮기고 v4를 
   delete old.avatar;
   delete old.scope;
   const s = validateState(old);
-  assert.equal(s.version, 4);
+  assert.equal(s.version, 5);
   assert.deepEqual(s.items, original.items);
   setAvatar(s, { enabled: true, height: 178 });
   attachBathroom(s);
@@ -109,11 +117,139 @@ test('잘못된 저장 위치·아바타를 거절하고 삭제한 공간의 참
   assert.equal(Object.hasOwn(s.floorplan.positions, id), false);
   assert.equal(s.avatar.roomId, original);
 });
-test('방 크기 변경으로 생긴 공간 중첩을 표시한다', () => {
+test('방 크기를 바꿔도 옆 공간과 겹치지 않고 맞닿은 벽이 그대로 남는다', () => {
   const s = freshState();
-  attachBathroom(s);
+  const bath = attachBathroom(s);
+  const at = { ...s.floorplan.positions[bath] };
   setRoom(s, roomWithDims(s.room, { w: 6 }));
+  let list = spaces(s);
+  assert.equal(floorplanWarnings(list, s.floorplan).size, 0);
+  assert.equal(connections(list, s.floorplan).length, 1);
+  // 오른쪽 벽에 화장실이 붙어 있으니 그 벽은 그대로 두고 왼쪽으로 2m 늘어난다. 화장실은 움직이지 않는다.
+  assert.deepEqual(s.floorplan.positions[bath], at);
+  assert.equal(s.floorplan.positions[s.roomId].x, -1);
+  // 양쪽에 이웃이 있으면 먼 쪽 이웃이 달라진 길이만큼 따라 움직인다.
+  const middle = s.roomId;
+  switchSpace(s, bath);
+  const far = addSpace(s, 'office', 'right');
+  switchSpace(s, bath);
+  const before = s.floorplan.positions[far].x;
+  const rows = setRoom(s, roomWithDims(s.room, { w: 3 }));
+  list = spaces(s);
+  assert.equal(floorplanWarnings(list, s.floorplan).size, 0);
+  assert.equal(connections(list, s.floorplan).length, 2);
+  assert.ok(Math.abs(s.floorplan.positions[far].x - (before + 1.2)) < 1e-9);
+  assert.deepEqual(s.floorplan.positions[middle], { x: -1, z: 0 });
+  assert.ok(rows.some((r) => r.label === '집 배치'));
+});
+test('겹친 채 저장된 공간은 가장 적게 움직여 떼어 놓고 벽을 맞붙인다', () => {
+  const s = freshState();
+  s.room = makeRoom('living');
+  s.otherRooms.push({ roomId: 'bath', name: '나의 화장실', room: makeRoom('bathroom'), items: [] });
+  s.roomOrder = ['bath', s.roomId];
+  s.floorplan = { positions: { bath: { x: 0, z: 0 }, [s.roomId]: { x: 1.8, z: 0 } } };
   assert.equal(floorplanWarnings(spaces(s), s.floorplan).size, 2);
+  const r = separateSpaces(s);
+  assert.deepEqual(r.moved, ['나의 화장실']);
+  assert.equal(r.remaining, 0);
+  assert.equal(floorplanWarnings(spaces(s), s.floorplan).size, 0);
+  assert.equal(connections(spaces(s), s.floorplan).length, 1);
+  // 겹친 곳이 없으면 아무것도 건드리지 않는다.
+  const same = JSON.stringify(s.floorplan);
+  assert.deepEqual(separateSpaces(s).moved, []);
+  assert.equal(JSON.stringify(s.floorplan), same);
+});
+test('방을 돌리면 가로·세로와 가구·아바타가 함께 돌고 네 번 돌리면 제자리다', () => {
+  const s = exampleState(),
+    start = structuredClone({ room: s.room, items: s.items });
+  const bath = attachBathroom(s);
+  setAvatar(s, { enabled: true, x: 1, z: 0.5 });
+  const bed = s.items.find((a) => a.type === 'bed'),
+    was = { x: bed.x, z: bed.z, angle: bed.angle };
+  const r = rotateSpace(s);
+  assert.deepEqual([r.w, r.d], [start.room.d, start.room.w]);
+  // 오른쪽으로 90°: (x, z) → (-z, x), 각도는 90° 줄어든다.
+  assert.ok(Math.abs(bed.x - -was.z) < 1e-9 && Math.abs(bed.z - was.x) < 1e-9);
+  assert.equal(bed.angle, (was.angle + 270) % 360);
+  assert.ok(Math.abs(s.avatar.x - -0.5) < 1e-9 && Math.abs(s.avatar.z - 1) < 1e-9);
+  assert.equal(layoutWarnings(s).all.size, 0);
+  assert.equal(floorplanWarnings(spaces(s), s.floorplan).size, 0);
+  for (let i = 0; i < 3; i++) rotateSpace(s);
+  assert.deepEqual([s.room.w, s.room.d], [start.room.w, start.room.d]);
+  for (const [i, a] of s.items.entries()) {
+    assert.ok(Math.abs(a.x - start.items[i].x) < 1e-9 && Math.abs(a.z - start.items[i].z) < 1e-9);
+    assert.equal(a.angle, start.items[i].angle);
+  }
+  // 다른 공간도 돌릴 수 있고, 돌린 공간에 직접 정해 둔 문은 자동 문으로 돌아간다.
+  setDoor(s, s.roomId, bath, { width: 0.9 });
+  assert.equal(s.floorplan.doors.length, 1);
+  const turned = rotateSpace(s, bath);
+  assert.deepEqual([turned.w, turned.d], [2.2, 1.8]);
+  assert.equal(s.floorplan.doors, undefined);
+  assert.equal(floorplanWarnings(spaces(s), s.floorplan).size, 0);
+});
+test('공간 유형을 바꾸면 기본 이름·바닥·설비가 따라 바뀌고 직접 지은 이름은 남는다', () => {
+  const s = freshState();
+  const first = s.roomId;
+  addSpace(s, 'bathroom');
+  assert.equal(s.name, '나의 화장실');
+  assert.equal(s.room.floorColor, '#dce1dc');
+  assert.deepEqual(s.items.map((a) => a.type).sort(), ['basin', 'shower', 'toilet']);
+  const second = addSpace(s, 'bathroom', null, { anchor: first });
+  assert.equal(s.name, '나의 화장실 2');
+  const rows = setRoom(s, roomWithType(s.room, 'living'));
+  assert.equal(s.name, '나의 거실');
+  assert.equal(s.room.floorColor, '#e0d4bf');
+  assert.equal(s.items.length, 0);
+  assert.ok(rows.some((r) => r.label === '이름' && r.to === '나의 거실'));
+  assert.equal(floorplanWarnings(spaces(s), s.floorplan).size, 0);
+  // 손댄 설비와 직접 지은 이름은 유형을 바꿔도 남긴다.
+  setRoom(s, roomWithType(s.room, 'bathroom'));
+  assert.equal(s.name, '나의 화장실 2');
+  s.items[0].sources = ['사용자 설정', '설비 초안', '설비 초안'];
+  s.name = '손님 욕실';
+  setRoom(s, roomWithType(s.room, 'office'));
+  assert.equal(s.name, '손님 욕실');
+  assert.equal(s.items.length, 1);
+  assert.equal(s.roomId, second);
+});
+test('새 공간은 말한 기준 공간의 벽에 실제 크기로 자리를 잡는다', () => {
+  const s = freshState();
+  const first = s.roomId,
+    bath = addSpace(s, 'bathroom');
+  switchSpace(s, first);
+  const room = roomWithDims(makeRoom('living'), { w: 6, d: 5 });
+  const living = addSpace(s, 'living', 'right', { room, anchor: bath, strict: false });
+  assert.deepEqual([s.room.w, s.room.d], [6, 5]);
+  assert.deepEqual(attachedTo(s, living, bath), {
+    roomId: bath,
+    name: '나의 화장실',
+    side: 'right',
+  });
+  assert.equal(floorplanWarnings(spaces(s), s.floorplan).size, 0);
+  // 고른 벽이 막혀 있으면 벽의 + 손잡이는 거절하고, 대화는 다른 벽을 찾는다.
+  switchSpace(s, first);
+  assert.throws(() => addSpace(s, 'bedroom', 'right', { anchor: first }), /자리가 없어요/);
+  addSpace(s, 'bedroom', 'right', { anchor: first, strict: false });
+  assert.equal(floorplanWarnings(spaces(s), s.floorplan).size, 0);
+  assert.notEqual(attachedTo(s, s.roomId, first), null);
+});
+test('v4 이하 저장본은 불러올 때 설비·이름·겹침을 한 번 손본다', () => {
+  const s = freshState();
+  s.room = makeRoom('living');
+  s.name = '나의 화장실';
+  const old = makeRoom('bathroom');
+  old.floorColor = '#e0d4bf';
+  s.otherRooms.push({ roomId: 'bath', name: '나의 화장실', room: old, items: [] });
+  s.roomOrder = ['bath', s.roomId];
+  s.floorplan = { positions: { bath: { x: 0, z: 0 }, [s.roomId]: { x: 1.8, z: 0 } } };
+  migrateLegacy(s);
+  const [bath, living] = spaces(s);
+  assert.deepEqual([bath.name, living.name], ['나의 화장실', '나의 거실']);
+  assert.equal(bath.room.floorColor, '#dce1dc');
+  assert.equal(bath.items.length, 3);
+  assert.equal(floorplanWarnings(spaces(s), s.floorplan).size, 0);
+  assert.deepEqual(validateState(JSON.parse(JSON.stringify(s))), s);
 });
 test('문 명령은 폭·막기·다시 내기·방향을 읽고 문을 기준으로 한 가구 문장은 읽지 않는다', () => {
   assert.deepEqual(parseComparisonCommand('화장실 문 폭 90cm로 해줘'), {

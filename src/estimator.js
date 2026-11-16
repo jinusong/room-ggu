@@ -15,6 +15,9 @@ const aliases = {
   plant: /화분|식물|plant/i,
   fridge: /냉장고|fridge|refrigerator/i,
   washer: /세탁기|washer|washing\s*machine/i,
+  toilet: /변기|toilet/i,
+  basin: /세면대|세면기|wash\s*basin|basin/i,
+  shower: /샤워\s*(?:부스|기|실|박스|공간)|shower/i,
   sofa: /소파|쇼파|sofa|couch/i,
   bed: /침대|매트리스|bed|mattress/i,
   desk: /책상|테이블|desk|table/i,
@@ -38,6 +41,28 @@ export function mentionedTypes(t) {
     }
   }
   return found;
+}
+// 문장에 나온 가구 이름을 나온 순서대로 찾는다. 긴 이름("소파 테이블")이 먼저 잡히면 그 자리는 가린다.
+// ref는 "침대 옆에", "책상에 놓을"처럼 자리나 짝을 가리킬 뿐 새로 놓을 가구가 아닌 이름이다.
+const FURNITURE_REF =
+  /^\s*(?:바로\s*)?(?:옆|앞|뒤|위|밑|아래|맞은\s*편|근처|쪽|용(?![가-힣])|(?:이랑|랑|과|와|하고)\s*(?:어울|맞는|맞춰|같은|비슷|세트)|에\s*(?:맞|어울|놓|올려|올릴|둘|두는))/;
+export function furnitureMentions(t) {
+  let rest = String(t);
+  const found = [];
+  for (const [type, re] of Object.entries(aliases)) {
+    const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
+    for (const m of rest.matchAll(g)) {
+      const end = m.index + m[0].length;
+      found.push({
+        type,
+        index: m.index,
+        end,
+        ref: FURNITURE_REF.test(String(t).slice(end, end + 16)),
+      });
+    }
+    rest = rest.replace(g, (word) => ' '.repeat(word.length));
+  }
+  return found.sort((a, b) => a.index - b.index);
 }
 // 목록에 없다고 알려진 물건. 목록에 없는 물건은 이 표에 없어도 없다고 답한다(planner.js의 unlistedPlan).
 // 이 표는 이름을 바로잡고 성질을 더할 때만 쓴다: "안마의자"·"스탠드 에어컨"을 의자·조명으로 읽지 않고,

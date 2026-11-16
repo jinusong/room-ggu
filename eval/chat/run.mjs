@@ -4,6 +4,8 @@
 // 사용: [MODEL=light|large] [HEADLESS=1] node eval/chat/run.mjs [http://127.0.0.1:5173/] [results/name.json]
 // MODEL은 앱의 상담 모델 선택(light: Gemma 3 1B, large: Gemma 4 E2B)이다. HEADLESS=1이면 창을 띄우지 않는다.
 // F16=off이면 Worker 스크립트의 shader-f16 확인을 거짓으로 바꿔, f16이 없는 GPU에서 고르는 f32 모델 경로를 실행한다.
+// SCENARIO=repair이면 화장실 하나만 있는 집에서 시작해, 실제 대화에서 틀렸던 문장들(자리를 가리킨 공간 이름,
+// 따지는 말, 한 문장의 방·가구 여럿, 겹침, 방 돌리기)을 차례로 보낸다.
 import { chromium } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,6 +33,35 @@ const PROMPTS = [
   '겹친 가구 있으면 정리해줘',
   '배치를 파일로 저장하고 싶어',
 ];
+// 2026-11-16의 실제 대화를 그대로 옮긴 문장들과 그 변형.
+const REPAIR_PROMPTS = [
+  '화장실 옆에 방하나 추가하자. 거기는 거실임',
+  '왜 화장실로 생성하는거야',
+  '거실이라고 그리고 거기에 소파랑 밥먹을 수 있는 식탁이 있었으면 좋겠어. 거실 평수는 대략 6평정도야',
+  '둘 다 놓아줘',
+  '아니 거실이라니까 왜 자꾸 화장실로 고정하냐고!!!!',
+  '거실로 바꿨는데 겹치잖아...',
+  '이 방 90도 돌려줘',
+  '거실 말고 침실로 바꿔줘',
+  '침실 옆에 서재 하나 붙여줘',
+  '책상이랑 의자 놓고 싶어',
+  '방 하나 더 만들어줘',
+  '아니 그게 아니라',
+  '방 초기화할래',
+];
+const SCENARIO = process.env.SCENARIO === 'repair' ? 'repair' : 'basic';
+const BATHROOM_HOME = {
+  version: 5,
+  roomId: 'bath',
+  roomOrder: ['bath'],
+  otherRooms: [],
+  name: '나의 화장실',
+  room: { type: 'bathroom', w: 1.8, d: 2.2, h: 2.4, wallColor: '#faf9f5', floorColor: '#dce1dc' },
+  items: [],
+  scope: 'house',
+  view: '3d',
+  floorplan: { positions: { bath: { x: 0, z: 0 } } },
+};
 const MODEL = process.env.MODEL === 'light' ? 'light' : 'large';
 // 모델이 켜진 상태에서도 앱이 직접 처리하는 키·자세·집 전체 명령. 18문장 뒤에 이어서 보낸다.
 const APP_PROMPTS = [
@@ -57,17 +88,21 @@ if (process.env.F16 === 'off')
     await route.fulfill({ response: res, body });
   });
 // 모델마다 같은 예시 방에서 시작하도록 처음 한 번 저장된 배치와 대화를 지운다.
-await page.addInitScript((choice) => {
-  try {
-    localStorage.setItem('room-ggu-model-choice', choice);
-    localStorage.removeItem('room-ggu-model');
-    if (!sessionStorage.getItem('eval-reset')) {
-      localStorage.removeItem('room-ggu-v2');
-      localStorage.removeItem('room-ggu-thread-v1');
-      sessionStorage.setItem('eval-reset', '1');
-    }
-  } catch {}
-}, MODEL);
+await page.addInitScript(
+  ([choice, seed]) => {
+    try {
+      localStorage.setItem('room-ggu-model-choice', choice);
+      localStorage.removeItem('room-ggu-model');
+      if (!sessionStorage.getItem('eval-reset')) {
+        if (seed) localStorage.setItem('room-ggu-v2', JSON.stringify(seed));
+        else localStorage.removeItem('room-ggu-v2');
+        localStorage.removeItem('room-ggu-thread-v1');
+        sessionStorage.setItem('eval-reset', '1');
+      }
+    } catch {}
+  },
+  [MODEL, SCENARIO === 'repair' ? BATHROOM_HOME : null],
+);
 const errors = [];
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 200)));
 page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
@@ -108,7 +143,7 @@ const ai = await page.evaluate(() => ({ ...window.__roomggu.app.ai }));
 console.log('model', status0, '→', ai.text, ai.model, Date.now() - t0, 'ms', ai.error || '');
 const results = [];
 const only = process.env.ONLY === 'app' ? [] : PROMPTS;
-for (const prompt of [...only, ...APP_PROMPTS]) {
+for (const prompt of SCENARIO === 'repair' ? REPAIR_PROMPTS : [...only, ...APP_PROMPTS]) {
   const start = Date.now();
   await page.locator('#chat-input').fill(prompt);
   await page.keyboard.press('Enter');
@@ -128,6 +163,8 @@ for (const prompt of [...only, ...APP_PROMPTS]) {
       room: `${s.name} ${s.room.type} ${s.room.w}x${s.room.d}x${s.room.h} wall ${s.room.wallColor} floor ${s.room.floorColor}`,
       draft: app.draft && `${app.draft.type} ${app.draft.dims.join('/')} ${app.draft.color} [${app.draft.sources.join(' | ')}]`,
       items: s.items.length, spaces: 1 + (s.otherRooms?.length || 0), target: app.target.type,
+      house: [{ name: s.name, room: s.room }, ...(s.otherRooms || [])].map((r) => `${r.name}[${r.room.type} ${r.room.w}x${r.room.d}]`).join(' | '),
+      queue: (app.queue || []).map((q) => q.type).join(','),
       avatar: s.avatar.enabled ? `${s.avatar.height}cm ${s.avatar.pose}` : 'off', scope: `${s.scope} ${s.view}`,
       label: document.querySelector('.msg.assistant:last-of-type .msg-meta')?.textContent,
     };

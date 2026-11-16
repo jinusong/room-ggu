@@ -1,5 +1,5 @@
 import * as T from 'three';
-import { houseLayout, bathroomFixtures } from './house-geometry.js';
+import { houseLayout } from './house-geometry.js';
 import { furniture } from './furniture.js';
 
 const material = (color) => new T.MeshStandardMaterial({ color, roughness: 0.85 });
@@ -10,58 +10,6 @@ function box(group, w, h, d, x, y, z, mat) {
   group.add(m);
   return m;
 }
-function ellipsoid(group, x, y, z, w, h, d, mat) {
-  const m = new T.Mesh(new T.SphereGeometry(1, 20, 12), mat);
-  m.position.set(x, y, z);
-  m.scale.set(w / 2, h / 2, d / 2);
-  m.castShadow = true;
-  group.add(m);
-  return m;
-}
-export function bathroomModel(room, openings = []) {
-  const root = new T.Group(),
-    ceramic = new T.MeshStandardMaterial({ color: '#fbfaf7', roughness: 0.28 }),
-    metal = material('#a6aaa5');
-  for (const f of bathroomFixtures(room, openings)) {
-    const g = new T.Group();
-    g.position.set(f.x, 0, f.z);
-    g.rotation.y = (f.angle * Math.PI) / 180;
-    if (f.flip) g.scale.x = -1;
-    g.userData.fixture = f.type;
-    g.userData.draft = true;
-    if (f.type === 'toilet') {
-      ellipsoid(g, 0, 0.22, 0.05, f.w * 0.7, 0.4, f.d * 0.6, ceramic);
-      ellipsoid(g, 0, 0.4, 0.06, f.w, 0.24, f.d * 0.78, ceramic);
-      ellipsoid(g, 0, 0.515, 0.07, f.w * 0.65, 0.015, f.d * 0.48, material('#c5cec5'));
-      box(g, f.w * 0.9, 0.5, 0.15, 0, 0.5, -f.d / 2 + 0.08, ceramic);
-      box(g, 0.07, 0.015, 0.04, 0.08, 0.758, -f.d / 2 + 0.08, metal);
-    } else if (f.type === 'basin') {
-      box(g, 0.15, 0.7, 0.16, 0, 0.35, 0, ceramic);
-      ellipsoid(g, 0, 0.76, 0, f.w, 0.16, f.d, ceramic);
-      ellipsoid(g, 0, 0.837, 0.015, f.w * 0.72, 0.016, f.d * 0.62, material('#c5cec5'));
-      box(g, 0.025, 0.15, 0.025, 0, 0.86, -f.d * 0.32, metal);
-      box(g, 0.025, 0.025, 0.1, 0, 0.93, -f.d * 0.2, metal);
-    } else {
-      box(g, f.w, 0.06, f.d, 0, 0.03, 0, ceramic);
-      box(g, f.w * 0.8, 0.005, f.d * 0.8, 0, 0.063, 0, material('#d6ded6'));
-      const glass = new T.MeshStandardMaterial({
-        color: '#cadbd2',
-        transparent: true,
-        opacity: 0.2,
-        roughness: 0.12,
-        depthWrite: false,
-        side: T.DoubleSide,
-      });
-      box(g, 0.012, 1.25, f.d, -f.w / 2, 0.685, 0, glass);
-      box(g, 0.025, 1.1, 0.025, f.w / 2 - 0.04, 1.1, -f.d / 2 + 0.04, metal);
-      box(g, 0.025, 0.025, 0.2, f.w / 2 - 0.04, 1.65, -f.d / 2 + 0.12, metal);
-      box(g, 0.12, 0.02, 0.12, f.w / 2 - 0.04, 1.64, -f.d / 2 + 0.23, metal);
-    }
-    root.add(g);
-  }
-  return root;
-}
-
 export function houseStructure(state, { plankTexture } = {}) {
   const layout = houseLayout(state),
     root = new T.Group(),
@@ -79,7 +27,7 @@ export function houseStructure(state, { plankTexture } = {}) {
       map.repeat.set(r.room.w / 1.6, r.room.d / 1.6);
       map.needsUpdate = true;
       top = new T.MeshStandardMaterial({ map, roughness: 0.82 });
-    } else top = material(r.room.type === 'bathroom' ? '#dce1dc' : r.room.floorColor);
+    } else top = material(r.room.floorColor);
     box(g, r.room.w, 0.08, r.room.d, 0, -0.04, 0, [edge, edge, top, edge, edge, edge]);
     if (state.grid || r.room.type === 'bathroom') {
       const points = [],
@@ -95,7 +43,6 @@ export function houseStructure(state, { plankTexture } = {}) {
         ),
       );
     }
-    if (r.room.type === 'bathroom') g.add(bathroomModel(r.room, r.openings));
     if (r.roomId === state.roomId) {
       // 고른 공간은 바닥 가장자리에 줄자 노랑 띠를 두른다.
       const mark = new T.MeshBasicMaterial({ color: '#e2ae2a', transparent: true, opacity: 0.95 }),

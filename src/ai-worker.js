@@ -144,7 +144,7 @@ async function interpret(payload) {
 intent: 가구 이야기는 furniture, 방 크기·유형·벽·바닥 이야기는 room, 아래 동작 요청은 action, 그 밖의 질문이나 인사는 chat.
 action: place 초안을 방에 놓기, undo 되돌리기, redo 다시 실행, rotate 선택한 가구 돌리기, duplicate 선택한 가구 복제, delete 선택한 가구 빼기, relocate 겹친 가구를 빈자리로, clear 가구 모두 비우기, example 예시 방, catalog 가구 고르기 열기, spaces 공간 목록, items 놓인 가구 목록, files 저장·불러오기, help 사용법, ai 모델 설정, new_space 새 공간 추가, switch_space 다른 공간으로 이동. 해당 없으면 none.
 furniture: ${typeList(TYPES)}. 가구 이야기가 아니면 none.
-room_type: ${typeList(ROOM_TYPES)}. 방 유형이나 용도를 말했을 때만 고르고 아니면 none.
+room_type: ${typeList(ROOM_TYPES)}. 방 유형이나 용도를 말했을 때만 고르고 아니면 none. "화장실 옆에 거실 추가"의 화장실처럼 자리를 가리키는 이름이 아니라 새로 만들거나 바꿀 공간을 고르세요. "A 말고 B", "B라니까"는 B입니다.
 space: 이동할 공간 이름. 없으면 none.
 seats: 소파에 앉는 사람 수 1~4, 모르면 null. size: compact 작게, standard 보통, large 크게, 모르면 unknown. depth: shallow 얕게, deep 깊게. height: low 낮게, tall 높게.
 color: 가구 색 ${names(FURNITURE_COLORS).join(', ')}. wall: 벽 색 ${names(WALL_COLORS).join(', ')}. floor: 바닥 ${names(FLOOR_COLORS).join(', ')}. 색을 말하지 않았으면 none.

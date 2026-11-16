@@ -71,9 +71,15 @@ import {
   PersonStanding,
   DoorOpen,
   FlipHorizontal2,
+  Toilet,
+  ShowerHead,
+  Droplets,
 } from 'lucide';
 const MAP = {
   bath: Bath,
+  toilet: Toilet,
+  'shower-head': ShowerHead,
+  droplets: Droplets,
   'door-open': DoorOpen,
   flip: FlipHorizontal2,
   'person-standing': PersonStanding,

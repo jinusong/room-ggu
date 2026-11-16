@@ -26,7 +26,36 @@ test('방 유형과 치수·마감을 반영하고 면적 기반 초안의 가�
   assert.equal(r.room.floorColor, '#93785c');
   const area = consultRoom('6평 원룸', makeRoom());
   assert.ok(Math.abs(area.room.w * area.room.d - 6 * 3.3058) < 0.1);
-  assert.match(area.reply, /가정|초안/);
+  // 말한 면적을 답에서 그대로 받아 주고, 가로·세로를 가정했으면 한쪽 길이를 묻는다.
+  assert.match(area.reply, /^6평\(약 19\.8m²\)에 맞춰 원룸을/);
+  assert.match(area.reply, /한쪽 벽 길이를 알려주면/);
+  assert.match(area.room.sources.w, /면적에서 가정/);
+});
+test('"한 6평 정도"는 5cm 단위의 다듬은 치수로 잡고 말한 면적에서 벗어나지 않는다', () => {
+  const living = makeRoom('living');
+  const r = consultRoom('한 6평정도 됨', living);
+  assert.deepEqual([r.room.w, r.room.d], [4.9, 4.05]);
+  assert.equal(((r.room.w * r.room.d) / 3.3058).toFixed(1), '6.0');
+  assert.equal(
+    r.reply,
+    '6평(약 19.8m²)에 맞춰 거실을 가로 4.9m, 세로 4.05m로 잡았어요. 한쪽 벽 길이를 알려주면 그 길이에 맞춰 다시 나눌게요.',
+  );
+  assert.deepEqual(r.area, { text: '6평', about: '약 19.8m²', assumed: true, square: false });
+  // 한쪽 길이를 함께 말하면 나머지를 면적으로 구하고 더 묻지 않는다.
+  const side = consultRoom('6평, 가로 5m', living);
+  assert.deepEqual([side.room.w, side.room.d], [5, 3.95]);
+  assert.match(side.room.sources.w, /^사용자 설정/);
+  assert.doesNotMatch(side.reply, /한쪽 벽/);
+  // 정사각형이라고 하면 1:1로 나눈다.
+  const sq = consultRoom('6평 정사각형', living);
+  assert.equal(sq.room.w, sq.room.d);
+  assert.match(sq.reply, /정사각형에 가깝게 나눴어요/);
+  // m²로 말하면 평을 덧붙인다. 어떤 면적이든 다듬은 값이 2% 넘게 벗어나지 않는다.
+  assert.match(consultRoom('20m² 정도야', living).reply, /^20m²\(약 6\.0평\)에 맞춰/);
+  for (const n of [1.5, 2, 3, 4.5, 7, 10, 15, 24, 33, 45]) {
+    const x = consultRoom(`${n}평`, living).room;
+    assert.ok(Math.abs(x.w * x.d - n * 3.3058) / (n * 3.3058) <= 0.02, `${n}평`);
+  }
 });
 test('기존 공간의 직접 입력을 보존하고 새 공간에는 이전 방 치수를 복사하지 않는다', () => {
   let r = consultRoom('가로 5m', makeRoom()).room;

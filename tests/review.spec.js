@@ -217,8 +217,12 @@ test('집 전체 길잡이·이름표로 공간을 고르고 ㄱ자 집을 만�
       p = app.state.floorplan.positions[bath],
       out = { doors: 0, fixtures: [], tags: app.scenes.tags().map((t) => t.text) };
     sc.room.updateMatrixWorld(true);
+    sc.objects.updateMatrixWorld(true);
     sc.room.traverse((o) => {
       if (o.userData.opening) out.doors++;
+    });
+    // 화장실 설비는 가구라서 가구 묶음에 있다.
+    sc.objects.traverse((o) => {
       if (o.userData.fixture) {
         const v = o.getWorldPosition(o.position.clone());
         out.fixtures.push({ type: o.userData.fixture, x: v.x - p.x, z: v.z - p.z });

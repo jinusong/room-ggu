@@ -15,6 +15,7 @@ export const CATEGORIES = {
   storage: '수납',
   decor: '소품',
   appliance: '가전',
+  bath: '욕실',
 };
 export const TYPES = {
   sofa: type('소파', 'sofa', 'living', [
@@ -120,7 +121,24 @@ export const TYPES = {
     ['기본 드럼', [60, 85, 65]],
     ['대형 드럼', [70, 98, 83]],
   ]),
+  toilet: type('변기', 'toilet', 'bath', [
+    ['소형 변기', [38, 72, 62]],
+    ['기본 변기', [42, 75, 68]],
+    ['넉넉한 변기', [45, 78, 72]],
+  ]),
+  basin: type('세면대', 'droplets', 'bath', [
+    ['소형 세면대', [45, 82, 35]],
+    ['기본 세면대', [50, 82, 40]],
+    ['넓은 세면대', [70, 85, 48]],
+  ]),
+  shower: type('샤워부스', 'shower-head', 'bath', [
+    ['소형 샤워부스', [70, 170, 70]],
+    ['기본 샤워부스', [80, 170, 80]],
+    ['넓은 샤워부스', [100, 180, 90]],
+  ]),
 };
+// 화장실을 만들면 가구로 함께 놓이는 설비. 다른 가구처럼 고르고 옮기고 뺄 수 있다.
+export const FIXTURE_TYPES = ['toilet', 'basin', 'shower'];
 export const ROOM_TYPES = {
   bathroom: {
     name: '화장실',
@@ -207,7 +225,10 @@ export const FLOOR_COLORS = [
   ['라이트 오크', '#eee4ce'],
   ['월넛', '#93785c'],
   ['그레이', '#babbb6'],
+  ['타일', '#dce1dc'],
 ];
+// 공간 유형의 기본 바닥. 화장실만 타일이고 나머지는 내추럴 오크다.
+export const defaultFloor = (type) => (type === 'bathroom' ? '#dce1dc' : FLOOR_COLORS[0][1]);
 // 가구 색상 초안. 앞의 6개는 기존 배치 파일의 COLORS와 같은 값이다.
 export const FURNITURE_COLORS = [
   ['오크', '#b29a80'],
@@ -229,7 +250,21 @@ export function makeRoom(type = 'studio', size = 1) {
     d,
     h,
     wallColor: WALL_COLORS[0][1],
-    floorColor: FLOOR_COLORS[0][1],
+    floorColor: defaultFloor(type),
     sources: { w: '공간 유형 기본값', d: '공간 유형 기본값', h: '공간 유형 기본값' },
   };
+}
+// 공간 유형을 바꾼 방. keep(출처)가 참인 치수는 남기고 나머지는 새 유형의 기본값으로 맞춘다.
+// 바닥이 이전 유형의 기본 바닥 그대로면 새 유형의 기본 바닥으로 함께 바꾼다.
+export function retypeRoom(room, type, keep = (source) => String(source).startsWith('사용자')) {
+  const next = structuredClone(room),
+    base = makeRoom(type);
+  next.type = type;
+  for (const k of ['w', 'd', 'h'])
+    if (!keep(room.sources[k])) {
+      next[k] = base[k];
+      next.sources[k] = '공간 유형 기본값';
+    }
+  if (room.floorColor === defaultFloor(room.type)) next.floorColor = base.floorColor;
+  return next;
 }

@@ -35,7 +35,16 @@ export { modelName, TEXT_MODELS };
 export const KEY = 'room-ggu-v2';
 export const THREAD_KEY = 'room-ggu-thread-v1';
 const VISION_KEY = 'room-ggu-vision-device';
-const ACTIONS = new Set(['place', 'catalog', 'photo', 'tool', 'relocate', 'clear-target', 'draft']);
+const ACTIONS = new Set([
+  'place',
+  'place-all',
+  'catalog',
+  'photo',
+  'tool',
+  'relocate',
+  'clear-target',
+  'draft',
+]);
 const FALLBACKS = [
   'loading',
   'off',
@@ -48,11 +57,17 @@ const FALLBACKS = [
 ];
 const MAX_TURNS = 80;
 
+// 저장본을 읽는다. v4 이하에서 온 것이면 화장실 설비·기본 이름·겹친 공간을 한 번 손본다.
+function loadState(raw) {
+  const state = validateState(raw);
+  if (raw.version < 5) ops.migrateLegacy(state);
+  return state;
+}
 let readError = false;
 let initial = exampleState();
 try {
   const raw = localStorage.getItem(KEY);
-  if (raw) initial = validateState(JSON.parse(raw));
+  if (raw) initial = loadState(JSON.parse(raw));
 } catch {
   readError = true;
 }
@@ -61,6 +76,8 @@ export const app = {
   state: initial,
   thread: [],
   draft: null,
+  // 한 문장에서 가구를 여럿 말했을 때 차례를 기다리는 초안. 앞의 초안을 놓으면 다음 것이 뜬다.
+  queue: [],
   selected: null,
   target: { type: 'room' },
   photo: null,
@@ -217,7 +234,7 @@ function saveThread() {
       const { photo, status, ...rest } = t;
       return photo ? { ...rest, hadPhoto: true } : rest;
     });
-    localStorage.setItem(THREAD_KEY, JSON.stringify({ turns, draft: app.draft }));
+    localStorage.setItem(THREAD_KEY, JSON.stringify({ turns, draft: app.draft, queue: app.queue }));
   } catch {}
 }
 try {
@@ -225,8 +242,11 @@ try {
   if (raw && Array.isArray(raw.turns))
     app.thread = raw.turns.slice(-MAX_TURNS).map(sanitizeTurn).filter(Boolean);
   if (raw?.draft) app.draft = ops.sanitizeItem(raw.draft);
+  if (app.draft && Array.isArray(raw?.queue))
+    app.queue = raw.queue.slice(0, 4).map(ops.sanitizeItem);
 } catch {
   app.thread = [];
+  app.queue = [];
 }
 
 // ---------- 기록 ----------
@@ -295,6 +315,7 @@ function spaceEvent() {
 export function clearThread() {
   app.thread = [];
   app.draft = null;
+  app.queue = [];
   app.photo = null;
   app.target = app.selected ? { type: 'item', id: app.selected } : { type: 'room' };
   persist();
@@ -340,15 +361,7 @@ function placeDraftInto(turn) {
     return;
   }
   snapshot();
-  const { item, free } = ops.placeItem(app.state, d);
-  app.draft = null;
-  // 초안을 다루던 도구는 놓인 가구를 계속 다루도록 대상을 옮긴다.
-  for (const t of app.thread)
-    for (const s of t.surfaces || [])
-      if (s.target?.type === 'draft' && (!s.target.id || s.target.id === d.id))
-        s.target = { type: 'item', id: item.id };
-  app.selected = item.id;
-  app.target = { type: 'item', id: item.id };
+  const { item, free } = placeOne(d);
   turn.receipt.push({
     label: '배치',
     to: `${item.name} · ${dimsText(item.dims)}cm`,
@@ -360,6 +373,61 @@ function placeDraftInto(turn) {
   turn.suggestions = [
     { label: '90° 돌리기', text: '90도 돌려줘' },
     { label: '색 바꾸기', text: `${TYPES[item.type].name} 색을 바꾸고 싶어` },
+    { label: '다른 가구', action: 'catalog' },
+  ];
+  // 기다리던 초안이 있으면 이어서 띄운다. 대상도 새 초안으로 옮긴다.
+  const next = app.queue.shift();
+  if (next) {
+    app.draft = next;
+    app.selected = null;
+    app.target = { type: 'draft' };
+    turn.text = free
+      ? `${josa(item.name, '을/를')} 방에 놓았어요. 이어서 ${nameOf(next)} 초안을 띄웠어요.`
+      : `${josa(item.name, '을/를')} 놓았지만 빈자리가 없어 다른 가구와 겹쳐요. 이어서 ${nameOf(next)} 초안을 띄웠어요.`;
+    turn.receipt.push({ label: '새 초안', to: `${nameOf(next)} · ${dimsText(next.dims)}cm` });
+    turn.surfaces.push({ kind: 'furniture-size', target: { type: 'draft', id: next.id } });
+    turn.suggestions = [
+      { label: '방에 놓기', action: 'place', primary: true },
+      ...(app.queue.length ? [{ label: '남은 가구 모두 놓기', action: 'place-all' }] : []),
+      { label: '다른 가구', action: 'catalog' },
+    ];
+  }
+}
+// 초안 하나를 방에 놓고, 그 초안을 다루던 도구가 놓인 가구를 계속 다루게 한다.
+function placeOne(d) {
+  const placed = ops.placeItem(app.state, d),
+    { item } = placed;
+  if (app.draft?.id === d.id) app.draft = null;
+  for (const t of app.thread)
+    for (const s of t.surfaces || [])
+      if (s.target?.type === 'draft' && (!s.target.id || s.target.id === d.id))
+        s.target = { type: 'item', id: item.id };
+  app.selected = item.id;
+  app.target = { type: 'item', id: item.id };
+  return placed;
+}
+// 지금 초안과 기다리는 초안을 한꺼번에 놓는다. 되돌리기 한 번으로 모두 물린다.
+function placeAllInto(turn) {
+  const list = [app.draft, ...app.queue].filter(Boolean);
+  if (!list.length) return placeDraftInto(turn);
+  snapshot();
+  const names = [];
+  let crowded = 0;
+  for (const d of list) {
+    const { item, free } = placeOne(d);
+    names.push(item.name);
+    if (!free) crowded++;
+    turn.receipt.push({ label: '배치', to: `${item.name} · ${dimsText(item.dims)}cm` });
+  }
+  app.draft = null;
+  app.queue = [];
+  const all = names.map((n, i) => (i < names.length - 1 ? josa(n, '과/와') : n)).join(' ');
+  turn.text = crowded
+    ? `${josa(all, '을/를')} 놓았지만 ${crowded}개는 빈자리가 없어 다른 가구와 겹쳐요. 크기를 줄이거나 위치를 옮겨 주세요.`
+    : `${josa(all, '을/를')} 방에 놓았어요. 도면에서 끌어 옮기거나 회전할 수 있어요.`;
+  if (crowded) turn.surfaces.push({ kind: 'impact', target: roomTarget() });
+  turn.suggestions = [
+    { label: '가구 목록', action: 'tool', arg: 'items' },
     { label: '다른 가구', action: 'catalog' },
   ];
 }
@@ -385,14 +453,41 @@ function runAction(action, arg, turn) {
       break;
     case 'relocate': {
       snapshot();
-      const r = ops.relocateConflicts(s);
-      turn.text = r.moved
-        ? `가구 ${r.moved}개를 빈자리로 옮겼어요.${r.remaining ? ` ${r.remaining}개는 방보다 크거나 자리가 없어 그대로 두었어요.` : ''}`
-        : r.remaining
-          ? '옮길 빈자리가 없어요. 가구 크기를 줄이거나 방을 넓혀 주세요.'
-          : '겹치거나 벽을 넘은 가구가 없어요.';
+      // 겹친 것이 공간일 수도, 가구일 수도 있다. 공간부터 떼어 놓고 가구를 정리한다.
+      const sp = ops.separateSpaces(s),
+        r = ops.relocateConflicts(s),
+        lines = [],
+        both = (names) =>
+          [...new Set(names)].map((n, i, a) => (i < a.length - 1 ? josa(n, '과/와') : n)).join(' ');
+      if (sp.overlapped.length)
+        lines.push(
+          sp.remaining
+            ? `${josa(both(sp.overlapped), '이/가')} 겹쳐 있는데 옮길 자리를 찾지 못했어요. 집 전체 2D에서 끌어 떼어 주세요.`
+            : `${josa(both(sp.overlapped), '이/가')} 겹쳐 있었어요. ${josa(both(sp.moved), '을/를')} 겹치지 않게 옆으로 옮겼어요.`,
+        );
+      if (r.moved)
+        lines.push(
+          `가구 ${r.moved}개를 빈자리로 옮겼어요.${r.remaining ? ` ${r.remaining}개는 방보다 크거나 자리가 없어 그대로 두었어요.` : ''}`,
+        );
+      else if (r.remaining)
+        lines.push('옮길 빈자리가 없어요. 가구 크기를 줄이거나 방을 넓혀 주세요.');
+      else if (!sp.overlapped.length) lines.push('겹친 공간도, 겹치거나 벽을 넘은 가구도 없어요.');
+      turn.text = lines.join(' ');
+      if (sp.moved.length)
+        turn.receipt.push({ label: '집 배치', to: `${sp.moved.length}개 공간 이동` });
       if (r.moved) turn.receipt.push({ label: '자리 정리', to: `${r.moved}개 이동` });
       turn.surfaces.push({ kind: 'impact', target: roomTarget() });
+      break;
+    }
+    case 'rotate-space': {
+      snapshot();
+      const r = ops.rotateSpace(s, arg?.id || s.roomId);
+      turn.text = `${josa(r.name, '을/를')} 오른쪽으로 90° 돌렸어요. 이제 가로 ${r.w}m, 세로 ${r.d}m이고 가구도 함께 돌렸어요.${r.moved.length ? ' 옆 공간은 겹치지 않게 옮겼어요.' : ''}`;
+      turn.receipt.push({ label: '방 돌리기', from: `${r.d} × ${r.w}m`, to: `${r.w} × ${r.d}m` });
+      turn.suggestions = [
+        { label: '한 번 더 돌리기', text: `${r.name} 돌려줘` },
+        { label: '되돌리기', text: '되돌려줘' },
+      ];
       break;
     }
     case 'clear': {
@@ -404,7 +499,10 @@ function runAction(action, arg, turn) {
         ? `가구 ${n}개를 비웠어요. 되돌리기로 다시 꺼낼 수 있어요.`
         : '이미 빈 방이에요.';
       if (n) turn.receipt.push({ label: '가구 비우기', to: `${n}개` });
-      turn.suggestions = [{ label: '가구 고르기', action: 'catalog' }];
+      turn.suggestions = [
+        { label: '가구 고르기', action: 'catalog' },
+        ...(s.otherRooms.length ? [{ label: '공간 정리', action: 'tool', arg: 'spaces' }] : []),
+      ];
       break;
     }
     case 'example':
@@ -444,6 +542,9 @@ function runAction(action, arg, turn) {
     case 'place':
       placeDraftInto(turn);
       break;
+    case 'place-all':
+      placeAllInto(turn);
+      break;
   }
 }
 
@@ -453,13 +554,35 @@ function applyPlan(plan, turn) {
   const s = app.state;
   if (c.addSpace) {
     snapshot();
-    ops.addSpace(s, c.addSpace);
-    s.name = `나의 ${ROOM_TYPES[c.addSpace].name}`;
+    // "화장실 옆에"처럼 기준 공간을 말했으면 그 공간의 벽에, 아니면 지금 방의 벽에 붙인다.
+    const near = c.near || null;
+    ops.addSpace(s, c.addSpace, near?.side || null, {
+      room: c.room,
+      anchor: near?.roomId || null,
+      strict: false,
+    });
     app.selected = null;
     app.target = app.draft ? { type: 'draft' } : { type: 'room' };
+    const at = ops.attachedTo(s, s.roomId, near?.roomId || null),
+      where = at ? `${at.name} ${ops.SIDES[at.side]}` : '';
     turn.receipt.push({ label: '새 공간', to: s.name });
-    const rows = ops.setRoom(s, c.room);
-    turn.receipt.push(...rows.filter((r) => r.label !== '공간 유형'));
+    if (where) turn.receipt.push({ label: '자리', to: where });
+    turn.receipt.push({ label: '크기', to: `${s.room.w} × ${s.room.d} × ${s.room.h}m` });
+    // 모델이 쓴 답이 아니면, 실제로 붙은 자리를 넣어 앱이 답을 쓴다.
+    if (plan.replyBy !== 'model' && plan.intent !== 'compound') {
+      const lines = [];
+      if (near?.missing)
+        lines.push(`${josa(near.missing, '이/가')} 아직 없어서 지금 방을 기준으로 잡았어요.`);
+      else if (near?.side && at && at.side !== near.side)
+        lines.push(`${ops.SIDES[near.side]}에는 자리가 없어 다른 벽에 붙였어요.`);
+      lines.push(
+        where
+          ? `${where}에 ${josa(s.name, '을/를')} 붙였어요.`
+          : `${josa(s.name, '을/를')} 새로 만들었어요.`,
+        `가로 ${s.room.w}m, 세로 ${s.room.d}m예요. 크기를 알려주면 바로 맞출게요.`,
+      );
+      turn.text = lines.join(' ');
+    }
   } else if (c.room) {
     snapshot();
     if (c.room.wallColor !== s.room.wallColor || c.room.floorColor !== s.room.floorColor)
@@ -481,6 +604,14 @@ function applyPlan(plan, turn) {
         to: `${TYPES[app.draft.type].name} · ${dimsText(app.draft.dims)}cm`,
       });
     else turn.receipt.push(...ops.diffItem(before, app.draft).map((r) => ({ ...r, tag: '초안' })));
+    // 새 초안을 잡으면 예전에 기다리던 초안은 버리고, 이번에 함께 말한 가구만 차례로 둔다.
+    if (plan.mode === 'new' || c.queue)
+      app.queue = (c.queue || []).slice(0, 4).map(ops.sanitizeItem);
+    for (const q of c.queue ? app.queue : [])
+      turn.receipt.push({
+        label: '다음 초안',
+        to: `${TYPES[q.type].name} · ${dimsText(q.dims)}cm`,
+      });
   }
 }
 
@@ -493,8 +624,13 @@ function historyForModel() {
       content: t.text.slice(0, 300),
     }));
 }
+// said는 이번 문장 앞의 사용자 말이다. "왜 화장실로 만들어?" 같은 말이 가리키는 앞 요청을 찾을 때 쓴다.
 function context() {
-  return { state: app.state, target: app.target, draft: app.draft };
+  const said = app.thread
+    .filter((t) => t.role === 'user' && !t.action && t.text)
+    .slice(-5, -1)
+    .map((t) => t.text);
+  return { state: app.state, target: app.target, draft: app.draft, queue: app.queue, said };
 }
 function modelContext() {
   const s = subject();
@@ -724,7 +860,7 @@ const TOOL_TEXT = {
   files: '배치는 파일로 저장하거나 불러올 수 있어요. 사진과 대화는 파일에 넣지 않아요.',
   ai: '이 기기에서 실행하는 모델이에요. 준비하지 않아도 기본 상담과 배치는 그대로 쓸 수 있어요.',
   help: '이렇게 쓰면 돼요.',
-  impact: '지금 배치에서 겹치거나 벽을 넘은 가구를 확인해요.',
+  impact: '겹친 공간과, 겹치거나 벽을 넘은 가구를 확인해요.',
   'furniture-size': '같은 종류의 다른 규격과 비교해 보세요.',
   'furniture-dims': '아는 치수만 고치면 돼요. 직접 입력한 값은 상담이나 모델이 바꾸지 않아요.',
   'furniture-color': '가구 색을 골라 보세요.',
@@ -940,7 +1076,7 @@ export function pickDoor(ids) {
 export function attachBathroom() {
   try {
     comparisonEdit((s) => ops.attachBathroom(s));
-    event('화장실을 방 옆에 붙였어요 · 연결 문과 설비는 위치를 가늠하기 위한 초안이에요');
+    event('화장실을 방 옆에 붙였어요 · 변기·세면대·샤워부스는 가구처럼 옮기거나 뺄 수 있어요');
     persist();
     emit();
   } catch (e) {
@@ -951,6 +1087,7 @@ export function attachBathroom() {
 export function runSuggestion(sug) {
   if (sug.text) return send(sug.text);
   if (sug.action === 'place') return placeDraft(sug.label);
+  if (sug.action === 'place-all') return placeDraft(sug.label, 'place-all');
   if (sug.action === 'catalog') return openTool('catalog');
   if (sug.action === 'tool' && sug.arg) return openTool(sug.arg);
   if (sug.action === 'photo') return pickPhoto();
@@ -958,11 +1095,12 @@ export function runSuggestion(sug) {
   if (sug.action === 'draft' && sug.arg) return createDraft(sug.arg, { via: 'photo' });
 }
 
-export function placeDraft(label = '방에 놓기') {
+export function placeDraft(label = '방에 놓기', action = 'place') {
   push({ role: 'user', text: label, action: true });
   const turn = push({ role: 'assistant', text: '' });
   try {
-    placeDraftInto(turn);
+    if (action === 'place-all') placeAllInto(turn);
+    else placeDraftInto(turn);
   } catch (e) {
     turn.text = e.message;
     turn.tone = 'error';
@@ -992,6 +1130,7 @@ export function createDraft(type, { via = 'catalog' } = {}) {
   }
   item.name = TYPES[type].name;
   app.draft = item;
+  app.queue = [];
   app.selected = null;
   app.target = { type: 'draft' };
   push({
@@ -1024,8 +1163,8 @@ export function createDraft(type, { via = 'catalog' } = {}) {
   }
 }
 
-export function relocate() {
-  push({ role: 'user', text: '겹친 가구 정리', action: true });
+export function relocate(label = '겹친 가구 정리') {
+  push({ role: 'user', text: label, action: true });
   const turn = push({ role: 'assistant', text: '' });
   runAction('relocate', null, turn);
   fixRoomTargets(turn);
@@ -1220,7 +1359,6 @@ export function addSpace(type, { side = null } = {}) {
     const from = app.state.name;
     snapshot();
     ops.addSpace(app.state, type, side);
-    app.state.name = `나의 ${ROOM_TYPES[type].name}`;
     app.selected = null;
     app.view.addSide = null;
     app.view.ghostRoom = null;
@@ -1241,6 +1379,22 @@ export function addSpace(type, { side = null } = {}) {
       receipt: [{ label: '새 공간', to: app.state.name }],
       suggestions: [{ label: '가구 고르기', action: 'catalog' }],
     });
+    persist();
+    emit();
+  } catch (e) {
+    app.history.pop();
+    toast(e.message);
+  }
+}
+// 집 전체에서 고른 공간을 통째로 90° 돌린다. 가구와 아바타가 함께 돌고, 옆 공간은 겹치지 않게 비킨다.
+export function rotateSpace(id = app.state.roomId) {
+  try {
+    snapshot();
+    const r = ops.rotateSpace(app.state, id);
+    app.view.door = null;
+    event(
+      `${josa(r.name, '을/를')} 90° 돌렸어요 · 가로 ${r.w}m, 세로 ${r.d}m${r.moved.length ? ' · 옆 공간은 겹치지 않게 옮겼어요' : ''}`,
+    );
     persist();
     emit();
   } catch (e) {
@@ -1321,7 +1475,7 @@ export async function importJSON(file) {
   try {
     if (!file) return;
     if (file.size > 5e6) throw Error('배치 파일은 5MB 이하로 선택해주세요.');
-    const next = validateState(JSON.parse(await file.text()));
+    const next = loadState(JSON.parse(await file.text()));
     snapshot();
     Object.assign(app.state, next);
     for (const a of app.state.items) clampItem(a, app.state.room);

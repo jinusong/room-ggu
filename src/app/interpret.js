@@ -1,8 +1,11 @@
 // 상담 모델이 기본 해석기다. 모델이 고른 의도·동작·가구·공간 유형·크기 느낌·색·도구·답을
 // 앱의 계획(planner.js와 같은 모양)으로 옮긴다. 앱은 다음만 검증하고, 바로잡으면 fixes에 남긴다.
 // - 숫자 치수는 모델이 아니라 문장에서 직접 읽는다(사용자 값은 그대로 둔다).
-// - 문장에 적힌 가구·공간 이름과 모델 선택이 어긋나면 문장을 따른다.
+// - 문장에 적힌 가구·공간 이름과 모델 선택이 어긋나면 문장을 따른다. 다만 "화장실 옆에"처럼 자리를
+//   가리키거나 "화장실 말고"처럼 아니라고 한 이름은 고를 유형으로 치지 않는다(room-consult.js의 roomMentions).
 // - 사용자가 말하지 않은 속성(벽·바닥·가구 색·공간 유형 등)과 문장에 없는 동작은 실행하지 않는다.
+// - 모델이 쓴 답 문장은 앱이 바로잡은 것이 없고, 하지 않은 일을 했다고 말하지 않을 때만 보여 준다.
+// - 한 문장에 방 이야기와 가구 이야기가 함께 있거나 가구가 여럿이면 마디로 나눠 각각 처리한다.
 // 모델 답을 쓸 수 없으면 store가 규칙 기반 planTurn으로 대신 처리한다.
 import {
   TYPES,
@@ -11,10 +14,11 @@ import {
   FLOOR_COLORS,
   FURNITURE_COLORS,
   makeRoom,
+  retypeRoom,
 } from '../catalog.js';
 import { makeItem, layoutWarnings, clampItem, spaces } from '../data.js';
 import { consult, applyModelResult, mentionedTypes } from '../estimator.js';
-import { detectRoomType, parseRoomDimensions } from '../room-consult.js';
+import { mentionsRoom, roomMentions, assertedType, parseRoomDimensions } from '../room-consult.js';
 import {
   chooseSurface,
   surfaceKind,
@@ -30,8 +34,12 @@ import {
   planTurn,
   resolveScope,
   parseFurnitureColor,
+  splitRequest,
+  mergePlans,
+  refSpace,
   ROOM_REFERENCE,
   ROOM_TALK,
+  COMPLAINT,
   noteUnlisted,
   actionSubject,
 } from './planner.js';
@@ -57,9 +65,9 @@ const ACTION_EVIDENCE = {
   duplicate: /복제|하나\s*더|똑같|같은\s*(?:거|것)|복사/,
   delete: /삭제|지워|빼|없애|치워/,
   relocate: /겹치|겹친|빈\s*(?:곳|자리)|정리|자동\s*배치|옮겨/,
-  clear: /비워|비우|빈\s*방|(?:다|모두|전부)\s*(?:치워|빼)/,
+  clear: /비워|비우|빈\s*방|(?:다|모두|전부)\s*(?:치워|빼)|초기화|리셋/,
   example: /예시/,
-  new_space: /추가|새\s*(?:방|공간)|새로|하나\s*더|만들/,
+  new_space: /추가|새\s*(?:방|공간)|새로|하나\s*더|만들|붙여|붙이/,
   switch_space: /이동|전환|열어|가자|넘어가|바꿔|보여/,
 };
 const ACTION_NAMES = {
@@ -78,6 +86,8 @@ const ACTION_NAMES = {
 const COMMAND_NAMES = {
   ...ACTION_NAMES,
   switch: '공간 이동',
+  'rotate-space': '방 돌리기',
+  'place-all': '모두 놓기',
   catalog: '가구 고르기',
   spaces: '공간 목록',
   items: '가구 목록',
@@ -93,6 +103,10 @@ const OPEN_TEXT = {
   help: '이렇게 쓰면 돼요.',
   ai: '이 기기에서 실행하는 모델이에요. 끄면 규칙으로 답해요.',
 };
+
+// 모델 답이 "했어요"라고 끝맺는 문장인지. 앱이 아무것도 바꾸지 않았는데 이런 답을 보여 주면 거짓말이 된다.
+const CLAIMS_DONE =
+  /(?:했|었|았|였|겼|꿨|웠|놨|렸|췄|뒀|됐)(?:어요|습니다|어|다)(?![가-힣])|(?:추가|변경|삭제|배치|적용|반영|완료|이동)(?:했|됐|되었)/;
 
 const colorOf = (list, name) => list.find(([n]) => n === name)?.[1] || null;
 const pick = (value, list, fallback) => (list.includes(value) ? value : fallback);
@@ -125,7 +139,7 @@ export function readModel(raw) {
 function literalScope(t, named) {
   const surfaceWords = WALL_WORDS.test(t) || FLOOR_WORDS.test(t) || /천장/.test(t);
   if (named.length && !surfaceWords) return 'furniture';
-  if (!named.length && (detectRoomType(t) || ROOM_REFERENCE.test(t) || ROOM_TALK.test(t)))
+  if (!named.length && (mentionsRoom(t) || ROOM_REFERENCE.test(t) || ROOM_TALK.test(t)))
     return 'room';
   return null;
 }
@@ -144,7 +158,15 @@ export function planFromModel(raw, text, ctx) {
     target.type === 'item' ? ctx.state.items.find((a) => a.id === target.id) || null : null;
   const named = mentionedTypes(t);
   const literal = literalScope(t, named);
-  const done = (plan) => ({ ...noteUnlisted(plan, t), decidedBy: 'model', fixes });
+  // 모델이 쓴 답(modelReply)은 바로잡은 것이 없고, 바꾼 것 없이 "했어요"라고 하지 않을 때만 쓴다.
+  const done = ({ modelReply, ...plan }) => {
+    const out = { ...plan, decidedBy: 'model', fixes };
+    if (modelReply && !fixes.length && (hasChanges(out) || !CLAIMS_DONE.test(modelReply))) {
+      out.reply = modelReply;
+      out.replyBy = 'model';
+    }
+    return noteUnlisted(out, t);
+  };
 
   // "되돌려줘", "공간 목록", "파일로 저장"처럼 문장에 명령이 분명한데 모델이 다른 일을 고르면 명령을 따른다.
   const rule = planTurn(t, ctx);
@@ -155,6 +177,27 @@ export function planFromModel(raw, text, ctx) {
       fixes.push(`문장의 명령(${COMMAND_NAMES[command] || command})을 따름`);
       return done(rule);
     }
+  }
+  // "왜 화장실로 만들어?"처럼 아니라고만 한 문장은 앞 대화에서 바라던 유형을 찾아 바로잡거나 되묻는다.
+  if (rule.repaired) {
+    fixes.push('아니라고 한 유형은 고르지 않고 앞 대화를 따름');
+    return done(rule);
+  }
+  // 무엇을 가리키는지 없는 불만("아니 그게 아니라")은 지금 대상인 가구나 초안 이야기로 받지 않고 되묻는다.
+  // 모델도 되묻는 답을 썼으면 그 답을 쓴다.
+  if (rule.vague)
+    return done({
+      ...rule,
+      modelReply: v.intent === 'chat' && v.action === 'none' ? usableReply(v.reply, t) : null,
+    });
+  // 어떤 공간인지 말하지 않고 방을 추가하자고 했으면 만들지 않고 묻는다. 모델이 용도에서 유형을
+  // 읽어 냈으면("잠잘 방 하나 추가해줘") 모델을 따른다.
+  if (rule.ask === 'space-type' && !(v.action === 'new_space' && v.roomType)) return done(rule);
+  // 방 이야기와 가구 이야기가 섞였거나 가구가 여럿이면 나눠서 처리한다.
+  const request = splitRequest(t);
+  if (request) {
+    const plan = compoundPlan(v, request, ctx, item, fixes);
+    if (plan) return done(plan);
   }
 
   // 목록에 없는 물건을 말했으면 모델이 비슷한 가구나 지금 대상을 골랐어도 만들거나 바꾸지 않는다.
@@ -181,17 +224,21 @@ export function planFromModel(raw, text, ctx) {
     else {
       // 모델이 바꿀 것이 없다고 봤지만 규칙이 바꿀 내용을 찾으면 규칙으로 처리한다.
       if (hasChanges(planTurn(t, ctx))) return { fallback: 'model-chat' };
+      const upset = COMPLAINT.test(t);
       return done({
         intent: 'chat',
         scope: null,
-        reply:
-          usableReply(v.reply, t) ||
-          '방 크기나 놓고 싶은 가구를 말해 주세요. “거실 가로 5m 세로 4m”처럼 말하면 바로 반영해요.',
+        modelReply: usableReply(v.reply, t),
+        reply: upset
+          ? '어디가 다르게 됐는지 알려 주세요. 방금 바꾼 내용은 되돌릴 수 있어요.'
+          : '방 크기나 놓고 싶은 가구를 말해 주세요. “거실 가로 5m 세로 4m”처럼 말하면 바로 반영해요.',
         surfaces: [],
-        suggestions: [
-          { label: '방 크기 정하기', action: 'tool', arg: 'room-size' },
-          { label: '가구 고르기', action: 'catalog' },
-        ],
+        suggestions: upset
+          ? [{ label: '되돌리기', text: '되돌려줘' }]
+          : [
+              { label: '방 크기 정하기', action: 'tool', arg: 'room-size' },
+              { label: '가구 고르기', action: 'catalog' },
+            ],
       });
     }
   }
@@ -220,12 +267,15 @@ function actionPlan(v, t, ctx, item, named, fixes) {
   if (Object.hasOwn(OPEN_TEXT, a)) {
     // 가구 이름을 말했으면 목록보다 그 가구 초안이 먼저다.
     if (a === 'catalog' && named.length) return null;
-    return surfacePlan(a, usableReply(v.reply, t) || OPEN_TEXT[a]);
+    return { ...surfacePlan(a, OPEN_TEXT[a]), modelReply: usableReply(v.reply, t) };
   }
   if (a === 'switch_space') {
     const hit = spaces(ctx.state).find((r) => r.roomId !== ctx.state.roomId && r.name === v.space);
-    if (!hit || !(t.includes(hit.name) || ACTION_EVIDENCE.switch_space.test(t))) {
-      fixes.push('공간 이동은 문장에 공간 이름이 있을 때만 실행');
+    // 이름을 그대로 말했거나, 옮기자는 말과 함께 그 공간의 유형을 말했을 때만 옮긴다.
+    // "거실 말고 침실로 바꿔줘"의 "바꿔"만 보고 모델이 고른 엉뚱한 공간으로 가지 않는다.
+    const typed = hit && roomMentions(t).some((m) => m.type === hit.room.type && m.role !== 'neg');
+    if (!hit || !(t.includes(hit.name) || (typed && ACTION_EVIDENCE.switch_space.test(t)))) {
+      fixes.push('공간 이동은 문장에 그 공간의 이름이나 유형이 있을 때만 실행');
       return null;
     }
     return metaPlan('switch', '', { arg: { id: hit.roomId } });
@@ -255,12 +305,10 @@ function actionPlan(v, t, ctx, item, named, fixes) {
     return metaPlan(a, '', { arg: { id: who.item.id } });
   }
   if (a === 'new_space') {
-    const literal = detectRoomType(t);
-    if (literal && v.roomType && v.roomType !== literal)
-      fixes.push(`공간 유형은 문장에 적힌 ${ROOM_TYPES[literal].name}`);
-    const type = literal || v.roomType;
+    const type = pickRoomType(v.roomType, t, fixes);
+    // 어떤 공간인지 알 수 없으면 방 이야기로 넘겨 되묻는다.
     if (!type) return null;
-    return newSpacePlan(type, t, v);
+    return newSpacePlan(type, t, v, ctx);
   }
   return metaPlan(
     a,
@@ -272,7 +320,29 @@ function actionPlan(v, t, ctx, item, named, fixes) {
   );
 }
 
-function newSpacePlan(type, t, v) {
+// 새로 만들거나 바꿀 공간 유형을 정한다. 문장에 유형이 적혀 있으면 그 안에서만 고른다.
+// - 못 박은 말("거실이라니까", "거실로 바꿔")이 있으면 그 유형이다.
+// - 유형을 여럿 말했으면 모델이 그중에서 고른 것을 따른다.
+// - 자리("화장실 옆에")나 부정("화장실 말고")으로만 나온 이름은 모델이 골라도 쓰지 않는다.
+function pickRoomType(modelType, t, fixes) {
+  const mentions = roomMentions(t),
+    wanted = mentions.filter((m) => m.role === 'new'),
+    literal = assertedType(mentions);
+  if (!wanted.length) {
+    if (modelType && mentions.some((m) => m.type === modelType)) {
+      fixes.push('자리를 가리키거나 아니라고 한 이름은 공간 유형으로 쓰지 않음');
+      return null;
+    }
+    return modelType;
+  }
+  if (modelType === literal) return literal;
+  if (modelType && !wanted.some((m) => m.strong) && wanted.some((m) => m.type === modelType))
+    return modelType;
+  if (modelType) fixes.push(`공간 유형은 문장에 적힌 ${ROOM_TYPES[literal].name}`);
+  return literal;
+}
+
+function newSpacePlan(type, t, v, ctx) {
   const room = makeRoom(type);
   for (const [k, n] of Object.entries(parseRoomDimensions(t))) {
     room[k] = n;
@@ -281,10 +351,9 @@ function newSpacePlan(type, t, v) {
   return {
     intent: 'room',
     scope: 'room',
-    reply:
-      usableReply(v.reply, t) ||
-      `${josa(ROOM_TYPES[type].name, '을/를')} 새 공간으로 만들었어요. 가로·세로를 알려주면 바로 맞출게요.`,
-    changes: { addSpace: type, room },
+    // 답은 실제로 붙은 공간과 벽, 크기를 넣어 store가 쓴다(applyPlan). 모델 답은 어디에 붙었는지 모른다.
+    reply: `${josa(ROOM_TYPES[type].name, '을/를')} 새 공간으로 만들었어요. 가로·세로를 알려주면 바로 맞출게요.`,
+    changes: { addSpace: type, room, near: refSpace(t, ctx.state) },
     surfaces: [{ kind: 'room-size', target: { type: 'room' } }],
     suggestions: [
       { label: '크기 알려주기', text: '가로 4m 세로 3m' },
@@ -298,22 +367,20 @@ const keep = (source) => /^(사용자|대화 추정)/.test(String(source));
 function roomPlan(v, t, ctx, fixes) {
   // 숫자·면적·문장에 적힌 유형과 마감은 먼저 문장에서 읽는다.
   const base = planRoom(t, ctx);
-  if (base.error || base.changes?.addSpace) return base;
+  // 새 공간 만들기, 되묻기, "이미 그 유형"은 문장에서 읽은 그대로 쓴다.
+  if (base.error || base.changes?.addSpace || !base.surfaces.length || base.settled) return base;
   const before = ctx.state.room;
-  const room = structuredClone(base.changes?.room || before);
-  const literalType = detectRoomType(t);
+  let room = structuredClone(base.changes?.room || before);
   if (v.roomType && v.roomType !== room.type) {
-    if (literalType) fixes.push(`공간 유형은 문장에 적힌 ${ROOM_TYPES[literalType].name} 유지`);
+    const mentions = roomMentions(t),
+      literal = assertedType(mentions),
+      picked = pickRoomType(v.roomType, t, []);
+    if (literal && picked === v.roomType) room = retypeRoom(room, v.roomType, keep);
+    else if (literal) fixes.push(`공간 유형은 문장에 적힌 ${ROOM_TYPES[literal].name} 유지`);
+    else if (mentions.length)
+      fixes.push('자리를 가리키거나 아니라고 한 이름은 공간 유형으로 쓰지 않음');
     else if (!PURPOSE.test(t)) fixes.push('말하지 않은 공간 유형 변경은 막음');
-    else {
-      room.type = v.roomType;
-      const d = makeRoom(v.roomType);
-      for (const k of ['w', 'd', 'h'])
-        if (!keep(room.sources[k])) {
-          room[k] = d[k];
-          room.sources[k] = '공간 유형 기본값';
-        }
-    }
+    else room = retypeRoom(room, v.roomType, keep);
   }
   if (v.size !== 'unknown' && !LITERAL_ROOM_SIZE.test(t) && ROOM_SIZE_TALK.test(t)) {
     const sizes = ROOM_TYPES[room.type].sizes[['compact', 'standard', 'large'].indexOf(v.size)];
@@ -360,25 +427,79 @@ function roomPlan(v, t, ctx, fixes) {
     room.wallColor !== before.wallColor && `벽은 ${name(WALL_COLORS, room.wallColor)}`,
     room.floorColor !== before.floorColor && `바닥은 ${name(FLOOR_COLORS, room.floorColor)}`,
   ].filter(Boolean);
+  // 면적으로 크기를 잡은 턴은 "6평(약 19.8m²)에 맞춰…"처럼 말한 면적을 받아 주는 앱의 답을 쓴다.
+  // 모델 답은 숫자를 말할 수 없어서, 그 답을 쓰면 면적을 알아들었는지 화면에서 알 수 없다.
+  const byArea =
+    base.area && room.w === base.changes?.room?.w && room.d === base.changes?.room?.d
+      ? base.reply
+      : null;
   const fallbackReply = !changed
     ? base.reply
     : [
-        sizeChanged &&
-          `${josa(ROOM_TYPES[room.type].name, '을/를')} 가로 ${room.w}m, 세로 ${room.d}m, 천장 ${room.h}m로 반영했어요.`,
+        byArea ||
+          (sizeChanged &&
+            `${josa(ROOM_TYPES[room.type].name, '을/를')} 가로 ${room.w}m, 세로 ${room.d}m, 천장 ${room.h}m로 반영했어요.`),
         finish.length && `${josa(finish.join(', '), '으로/로')} 바꿨어요.`,
       ]
         .filter(Boolean)
         .join(' ');
-  const areaNote = /면적만으로[^.]*\./.exec(base.reply)?.[0];
   return {
     intent: 'room',
     scope: 'room',
-    reply: (!fixes.length && usableReply(v.reply, t)) || fallbackReply,
-    note: areaNote && !fixes.length ? areaNote : undefined,
+    modelReply: byArea ? null : usableReply(v.reply, t),
+    reply: fallbackReply,
+    area: byArea ? base.area : undefined,
     changes: changed ? { room } : {},
     surfaces,
     suggestions: base.suggestions,
   };
+}
+
+// 한 문장을 방 마디와 가구 마디로 나눈 요청. 모델이 고른 가구에는 모델의 단서(인원·크기 느낌·색)를 쓰고,
+// 나머지 가구는 그 마디에 적힌 말로 초안을 잡는다. 방 마디의 숫자·면적·유형은 문장에서 읽는다.
+function compoundPlan(v, request, ctx, item, fixes) {
+  const { roomText, pieces } = request;
+  let room = null;
+  if (roomText) {
+    room = v.intent === 'room' ? roomPlan(v, roomText, ctx, fixes) : planRoom(roomText, ctx);
+    if (room.error) return room;
+    if (!room.changes?.room && !room.changes?.addSpace) room = null;
+  }
+  if (!room && pieces.length < 2) return null;
+  if (pieces.length === 1 && item) return null;
+  // 새 초안으로만 잡는다. 지금 고른 가구를 고치는 말은 보통 경로가 맡는다.
+  const fresh = { ...ctx, target: { type: 'room' } };
+  const drafts = pieces.map((piece) => {
+    const mine = piece.type === v.furniture || (pieces.length === 1 && !v.furniture);
+    const plan = furniturePlan(
+      mine
+        ? v
+        : {
+            ...v,
+            furniture: piece.type,
+            seats: null,
+            size: 'unknown',
+            depth: 'unknown',
+            height: 'unknown',
+            color: null,
+            ui: null,
+          },
+      piece.text,
+      fresh,
+      null,
+      [piece.type],
+      fixes,
+    );
+    return plan.changes.draft;
+  });
+  fixes.push(
+    room && pieces.length > 1
+      ? '방 이야기와 가구 여럿을 나눠 처리'
+      : room
+        ? '방 이야기와 가구 이야기를 나눠 처리'
+        : '가구 여럿을 나눠 처리',
+  );
+  return mergePlans(room, drafts, ctx);
 }
 
 function furniturePlan(v, t, ctx, item, named, fixes) {
@@ -399,9 +520,8 @@ function furniturePlan(v, t, ctx, item, named, fixes) {
     return {
       intent: 'furniture',
       scope: null,
-      reply:
-        usableReply(v.reply, t) ||
-        '어떤 가구인지 알려주세요. 이름을 말하거나 아래에서 고르면 크기 초안부터 잡아드려요.',
+      modelReply: usableReply(v.reply, t),
+      reply: '어떤 가구인지 알려주세요. 이름을 말하거나 아래에서 고르면 크기 초안부터 잡아드려요.',
       surfaces: [{ kind: 'catalog', target: { type: 'room' } }],
       suggestions: [
         { label: '2인 소파', text: '두 명이 앉는 소파' },
@@ -466,13 +586,23 @@ function furniturePlan(v, t, ctx, item, named, fixes) {
       surfaces.push({ kind: 'impact', target: { type: 'room' } });
   }
   const what = mode === 'item' ? `${TYPES[type].name} 크기는` : `${TYPES[type].name} 초안은`;
-  const fallbackReply = `${what} ${dimsText(next.dims)}cm예요. ${mode === 'new' ? '방에 놓기 전에 아래에서 규격을 비교해 보세요.' : '아래 도구에서 더 조절할 수 있어요.'}`;
+  // 색만 바뀌었으면 치수를 되풀이하지 않고 바뀐 색을 말한다. 아무것도 안 바뀌었으면 그대로라고 한다.
+  const colorName = FURNITURE_COLORS.find(([, hex]) => hex === next.color)?.[0],
+    sameDims = next.dims.every((d, i) => d === base.dims[i]),
+    label = next.name || TYPES[type].name;
+  const fallbackReply =
+    mode !== 'new' && sameDims && next.color !== base.color && colorName
+      ? `${label} 색을 ${josa(colorName, '으로/로')} 바꿨어요.`
+      : mode !== 'new' && sameDims && next.color === base.color
+        ? `${josa(label, '은/는')} 그대로예요. “가로 140cm”, “초록색으로”, “조금 더 작게”처럼 바꿀 치수나 색을 알려주세요.`
+        : `${what} ${dimsText(next.dims)}cm예요. ${mode === 'new' ? '방에 놓기 전에 아래에서 규격을 비교해 보세요.' : '아래 도구에서 더 조절할 수 있어요.'}`;
   return {
     intent: 'furniture',
     scope: 'furniture',
     mode,
     target,
-    reply: (!fixes.length && usableReply(v.reply, t)) || fallbackReply,
+    modelReply: usableReply(v.reply, t),
+    reply: fallbackReply,
     changes: mode === 'item' ? { item: { id: item.id, next } } : { draft: next },
     surfaces,
     suggestions: furnitureChips(next, mode),

@@ -8,7 +8,7 @@ import { avatarLayout, avatarSpace, avatarRect, HOME_VIEW } from './avatar.js';
 import { spaces } from './data.js';
 import { houseLayout } from './house-geometry.js';
 import { roomOpenings, doorSwing } from './floorplan.js';
-import { houseStructure, houseFurniture, bathroomModel } from './house-three.js';
+import { houseStructure, houseFurniture } from './house-three.js';
 export { PAPER };
 
 // 종이 위에 놓인 1:50 실내 모형처럼 보이는 3D 장면.
@@ -608,7 +608,6 @@ export class RoomScene {
       for (const t of this.roomTapes) t.visible = !this.selected;
       this.room.add(wl, dl, hl);
     }
-    if (this.state.room.type === 'bathroom') this.room.add(bathroomModel(this.state.room, doors));
     this.dirty = true;
   }
   fitDistance() {
