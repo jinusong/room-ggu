@@ -14,9 +14,10 @@ import {
   modelMissing,
 } from './models.js';
 
-test('기본 상담 모델은 가장 가벼운 후보이고 모르는 선택은 기본으로 돌아간다', () => {
-  const sizes = Object.values(TEXT_MODELS).map((m) => m.downloadMB);
-  assert.equal(TEXT_MODELS[DEFAULT_TEXT_MODEL].downloadMB, Math.min(...sizes));
+test('기본 상담 모델은 Gemma 4 E2B이고 모르는 선택은 기본으로 돌아간다', () => {
+  assert.equal(DEFAULT_TEXT_MODEL, 'large');
+  assert.equal(TEXT_MODELS[DEFAULT_TEXT_MODEL].f16, 'gemma-4-E2B-it-q4f16_1-MLC');
+  assert.equal(TEXT_MODELS[DEFAULT_TEXT_MODEL].f32, 'gemma-4-E2B-it-q4f32_1-MLC');
   assert.equal(textModel('large').name, 'Gemma 4 E2B');
   for (const bad of [undefined, null, '', 'huge', '__proto__', 'constructor'])
     assert.equal(textModel(bad).key, DEFAULT_TEXT_MODEL);
@@ -24,6 +25,8 @@ test('기본 상담 모델은 가장 가벼운 후보이고 모르는 선택은 
   assert.equal(modelName('gemma3-1b-it-q4f16_1-MLC'), 'Gemma 3 1B');
   assert.equal(modelName('Qwen3-0.6B-q4f32_1-MLC'), 'Qwen3 0.6B');
   assert.equal(sizeText(600), '600MB');
+  assert.equal(sizeText(0.02), '<1MB');
+  assert.equal(sizeText(0), '0MB');
   assert.equal(sizeText(2840), '2.8GB');
 });
 test('로더의 진행 문장에서 내려받기와 보관본 불러오기를 구별한다', () => {
@@ -83,8 +86,8 @@ test('모델 조각이 모두 보관돼 있을 때만 받아 둔 모델로 본�
   const id = 'gemma3-1b-it-q4f16_1-MLC',
     base = `https://huggingface.co/mlc-ai/${id}/resolve/main/`,
     records = [
-      { dataPath: 'params_shard_0.bin', nbytes: 30 * 1048576 },
-      { dataPath: 'params_shard_1.bin', nbytes: 12.2 * 1048576 },
+      { dataPath: 'params_shard_0.bin', nbytes: 30 * 1000000 },
+      { dataPath: 'params_shard_1.bin', nbytes: 12.2 * 1000000 },
     ];
   const fake = (files) => {
     const urls = files.map((f) => base + f);

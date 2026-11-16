@@ -11,6 +11,7 @@ const STALL_MS = 60000;
 const AUTO_FOLD_MS = 7000;
 const TITLES = {
   text: {
+    connect: '상담 모델 연결 중',
     fetch: '상담 모델 받는 중',
     init: '상담 모델 준비 중',
     done: '상담 모델 준비 완료',
@@ -135,7 +136,7 @@ export function ModelIsland() {
   const ref = useRef(null);
   const inside = useRef(false);
   const [, tick] = useState(0);
-  const busy = d?.phase === 'fetch' || d?.phase === 'init';
+  const busy = ['connect', 'fetch', 'init'].includes(d?.phase);
   // 받는 중에는 몇 초마다 다시 그려, 받은 양이 한동안 늘지 않으면 알린다.
   useEffect(() => {
     if (!busy) return;
@@ -229,7 +230,7 @@ export function ModelIsland() {
                 }
                 size={16}
                 // 한참 멈춰 있으면 도는 표시도 멈춘다. 그때는 글로 알린다.
-                className={d.phase === 'init' && !stalled ? 'spin' : ''}
+                className={d.phase !== 'fetch' && busy && !stalled ? 'spin' : ''}
               />
             )}
           </span>
@@ -257,17 +258,19 @@ export function ModelIsland() {
                   aria-valuenow={d.phase === 'fetch' ? percent : undefined}
                 >
                   <span
-                    class={d.phase === 'init' ? 'is-waiting' : ''}
-                    style={{ width: `${d.phase === 'init' ? 100 : Math.max(2, percent)}%` }}
+                    class={d.phase !== 'fetch' ? 'is-waiting' : ''}
+                    style={{ width: `${d.phase !== 'fetch' ? 100 : Math.max(2, percent)}%` }}
                   />
                 </div>
                 <div class="island-numbers mono">
                   <span>
                     {d.phase === 'fetch'
                       ? `${sizeText(d.mb || 0)} / 약 ${sizeText(d.totalMB || 0)}`
-                      : d.cached
-                        ? '보관해 둔 모델을 불러오는 중'
-                        : '다 받았어요 · 기기에 맞게 준비하는 중'}
+                      : d.phase === 'connect'
+                        ? '모델 파일에 연결하는 중'
+                        : d.cached
+                          ? '보관해 둔 모델을 불러오는 중'
+                          : '다 받았어요 · 기기에 맞게 준비하는 중'}
                   </span>
                   {d.phase === 'fetch' && <b>{percent}%</b>}
                 </div>
@@ -290,7 +293,7 @@ export function ModelIsland() {
             </p>
             {stalled && (
               <p class="island-stalled" role="status">
-                {d.phase === 'fetch'
+                {d.phase === 'fetch' || d.phase === 'connect'
                   ? '한동안 받은 양이 늘지 않았어요. 네트워크를 확인해 주세요. 취소한 뒤 다시 켜면 받은 데서 이어서 받아요.'
                   : '준비가 평소보다 오래 걸려요. 계속 기다리거나, 취소한 뒤 다른 탭을 닫고 다시 켜 보세요.'}
               </p>

@@ -1,11 +1,12 @@
 // 브라우저 Worker에서 공개 가중치 모델을 실행한다. 대화와 사진은 이 기기 밖으로 보내지 않는다.
-// - 상담 모델: WebLLM의 Gemma 3 1B(f16이 없는 GPU에서는 Qwen3 0.6B)가 기본이고, 사용자가 고르면 Gemma 4 E2B를 쓴다.
+// - 상담 모델: Gemma 4 E2B가 기본이다. 메모리가 부족하면 Gemma 3 1B를 직접 고른다.
 //   어느 모델이든 문장을 해석해 같은 JSON 스키마로 답한다.
 // - 사진 모델: Transformers.js의 SigLIP이 사진과 20가지 가구 이름을 비교해 점수를 낸다.
 import { TYPES, ROOM_TYPES, WALL_COLORS, FLOOR_COLORS, FURNITURE_COLORS } from './catalog.js';
 import { MODEL_ACTIONS, MODEL_UI } from './ui-schema.js';
 import { PHOTO_MODEL, PHOTO_LABELS } from './app/photo.js';
-import { textModel, modelCached, DOWNLOAD_START } from './app/models.js';
+import { textModel, modelCached } from './app/models.js';
+import { prepareTextModel } from './app/model-download.js';
 
 let engine = null,
   textId = null,
@@ -37,16 +38,27 @@ async function loadText(choice) {
   const adapter = await self.navigator.gpu.requestAdapter();
   if (!adapter)
     throw Error('사용할 수 있는 GPU를 찾지 못했어요. 브라우저 하드웨어 가속을 확인해 주세요.');
-  const { MLCEngine, prebuiltAppConfig } = await import('@mlc-ai/web-llm');
   const model = textModel(choice),
     preferred = adapter.features.has('shader-f16') ? model.f16 : model.f32;
-  if (!prebuiltAppConfig.model_list.some((x) => x.model_id === preferred))
-    throw Error('이 버전에서 지원하는 모델을 찾지 못했어요.');
-  // 보관해 둔 모델이 없으면 내려받기를 시작한다고 먼저 알린다. 로더는 설정·토크나이저를 받은 뒤에야
-  // 첫 진행 상황을 보내므로, 그 사이에도 화면이 내려받는 중임을 보여줄 수 있게 한다.
-  // 라이브러리의 hasModelInCache는 저장소 형식에 따라 받아 둔 모델도 없다고 답해서 캐시를 직접 확인한다.
-  if (!(await modelCached(preferred)))
-    emit('text', { progress: 0, text: DOWNLOAD_START, model: preferred });
+  const cached = await modelCached(preferred);
+  if (!cached) emit('text', { phase: 'connect', model: preferred });
+  // 무거운 라이브러리를 읽는 동안에도 설정·가중치를 먼저 받는다. 실행 파일과 토크나이저도
+  // 가중치와 함께 받아, WebLLM.reload의 순차 다운로드와 중복 요청을 피한다.
+  const sdk = import('@mlc-ai/web-llm');
+  const library = sdk.then(({ prebuiltAppConfig }) => {
+    const record = prebuiltAppConfig.model_list.find((x) => x.model_id === preferred);
+    if (!record) throw Error('이 버전에서 지원하는 모델을 찾지 못했어요.');
+    return record.model_lib;
+  });
+  await prepareTextModel(
+    preferred,
+    (r) => {
+      if (!cached) emit('text', { ...r, model: preferred });
+    },
+    { library },
+  );
+  if (!cached) emit('text', { phase: 'init', progress: 1, model: preferred });
+  const { MLCEngine } = await sdk;
   engine = new MLCEngine({
     initProgressCallback: (r) =>
       emit('text', { progress: r.progress, text: r.text, model: preferred }),

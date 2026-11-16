@@ -4,7 +4,7 @@ export const TEXT_MODELS = {
   light: {
     key: 'light',
     name: 'Gemma 3 1B',
-    note: '가벼움 · 기본',
+    note: '가벼운 모델',
     f16: 'gemma3-1b-it-q4f16_1-MLC',
     f32: 'Qwen3-0.6B-q4f32_1-MLC',
     downloadMB: 600,
@@ -13,14 +13,14 @@ export const TEXT_MODELS = {
   large: {
     key: 'large',
     name: 'Gemma 4 E2B',
-    note: '더 큰 모델 · 직접 고를 때만',
+    note: '기본 · 컴퓨터용',
     f16: 'gemma-4-E2B-it-q4f16_1-MLC',
     f32: 'gemma-4-E2B-it-q4f32_1-MLC',
     downloadMB: 2840,
     vramMB: 3387,
   },
 };
-export const DEFAULT_TEXT_MODEL = 'light';
+export const DEFAULT_TEXT_MODEL = 'large';
 export const textModel = (key) =>
   Object.hasOwn(TEXT_MODELS, key) ? TEXT_MODELS[key] : TEXT_MODELS[DEFAULT_TEXT_MODEL];
 export function modelName(id) {
@@ -55,7 +55,7 @@ export async function modelMissing(id) {
     const bytes = missing.reduce((n, r) => n + (Number.isFinite(r.nbytes) ? r.nbytes : NaN), 0);
     return {
       cached: missing.length === 0,
-      missingMB: Number.isFinite(bytes) ? Math.ceil(bytes / 1048576) : null,
+      missingMB: Number.isFinite(bytes) ? Math.ceil(bytes / 1000000) : null,
     };
   } catch {
     return { cached: false, missingMB: null };
@@ -74,7 +74,7 @@ export function handheld(nav = globalThis.navigator) {
   );
 }
 export const sizeText = (mb) =>
-  mb >= 1000 ? `${(mb / 1000).toFixed(1)}GB` : `${Math.round(mb)}MB`;
+  mb >= 1000 ? `${(mb / 1000).toFixed(1)}GB` : mb > 0 && mb < 1 ? '<1MB' : `${Math.round(mb)}MB`;
 
 // 로더가 던지는 영문 오류를 무슨 일이 왜 일어났는지 알 수 있는 말로 바꾼다. 모르는 오류는 원문을 덧붙인다.
 export function explainLoadError(message = '') {

@@ -75,7 +75,7 @@ export const app = {
     progress: 0,
     label: '',
     error: '',
-    // 내려받기 안내: task는 text|vision, phase는 fetch(내려받는 중)|init(준비)|done|error.
+    // 내려받기 안내: task는 text|vision, phase는 connect|fetch|init|done|error.
     download: null,
   },
   busy: null,
@@ -1555,7 +1555,7 @@ export async function loadText({ auto = false, fresh = false } = {}) {
   if (fresh) {
     app.ai.download = {
       task: 'text',
-      phase: 'fetch',
+      phase: 'connect',
       name: app.view.asked?.name || choice.name,
       mb: 0,
       totalMB: app.view.asked?.total || choice.downloadMB,
@@ -1652,8 +1652,11 @@ function trackDownload(task, patch) {
   const now = app.ai.download,
     // 준비만 하던 중에 실제로 받기 시작하면 새 내려받기로 본다.
     fresh =
-      !now || now.task !== task || now.phase === 'done' || (patch.phase === 'fetch' && now.cached);
-  if (fresh && patch.phase === 'fetch') {
+      !now ||
+      now.task !== task ||
+      now.phase === 'done' ||
+      (['connect', 'fetch'].includes(patch.phase) && now.cached);
+  if (fresh && ['connect', 'fetch'].includes(patch.phase)) {
     app.view.downloadOpen = true;
     app.view.downloadAuto = true;
   }
@@ -1739,21 +1742,25 @@ onAIStatus((data) => {
   if (data.event === 'progress') {
     let label = data.text || '모델 준비 중';
     if (data.task === 'text') {
-      const step = parseProgress(label);
+      const step = data.phase ? data : parseProgress(label);
       label =
-        step.phase === 'fetch'
-          ? '상담 모델 내려받는 중'
-          : step.phase === 'cache'
-            ? '보관해 둔 상담 모델을 불러오는 중'
-            : '이 기기에 맞게 상담 모델을 준비하는 중';
-      if (step.phase === 'fetch') {
-        // 받은 양은 로더가 알려준 비율을 실제 파일 크기에 곱해 어림한다.
+        step.phase === 'connect'
+          ? '상담 모델 파일에 연결하는 중'
+          : step.phase === 'fetch'
+            ? '상담 모델 내려받는 중'
+            : step.phase === 'cache'
+              ? '보관해 둔 상담 모델을 불러오는 중'
+              : '이 기기에 맞게 상담 모델을 준비하는 중';
+      if (step.phase === 'connect') {
+        trackDownload('text', { phase: 'connect', name: modelName(data.model), cached: false });
+      } else if (step.phase === 'fetch') {
+        // 직접 받는 경로는 전송 중인 바이트를 쓰고, 로더 문장만 있을 때는 비율로 어림한다.
         const part = Number.isFinite(data.progress) ? data.progress : step.percent / 100,
-          total = downloadSize(data.model) || textModel(app.ai.choice).downloadMB;
+          total = data.totalMB || downloadSize(data.model) || textModel(app.ai.choice).downloadMB;
         trackDownload('text', {
           phase: 'fetch',
           name: data.model ? modelName(data.model) : textModel(app.ai.choice).name,
-          mb: Math.round(part * total),
+          mb: Number.isFinite(data.mb) ? data.mb : Math.round(part * total),
           totalMB: total,
           progress: part,
         });

@@ -389,6 +389,12 @@ test('모델을 받거나 준비하는 동안 위쪽 아일랜드로 알리고, 
     progress: 0.43,
     at: Date.now(),
   };
+  // 연결을 기다리는 동안에는 내려받기 0%로 표시하지 않는다. 취소와 접기는 그대로 쓴다.
+  await progress({ task: 'text', phase: 'connect', name: 'Gemma 4 E2B', at: Date.now() }, true);
+  await expect(page.locator('#island-toggle')).toContainText('상담 모델 연결 중');
+  await expect(page.locator('#island-toggle')).not.toContainText('%');
+  await expect(page.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow');
+  await expect(page.locator('#island-cancel')).toBeVisible();
   await progress(fetching);
   const island = page.locator('#model-island'),
     toggle = page.locator('#island-toggle');
@@ -515,13 +521,13 @@ test('모델을 받거나 준비하는 동안 위쪽 아일랜드로 알리고, 
   await page.locator('#island-toggle').click();
   await page.locator('#island-close').click();
   await expect(island).toHaveCount(0);
-  // AI 도구에서 두 모델의 크기를 비교해 고를 수 있다. 기본은 가벼운 모델이다.
+  // AI 도구에서 두 모델의 크기를 비교해 고를 수 있다. 기본은 Gemma 4 E2B다.
   await page.getByRole('button', { name: '파일과 설정' }).click();
   await page.getByRole('menuitem', { name: '이 기기의 AI' }).click();
   const light = page.getByRole('radio', { name: /Gemma 3 1B/ }),
     large = page.getByRole('radio', { name: /Gemma 4 E2B/ });
-  await expect(light).toHaveAttribute('aria-checked', 'true');
+  await expect(light).toHaveAttribute('aria-checked', 'false');
   await expect(light).toContainText('600MB');
-  await expect(large).toHaveAttribute('aria-checked', 'false');
+  await expect(large).toHaveAttribute('aria-checked', 'true');
   await expect(large).toContainText('2.8GB');
 });

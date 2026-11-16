@@ -31,7 +31,7 @@ const PROMPTS = [
   '겹친 가구 있으면 정리해줘',
   '배치를 파일로 저장하고 싶어',
 ];
-const MODEL = process.env.MODEL === 'large' ? 'large' : 'light';
+const MODEL = process.env.MODEL === 'light' ? 'light' : 'large';
 // 모델이 켜진 상태에서도 앱이 직접 처리하는 키·자세·집 전체 명령. 18문장 뒤에 이어서 보낸다.
 const APP_PROMPTS = [
   '예시 방 불러와줘',

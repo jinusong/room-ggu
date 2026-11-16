@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// 휴대 기기에서는 상담 모델(약 600MB)을 받기 전에 먼저 묻는다. 누르기 전에는 모델 파일을 요청하지 않는다.
+// 휴대 기기에서는 상담 모델(약 2.8GB)을 받기 전에 먼저 묻는다. 누르기 전에는 모델 파일을 요청하지 않는다.
 const PHONE =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1';
 const MODEL_HOSTS = /huggingface\.co|hf\.co|xethub|raw\.githubusercontent\.com/;
@@ -44,8 +44,8 @@ test.describe('휴대 기기', () => {
     const requested = await start(page, context);
     const ask = page.getByRole('dialog', { name: '상담 모델을 먼저 받아야 해요' });
     await expect(ask).toBeVisible();
-    await expect(ask).toContainText('Gemma 3 1B');
-    await expect(ask).toContainText('약 600MB');
+    await expect(ask).toContainText('Gemma 4 E2B');
+    await expect(ask).toContainText('약 2.8GB');
     await expect(ask).toContainText('이 기기에서 해석해요');
     expect(await ai(page)).toMatchObject({ text: 'off', why: 'ask' });
     // 팝업은 화면 안에 들어오고, 누를 자리는 44px 이상이다. 나타나는 움직임이 끝난 뒤에 잰다.
@@ -123,7 +123,7 @@ test.describe('휴대 기기', () => {
     const island = page.locator('#model-island');
     await expect(island).toBeVisible();
     // 실제 파일은 막아 두었으므로 받는 중이거나, 이유와 다시 시도를 알리는 상태다.
-    await expect(island).toHaveAttribute('data-phase', /fetch|init|error/);
+    await expect(island).toHaveAttribute('data-phase', /connect|fetch|init|error/);
     // 나타나는 움직임이 끝난 뒤의 자리를 잰다.
     await page.waitForTimeout(450);
     const now = await island.boundingBox();
@@ -157,7 +157,7 @@ test.describe('휴대 기기', () => {
     const requested = await start(page, context);
     const ask = page.getByRole('dialog', { name: '상담 모델을 먼저 받아야 해요' });
     await expect(ask).toBeVisible();
-    await expect(ask).toContainText('약 600MB');
+    await expect(ask).toContainText('약 2.8GB');
     await page.locator('#ask-later').click();
     await expect(ask).toHaveCount(0);
     await expect(page.locator('.status-line')).toContainText('모델을 아직 받지 않음');
