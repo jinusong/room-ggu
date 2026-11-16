@@ -283,7 +283,7 @@ function newSpacePlan(type, t, v) {
     scope: 'room',
     reply:
       usableReply(v.reply, t) ||
-      `${ROOM_TYPES[type].name}을 새 공간으로 만들었어요. 가로·세로를 알려주면 바로 맞출게요.`,
+      `${josa(ROOM_TYPES[type].name, '을/를')} 새 공간으로 만들었어요. 가로·세로를 알려주면 바로 맞출게요.`,
     changes: { addSpace: type, room },
     surfaces: [{ kind: 'room-size', target: { type: 'room' } }],
     suggestions: [
@@ -364,7 +364,7 @@ function roomPlan(v, t, ctx, fixes) {
     ? base.reply
     : [
         sizeChanged &&
-          `${ROOM_TYPES[room.type].name}을 가로 ${room.w}m, 세로 ${room.d}m, 천장 ${room.h}m로 반영했어요.`,
+          `${josa(ROOM_TYPES[room.type].name, '을/를')} 가로 ${room.w}m, 세로 ${room.d}m, 천장 ${room.h}m로 반영했어요.`,
         finish.length && `${josa(finish.join(', '), '으로/로')} 바꿨어요.`,
       ]
         .filter(Boolean)

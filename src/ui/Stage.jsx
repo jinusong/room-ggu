@@ -10,6 +10,7 @@ import * as store from '../app/store.js';
 import { app } from '../app/store.js';
 import { findFreeSpot, fitStatus } from '../app/ops.js';
 import { Icon } from './icons.js';
+import { josa } from '../app/text.js';
 import { useOutside } from './widgets.jsx';
 
 // 초안과 규격 미리보기를 방 안의 점선 가구로 계산한다.
@@ -498,7 +499,7 @@ function DoorBar() {
       class="stage-tag door-bar"
       data-door-bar
       role="group"
-      aria-label={`${link.names[0]}와 ${link.names[1]} 사이 문`}
+      aria-label={`${josa(link.names[0], '과/와')} ${link.names[1]} 사이 문`}
     >
       <button
         class="bar-btn"

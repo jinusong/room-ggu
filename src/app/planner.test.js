@@ -248,3 +248,10 @@ test('고른 가구와 다른 가구를 말하면 그 가구에 하고, 없거�
     undefined,
   );
 });
+test('답의 조사는 이름의 받침을 따른다', () => {
+  const s = freshState();
+  assert.match(planTurn('책상', { state: s, target: room }).reply, /^책상을 기준으로/);
+  assert.match(planTurn('소파', { state: s, target: room }).reply, /^소파를 기준으로/);
+  assert.match(planTurn('서재', { state: s, target: room }).reply, /^서재를 가로/);
+  assert.match(planTurn('거실', { state: s, target: room }).reply, /^거실을 가로/);
+});

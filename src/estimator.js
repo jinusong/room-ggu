@@ -1,5 +1,6 @@
 import { UI_SURFACES } from './ui-schema.js';
 import { TYPES, makeItem, DEFAULT_SOURCE } from './data.js';
+import { josa } from './app/text.js';
 const aliases = {
   armchair: /라운지체어|암체어|1인용\s*안락|armchair/i,
   coffee: /소파\s*테이블|커피\s*테이블|coffee\s*table/i,
@@ -175,7 +176,7 @@ export function consult(text, previous, caption = '', { keepType = false } = {})
   let reply = updated.length
     ? `${TYPES[a.type].name} 치수 초안을 바꿨어요. 가로 ${a.dims[0]}, 깊이 ${a.dims[2]}, 전체 높이 ${a.dims[1]}cm예요.`
     : allDefault
-      ? `${TYPES[a.type].name}를 기준으로 시작할게요. 가로 ${a.dims[0]}, 깊이 ${a.dims[2]}, 전체 높이 ${a.dims[1]}cm는 유형별 기본값이에요.`
+      ? `${josa(TYPES[a.type].name, '을/를')} 기준으로 시작할게요. 가로 ${a.dims[0]}, 깊이 ${a.dims[2]}, 전체 높이 ${a.dims[1]}cm는 유형별 기본값이에요.`
       : `지금 ${TYPES[a.type].name} 초안은 가로 ${a.dims[0]}, 깊이 ${a.dims[2]}, 전체 높이 ${a.dims[1]}cm예요. 바꿀 치수를 알려주세요.`;
   if (a.type === 'sofa' && !updated.includes(0) && a.sources[0] === DEFAULT_SOURCE)
     reply += ' 보통 몇 명이 앉나요?';
