@@ -1,10 +1,10 @@
 // 규칙 기반 대화 계획기. 상담 모델을 쓸 수 없을 때(준비 중·꺼짐·미지원·실패) 쓰는 대체 경로다.
 // 사용자 문장 하나를 읽고 "무엇을 바꿀지, 어떤 도구를 보여줄지"를 정한다.
 // 상태를 직접 바꾸지 않는다. 적용과 실행 취소 기록은 store가 맡는다.
-import { TYPES, ROOM_TYPES, FURNITURE_COLORS } from '../catalog.js';
+import { TYPES, ROOM_TYPES, FURNITURE_COLORS, WALL_COLORS, FLOOR_COLORS } from '../catalog.js';
 import { josa } from './text.js';
 import { makeItem, layoutWarnings, clampItem, spaces } from '../data.js';
-import { consult, detectType, extractDimensions } from '../estimator.js';
+import { consult, detectType, extractDimensions, unlistedInfo } from '../estimator.js';
 import { consultRoom, consultationScope, detectRoomType } from '../room-consult.js';
 import { chooseSurface, surfaceKind } from '../ui-schema.js';
 
@@ -70,6 +70,28 @@ export function matchSpace(text, state) {
   );
 }
 
+// “침대 빼줘”처럼 동작할 가구를 문장에 적었으면 그 가구에 한다. 이름이 없거나 고른 가구와 같으면 고른 가구다.
+// 말한 가구가 방에 없거나 여럿이면 실행하지 않고 알려 준다. 같은 종류의 초안이 떠 있으면 초안 이야기로 넘긴다.
+export function actionSubject(t, state, item, verb, draft = null) {
+  const type = detectType(t);
+  if (!type || type === item?.type) return item ? { item } : null;
+  const found = state.items.filter((a) => a.type === type);
+  if (found.length === 1) return { item: found[0] };
+  if (!found.length && draft?.type === type) return null;
+  const name = TYPES[type].name;
+  return {
+    plan: {
+      intent: 'meta',
+      scope: null,
+      reply: found.length
+        ? `${josa(name, '이/가')} ${found.length}개 있어요. ${verb} ${josa(name, '을/를')} 도면에서 눌러 고른 뒤 다시 말해 주세요.`
+        : `이 방에는 ${josa(name, '이/가')} 없어요.`,
+      surfaces: found.length ? [surface('items')] : [],
+      suggestions: [],
+    },
+  };
+}
+
 function planMeta(t, ctx, item) {
   const { state, draft } = ctx;
   const numbers = Object.keys(extractDimensions(t)).length > 0;
@@ -118,14 +140,18 @@ function planMeta(t, ctx, item) {
     return metaPlan('relocate', '');
   if (/빈\s*방(?:으로|에서)|가구\s*(?:를\s*)?(?:다|모두|전부)\s*(?:치워|비워|빼)/.test(t))
     return metaPlan('clear', '');
-  if (item) {
-    if (/회전|돌려/.test(t)) {
+  const rotate = /회전|돌려/.test(t);
+  if (rotate || /삭제|지워|빼\s*줘|없애|치워\s*줘/.test(t)) {
+    const who = actionSubject(t, state, item, rotate ? '돌릴' : '뺄', ctx.draft);
+    if (who?.plan) return who.plan;
+    if (who && rotate) {
       const m = t.match(/(-?\d{1,3})\s*도/);
-      return metaPlan('rotate', '', { arg: { deg: m ? +m[1] : 90 } });
+      return metaPlan('rotate', '', { arg: { deg: m ? +m[1] : 90, id: who.item.id } });
     }
-    if (!type && /복제|하나\s*더|똑같은\s*(?:거|것)/.test(t)) return metaPlan('duplicate', '');
-    if (/삭제|지워|빼\s*줘|없애|치워\s*줘/.test(t)) return metaPlan('delete', '');
+    if (who) return metaPlan('delete', '', { arg: { id: who.item.id } });
   }
+  if (item && !type && /복제|하나\s*더|똑같은\s*(?:거|것)/.test(t))
+    return metaPlan('duplicate', '');
   if (
     draft &&
     (!type || type === draft.type) &&
@@ -248,14 +274,163 @@ function planFurniture(t, ctx, item) {
   };
 }
 
+// 선택한 가구·초안에 하는 동작. 목록에 없는 물건을 말했으면 지금 대상에 하지 않는다.
+const SUBJECT_ACTIONS = ['rotate', 'duplicate', 'delete', 'place'];
+const nameList = (names) => names.slice(0, 3).join('·');
+
+// 놓기·빼기 같은 동사 바로 앞의 낱말을 목적어로 읽는다. 목록의 가구면 known, 아니면 무엇이든 unlisted다.
+// "컴퓨터랑 책상"처럼 이어진 말은 함께 보고, "책상에"·"책상 위에"는 놓을 곳(place)으로 본다.
+const OBJECT_VERB =
+  /^(?:놓|놔|두고|둘|둬|두자|두면|두려|추가|넣|배치|만들|만들어|올려|올리|올릴|설치|깔아|깔고|붙여|생성|사고|살래|사자|사줘|사려|들이|들여|필요|있으면|있어|있나|있니|갖다|가져|걸어|걸고|달아|빼|지워|지우|삭제|없애|치워|돌려|돌리|회전|옮겨|옮기|복제)/;
+// 목적어와 동사 사이에 오는 수량·꾸밈·자리 말은 건너뛴다.
+const SKIP_WORD =
+  /^(?:하나|하나만|한|두|세|네|몇|개|대|더|좀|또|새로|같이|다시|그냥|바로|꼭|\d+(?:\.\d+)?\s*(?:개|대|도|cm|mm|m|센치|미터)?)$|(?:게|히|으로|로|쪽|에|에서|에다|에다가)$/;
+const PARTICLE = /(?:이랑|랑|하고|와|과|을|를|은|는|이|가|도|만)$/;
+const AND_TAIL = /(?:이랑|랑|하고|와|과|,)$/;
+const PLACE_TAIL = /에(?:다가?)?$/;
+const PLACE_WORD = /^(?:위|옆|앞|아래|밑|안)/;
+const NOT_THING =
+  /^(?:(?:이|그|저)(?:거|것|걸|건|게)|여기|거기|저기|이쪽|그쪽|가구|물건|초안|아바타|사람|공간|방|집|벽|바닥|천장|문|창문|크기|색|자리)$/;
+
+export function objectsOf(t) {
+  const words = String(t)
+    .replace(/[.!?~…]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  const v = words.findIndex((w) => OBJECT_VERB.test(w));
+  let i = v - 1;
+  // “책상 위에”처럼 띄어 쓴 놓을 곳도 건너뛴다.
+  while (i >= 0 && (SKIP_WORD.test(words[i]) || PLACE_WORD.test(words[i + 1] || ''))) i--;
+  if (i < 0) return null;
+  const picked = [i];
+  while (picked[0] > 0 && AND_TAIL.test(words[picked[0] - 1])) picked.unshift(picked[0] - 1);
+  const known = [],
+    unlisted = [];
+  for (const j of picked) {
+    const raw = words[j].replace(/,$/, '');
+    const w = raw.replace(PARTICLE, '') || raw;
+    const odd = unlistedInfo(w);
+    const type = !odd && detectType(w);
+    if (odd) unlisted.push(odd);
+    else if (type) known.push(type);
+    else if (!NOT_THING.test(w) && !detectRoomType(w) && /[가-힣a-z]/i.test(w))
+      unlisted.push({ name: w, on: false, alt: [] });
+  }
+  // 놓을 곳은 목적어 앞(“책상에 컴퓨터”)에도 뒤(“컴퓨터를 책상 위에”)에도 온다.
+  let place = null;
+  for (let j = 0; j < v; j++) {
+    if (picked.includes(j)) continue;
+    const type = detectType(words[j]);
+    if (type && (PLACE_TAIL.test(words[j]) || PLACE_WORD.test(words[j + 1] || ''))) place = type;
+  }
+  return { known, unlisted, place };
+}
+
+// 목록에 없는 물건만 말했으면 가구를 만들거나 바꾸지 않고 없다고 답한다.
+// 목록의 가구도 함께 말했으면(“컴퓨터랑 책상”) null을 돌려 그 가구로 이어서 처리한다.
+export function unlistedPlan(t) {
+  const o = objectsOf(t);
+  if (!o?.unlisted.length || o.known.length) return null;
+  return unlistedReply(o);
+}
+
+function unlistedReply(o) {
+  const first = o.unlisted[0];
+  const names = nameList(o.unlisted.map((x) => x.name));
+  const count = Object.keys(TYPES).length;
+  const reply = o.place
+    ? `${josa(names, '은/는')} 아직 가구 목록에 없어서 ${TYPES[o.place].name} 위에 올릴 수 없어요. 지금은 바닥에 놓는 가구 ${count}종만 다뤄요.`
+    : first.on
+      ? `${josa(names, '은/는')} 아직 가구 목록에 없어요. 다른 가구 위에 올리는 물건은 아직 놓을 수 없어요.`
+      : `${josa(names, '은/는')} 아직 가구 목록에 없어요. 지금은 가구 ${count}종만 놓을 수 있어요. 비슷한 크기의 가구로 자리를 가늠해 보세요.`;
+  const alt = first.alt.filter((k) => k !== o.place).slice(0, 2);
+  return {
+    intent: 'chat',
+    scope: null,
+    unlisted: o.unlisted.map((x) => x.name),
+    reply,
+    surfaces: [],
+    suggestions: [
+      ...alt.map((k) => say(TYPES[k].name, `${TYPES[k].name} 하나 놓고 싶어`)),
+      act('가구 고르기', 'catalog'),
+    ],
+  };
+}
+
+// 목록의 가구와 함께 말한 목록에 없는 물건은 빼고 처리했다고 덧붙인다.
+export function noteUnlisted(plan, t) {
+  const o = objectsOf(t);
+  if (!o?.unlisted.length || !o.known.length || plan.intent !== 'furniture' || !plan.reply)
+    return plan;
+  const names = nameList(o.unlisted.map((x) => x.name));
+  return { ...plan, reply: `${plan.reply} ${josa(names, '은/는')} 가구 목록에 없어서 뺐어요.` };
+}
+
+// 동사 없이 이름 하나만 말한 문장(“트램펄린”, “큰 트램펄린”)의 그 이름.
+// 인사·대답·지시어·방 이름·색·분위기 말, “도와줘”처럼 서술어로 끝나는 말이면 null.
+const CHAT_WORD =
+  /^(?:안녕|고마|감사|응|네|예|아니|좋아|싫어|그래|됐어|오케이|ok|okay|hi|hello|thanks|ㅎ|ㅋ|ㅠ|음|흠|뭐|왜|와|오|굿)/i;
+const STYLE_WORD =
+  /모던|미니멀|북유럽|빈티지|내추럴|심플|클래식|인더스트리얼|코지|아늑|깔끔|따뜻|밝|어둡|스타일|느낌|분위기/;
+const PREDICATE = /(?:줘|요|다|해|어|아|지|까|니|래|게|고|며|면|서|던)$/;
+const SIZE_WORD = /^(?:크|큰|작|넓|좁|높|낮|길|짧|넉넉|아담|여유|얕|깊)/;
+const COLOR_NAMES = [...FURNITURE_COLORS, ...WALL_COLORS, ...FLOOR_COLORS].map(([n]) => n);
+// 받침이 ㄴ인 꾸밈말(“큰”, “작은”, “예쁜”)
+const MODIFIER = (w) => {
+  const code = w.slice(-1).charCodeAt(0) - 0xac00;
+  return code >= 0 && code <= 11171 && code % 28 === 4;
+};
+function loneName(t) {
+  if (objectsOf(t) || /\d/.test(t)) return null;
+  const words = t
+    .replace(/[.!?~…,]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w && !SKIP_WORD.test(w));
+  if (!words.length || words.length > 2 || (words.length === 2 && !MODIFIER(words[0]))) return null;
+  const raw = words.at(-1);
+  const w = raw.replace(PARTICLE, '') || raw;
+  const odd = unlistedInfo(w);
+  if (odd) return { ...odd, sure: true };
+  if (
+    detectType(w) ||
+    CHAT_WORD.test(w) ||
+    STYLE_WORD.test(w) ||
+    SIZE_WORD.test(w) ||
+    PREDICATE.test(raw) ||
+    NOT_THING.test(w) ||
+    detectRoomType(w) ||
+    parseFurnitureColor(w) ||
+    COLOR_NAMES.some((n) => w.includes(n)) ||
+    !/[가-힣a-z]/i.test(w)
+  )
+    return null;
+  return { name: w, on: false, alt: [] };
+}
+
+// 계획이 방·가구·초안 중 무엇이든 실제로 바꾸는지. 그대로인 초안이나 가구는 바꾸지 않은 것이다.
+function changesSomething(plan, ctx, item) {
+  const c = plan.changes || {};
+  if (plan.action || c.room || c.addSpace) return true;
+  if (c.item) return JSON.stringify(c.item.next) !== JSON.stringify(item);
+  if (c.draft) return !ctx.draft || JSON.stringify(c.draft) !== JSON.stringify(ctx.draft);
+  return false;
+}
+
 export function planTurn(text, ctx) {
   const t = String(text).trim().slice(0, 1500);
   const target = ctx.target || roomTarget;
   const item = target.type === 'item' ? ctx.state.items.find((a) => a.id === target.id) : null;
   const meta = planMeta(t, ctx, item);
-  if (meta) return meta;
+  const unlisted = unlistedPlan(t);
+  if (meta && !(unlisted && SUBJECT_ACTIONS.includes(meta.action))) return meta;
+  if (unlisted) return unlisted;
   const scope = resolveScope(t, item || target.type === 'draft' ? target : roomTarget);
-  return scope === 'room' ? planRoom(t, ctx) : planFurniture(t, ctx, item);
+  const plan = noteUnlisted(scope === 'room' ? planRoom(t, ctx) : planFurniture(t, ctx, item), t);
+  // 이름 하나만 말했는데 아무것도 바뀌지 않으면 목록에 없는 물건이다(“퀸”, “네이비”는 바뀌므로 그대로).
+  const lone = loneName(t);
+  return lone && (lone.sure || !changesSomething(plan, ctx, item))
+    ? unlistedReply({ unlisted: [lone], place: null })
+    : plan;
 }
 
 // 첫 화면과 빈 대화에서 보여줄 시작점.

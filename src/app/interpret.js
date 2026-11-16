@@ -32,6 +32,8 @@ import {
   parseFurnitureColor,
   ROOM_REFERENCE,
   ROOM_TALK,
+  noteUnlisted,
+  actionSubject,
 } from './planner.js';
 import { usableReply } from './model-turn.js';
 import { dimsText, josa } from './text.js';
@@ -142,7 +144,7 @@ export function planFromModel(raw, text, ctx) {
     target.type === 'item' ? ctx.state.items.find((a) => a.id === target.id) || null : null;
   const named = mentionedTypes(t);
   const literal = literalScope(t, named);
-  const done = (plan) => ({ ...plan, decidedBy: 'model', fixes });
+  const done = (plan) => ({ ...noteUnlisted(plan, t), decidedBy: 'model', fixes });
 
   // "되돌려줘", "공간 목록", "파일로 저장"처럼 문장에 명령이 분명한데 모델이 다른 일을 고르면 명령을 따른다.
   const rule = planTurn(t, ctx);
@@ -153,6 +155,13 @@ export function planFromModel(raw, text, ctx) {
       fixes.push(`문장의 명령(${COMMAND_NAMES[command] || command})을 따름`);
       return done(rule);
     }
+  }
+
+  // 목록에 없는 물건을 말했으면 모델이 비슷한 가구나 지금 대상을 골랐어도 만들거나 바꾸지 않는다.
+  if (rule.unlisted) {
+    if (v.furniture || v.action !== 'none')
+      fixes.push(`목록에 없는 물건(${rule.unlisted.join('·')})이라 가구를 만들지 않음`);
+    return done(rule);
   }
 
   if (v.action !== 'none') {
@@ -226,7 +235,12 @@ function actionPlan(v, t, ctx, item, named, fixes) {
     return null;
   }
   if (['rotate', 'duplicate', 'delete'].includes(a)) {
-    if (!item)
+    const who =
+      a === 'duplicate'
+        ? item && { item }
+        : actionSubject(t, ctx.state, item, a === 'rotate' ? '돌릴' : '뺄', ctx.draft);
+    if (who?.plan) return who.plan;
+    if (!who)
       return {
         intent: 'meta',
         scope: null,
@@ -236,9 +250,9 @@ function actionPlan(v, t, ctx, item, named, fixes) {
       };
     if (a === 'rotate') {
       const m = t.match(/(-?\d{1,3})\s*도/);
-      return metaPlan('rotate', '', { arg: { deg: m ? +m[1] : 90 } });
+      return metaPlan('rotate', '', { arg: { deg: m ? +m[1] : 90, id: who.item.id } });
     }
-    return metaPlan(a, '');
+    return metaPlan(a, '', { arg: { id: who.item.id } });
   }
   if (a === 'new_space') {
     const literal = detectRoomType(t);

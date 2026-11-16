@@ -38,6 +38,48 @@ export function mentionedTypes(t) {
   }
   return found;
 }
+// 목록에 없다고 알려진 물건. 목록에 없는 물건은 이 표에 없어도 없다고 답한다(planner.js의 unlistedPlan).
+// 이 표는 이름을 바로잡고 성질을 더할 때만 쓴다: "안마의자"·"스탠드 에어컨"을 의자·조명으로 읽지 않고,
+// on은 보통 다른 가구 위에 두는 물건, alt는 대신 권할 목록의 가구다.
+const UNLISTED = [
+  ['컴퓨터', /컴퓨터|데스크\s*톱|데스크\s*탑|본체|\bpc\b/i, { on: true, alt: ['desk'] }],
+  ['모니터', /모니터|monitor/i, { on: true, alt: ['desk'] }],
+  ['노트북', /노트북|랩\s*탑|laptop/i, { on: true, alt: ['desk'] }],
+  ['프린터', /프린터|printer/i, { on: true, alt: ['cabinet'] }],
+  ['TV', /(?:TV|티비|텔레비전)(?!\s*(?:장|stand))/i, { on: true, alt: ['tvstand'] }],
+  ['게임기', /게임기|플스|닌텐도|엑스박스/, { on: true, alt: ['tvstand'] }],
+  ['스피커', /스피커|speaker/i, { on: true, alt: ['shelf'] }],
+  ['전자레인지', /전자\s*레인지|microwave/i, { on: true, alt: ['cabinet'] }],
+  ['안마의자', /안마\s*의자|마사지\s*체어/, { alt: ['armchair'] }],
+  ['에어컨', /(?:스탠드\s*)?에어컨/, { alt: [] }],
+  ['공기청정기', /공기\s*청정기/, { alt: [] }],
+  ['선풍기', /선풍기|서큘레이터/, { alt: [] }],
+  ['가습기', /가습기/, { alt: [] }],
+  ['건조기', /건조기|dryer/i, { alt: ['washer'] }],
+  ['빨래 건조대', /빨래\s*건조대|건조대/, { alt: [] }],
+  ['식기세척기', /식기\s*세척기|식세기/, { alt: ['cabinet'] }],
+  ['정수기', /정수기/, { alt: [] }],
+  ['피아노', /피아노|piano/i, { alt: [] }],
+  ['자전거', /자전거|bicycle/i, { alt: [] }],
+  ['러닝머신', /러닝\s*머신|트레드밀|treadmill/i, { alt: [] }],
+  ['화장대', /화장대/, { alt: ['dresser'] }],
+  ['행거', /행거|옷걸이/, { alt: ['wardrobe'] }],
+  ['거울', /거울|mirror/i, { alt: [] }],
+  ['커튼', /커튼|블라인드/, { alt: [] }],
+  ['액자', /액자|포스터/, { alt: [] }],
+  ['어항', /어항|수족관/, { alt: ['cabinet'] }],
+  ['캣타워', /캣\s*타워/, { alt: [] }],
+];
+// 목적어 하나가 목록에 없는 물건으로 알려진 이름인지 본다. 아니면 null.
+// 이름이 낱말 끝까지 닿을 때만 본다: "컴퓨터책상"은 책상, "안마의자"는 안마의자다.
+export function unlistedInfo(word) {
+  for (const [name, re, info] of UNLISTED) {
+    const m = String(word).match(re);
+    if (m && m.index + m[0].length === word.length) return { name, ...info };
+  }
+  return null;
+}
+
 export function extractDimensions(t) {
   const out = {},
     axes = {
