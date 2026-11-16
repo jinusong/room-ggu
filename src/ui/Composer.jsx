@@ -93,11 +93,11 @@ export function Composer({ onFocusChange, mobile }) {
   };
   const ref = useAutosize(text);
   useOutside(menuRef, () => setMenu(false), menu);
-  const busy = app.busy?.kind === 'model';
+  const busy = !!app.busy;
   const pending = app.photo && !app.photo.sent ? app.photo : null;
   const submit = (e) => {
     e?.preventDefault();
-    if (busy || (!text.trim() && !pending)) return;
+    if (app.busy || (!text.trim() && !pending)) return;
     const value = text;
     setText('');
     draftText = '';

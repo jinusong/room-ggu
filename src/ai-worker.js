@@ -159,6 +159,7 @@ ${example({ intent: 'room', wall: '샌드', floor: '월넛', ui: 'finishes', rep
 ${example({ intent: 'action', action: 'delete', furniture: 'chair', reply: '의자를 뺐어요.' })}
 지금 대상: ${c.target || '방'}
 지금 공간: ${c.room || '알 수 없음'}
+사진 정보: ${c.photo || '없음'}. 사진이 있더라도 분류 후보만 전달받으며, 이미지를 직접 보거나 치수를 측정했다고 말하지 마세요.
 다른 공간: ${spaces.join(', ') || '없음'}
 직전 대화: ${JSON.stringify((payload.history || []).slice(-4))}
 사용자: ${String(payload.text || '').slice(0, 600)}

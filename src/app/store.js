@@ -75,8 +75,12 @@ export const app = {
     progress: 0,
     label: '',
     error: '',
+    visionLabel: '',
+    visionProgress: 0,
+    visionError: '',
     // 내려받기 안내: task는 text|vision, phase는 connect|fetch|init|done|error.
     download: null,
+    downloads: { text: null, vision: null },
   },
   busy: null,
   modelSeq: 0,
@@ -504,6 +508,13 @@ function modelContext() {
   return {
     target,
     room: `${app.state.name} · ${ROOM_TYPES[r.type].name} 가로 ${r.w}m 세로 ${r.d}m 천장 ${r.h}m · 놓인 가구 ${app.state.items.length}개${app.draft ? ` · 초안 ${app.draft.name}` : ''}`,
+    photo:
+      app.photo?.analyzed &&
+      app.photo.roomId === app.state.roomId &&
+      app.target.type === 'draft' &&
+      app.photo.draftId === app.draft?.id
+        ? `사진 분류 후보: ${(app.photo.candidates || []).map((c) => TYPES[c.type].name).join(', ')}. 현재 고른 초안: ${app.draft?.name || '없음'}. 사진 자체나 실제 치수는 제공되지 않음.`
+        : undefined,
     spaces: spaces(app.state)
       .filter((x) => x.roomId !== app.state.roomId)
       .map((x) => x.name),
@@ -519,7 +530,7 @@ const withPhoto = (plan, extra) =>
 
 function finishTurn(turn, plan, meta) {
   Object.assign(turn, {
-    text: plan.reply || '',
+    text: [turn.photoIntro, plan.reply].filter(Boolean).join(' '),
     surfaces: (plan.surfaces || []).map((s) => ({ id: turnId(), ...s })),
     suggestions: plan.suggestions || [],
     status: 'done',
@@ -547,7 +558,7 @@ export async function send(raw) {
     .trim()
     .slice(0, 1500);
   const pendingPhoto = app.photo && !app.photo.sent ? app.photo : null;
-  if ((!text && !pendingPhoto) || app.busy?.kind === 'model') return;
+  if ((!text && !pendingPhoto) || app.busy) return;
   const history = historyForModel();
   push({ role: 'user', text, ...(pendingPhoto ? { photo: pendingPhoto.data } : {}) });
   const turn = push({ role: 'assistant', text: '' });
@@ -557,25 +568,31 @@ export async function send(raw) {
     pendingPhoto.surfaceId = turnId();
     extra = [{ id: pendingPhoto.surfaceId, kind: 'photo', target: { type: 'room' } }];
   }
-  if (!text) {
-    // 모델을 꺼 두었거나 아직 받지 않기로 했으면 사진 모델도 저절로 받지 않는다. 휴대 기기에서는
-    // 이미 올라와 있을 때만 바로 판별하고, 아니면 크기를 적어 둔 단추를 눌러야 받는다.
+  if (pendingPhoto) {
+    pendingPhoto.caption = text;
+    pendingPhoto.captionPending = !!text;
+    pendingPhoto.roomId = app.state.roomId;
+    pendingPhoto.history = history;
     const auto =
-      !['user', 'url', 'later', 'ask'].includes(app.ai.why) &&
-      (!handheld() || app.ai.vision === 'ready');
+      app.ai.vision === 'ready' ||
+      (!['user', 'url', 'later', 'ask'].includes(app.ai.why) && !handheld());
     finishTurn(
       turn,
       {
         reply: auto
-          ? '사진을 받았어요. 이 기기의 사진 모델로 가구 종류를 확인할게요.'
-          : '사진을 받았어요. 사진 모델로 가구 종류를 확인하거나, 아래에서 직접 골라 주세요.',
+          ? `사진을 받았어요. 가구 종류를 확인할게요.${text ? ' 함께 보낸 설명도 반영해요.' : ''}`
+          : `사진을 받았어요. 아래에서 사진 판별을 시작하거나 종류를 직접 골라 주세요.${text ? ' 고른 종류에 설명도 반영해요.' : ''}`,
         surfaces: extra,
       },
       { engine: 'app' },
     );
-    if (auto) analyzePhoto();
+    if (auto) await analyzePhoto();
     return;
   }
+  return respondToText(text, turn, history, extra);
+}
+
+async function respondToText(text, turn, history, extra = []) {
   const comparison = parseComparisonCommand(text, { avatarOn: !!avatarLayout(app.state) });
   if (comparison) {
     let reply;
@@ -681,19 +698,16 @@ export function interruptModel() {
   });
 }
 
-// 진행 중인 모델 작업 취소: 해석 중이면 그 답만 멈추고, 사진 판별이면 Worker를 멈춘다.
+// 답 생성과 사진 판별은 각각 멈춘다. 사진을 취소해도 Gemma 다운로드는 계속된다.
 export function cancelModel() {
   if (pending) return interruptModel();
   if (app.busy?.kind !== 'vision') return;
-  app.modelSeq++;
-  stopAI('사진 판별을 취소했어요.');
   app.busy = null;
+  stopAI('사진 판별을 취소했어요.', 'vision');
   app.ai.vision = 'off';
-  app.ai.model = null;
-  if (app.ai.download?.task === 'vision') app.ai.download = null;
+  setLaneDownload('vision', null);
   toast('사진 판별을 취소했어요.');
-  // Worker를 다시 만들었으니 기본 설정이면 상담 모델을 다시 준비한다.
-  if (!app.ai.why) loadText({ auto: true });
+  emit();
 }
 
 // ---------- 직접 연 도구와 버튼 동작 ----------
@@ -960,7 +974,22 @@ export function placeDraft(label = '방에 놓기') {
 
 export function createDraft(type, { via = 'catalog' } = {}) {
   if (!Object.hasOwn(TYPES, type)) return;
+  const photo = via === 'photo' ? app.photo : null;
+  if (photo?.roomId && photo.roomId !== app.state.roomId) {
+    toast('사진을 보낸 공간으로 돌아온 뒤 종류를 골라 주세요.');
+    return;
+  }
+  if (app.busy?.kind === 'vision') cancelModel();
   const item = makeItem(type);
+  const previous = photo && app.draft?.id === photo.draftId ? app.draft : null;
+  if (previous) {
+    for (let i = 0; i < 3; i++)
+      if (String(previous.sources[i]).startsWith('사용자')) {
+        item.dims[i] = previous.dims[i];
+        item.sources[i] = previous.sources[i];
+      }
+    item.color = previous.color;
+  }
   item.name = TYPES[type].name;
   app.draft = item;
   app.selected = null;
@@ -971,8 +1000,10 @@ export function createDraft(type, { via = 'catalog' } = {}) {
       via === 'photo' ? `${josa(TYPES[type].name, '으로/로')} 잡기` : `${TYPES[type].name} 고르기`,
     action: true,
   });
-  if (via === 'photo') for (let i = 0; i < 3; i++) item.sources[i] = '사진 유형 · 기본값';
-  push({
+  if (via === 'photo')
+    for (let i = 0; i < 3; i++)
+      if (!String(item.sources[i]).startsWith('사용자')) item.sources[i] = '사진 유형 · 기본값';
+  const turn = push({
     role: 'assistant',
     text: `${TYPES[type].name} 초안을 방 안에 먼저 띄웠어요. 규격을 고르거나 아는 치수를 말해 주세요.`,
     surfaces: [{ kind: 'furniture-size', target: { type: 'draft', id: item.id } }],
@@ -985,6 +1016,12 @@ export function createDraft(type, { via = 'catalog' } = {}) {
   });
   persist();
   emit();
+  if (photo) {
+    photo.draftId = item.id;
+    photo.chosenType = type;
+    photo.roomId ||= app.state.roomId;
+    return applyPhotoCaption(photo, turn);
+  }
 }
 
 export function relocate() {
@@ -1327,6 +1364,7 @@ export async function attachPhoto(file) {
   if (!file) return;
   try {
     const data = await imageData(file);
+    if (app.busy?.kind === 'vision') cancelModel();
     app.photo = { data, caption: '', analyzed: false, sent: false, type: null };
     emit();
   } catch (e) {
@@ -1344,29 +1382,53 @@ export function setVisionDevice(device) {
   } catch {}
   emit();
 }
+function makePhotoDraft(photo, type) {
+  const before =
+    app.draft && app.draft.id === photo.draftId && app.draft.type === type
+      ? app.draft
+      : makeItem(type);
+  const next = structuredClone(before);
+  next.name = TYPES[type].name;
+  for (let i = 0; i < 3; i++)
+    if (!String(next.sources[i]).startsWith('사용자')) next.sources[i] = '사진 유형 · 기본값';
+  app.draft = ops.sanitizeItem(next);
+  photo.draftId = app.draft.id;
+  app.target = { type: 'draft' };
+  app.selected = null;
+}
+async function applyPhotoCaption(photo, turn) {
+  if (!photo.captionPending || photo !== app.photo || photo.roomId !== app.state.roomId) return;
+  photo.captionPending = false;
+  turn.photoIntro = turn.text;
+  await respondToText(photo.caption, turn, photo.history || historyForModel());
+}
 export async function analyzePhoto() {
   const photo = app.photo;
   if (!photo || app.busy) return;
-  app.busy = { kind: 'vision' };
-  // 사진 판별 모델을 처음 올릴 때만 아일랜드로 알린다. 이미 올라와 있으면 판별은 금방 끝난다.
-  if (app.ai.vision !== 'ready' && !app.ai.download) {
-    app.ai.download = {
+  photo.roomId ||= app.state.roomId;
+  const job = { kind: 'vision', photo };
+  app.busy = job;
+  setLaneDownload(
+    'vision',
+    {
       task: 'vision',
       phase: 'init',
       name: 'SigLIP base',
       cached: true,
       at: Date.now(),
-    };
-    app.view.downloadOpen = false;
-  }
+    },
+    true,
+  );
+  app.view.downloadOpen = false;
   app.ai.vision = 'loading';
-  app.ai.label = '사진 판별 모델 준비 중';
-  app.ai.progress = 0;
+  app.ai.visionLabel = '사진 판별 모델 준비 중';
+  app.ai.visionProgress = 0;
+  app.ai.visionError = '';
   visionFiles.clear();
   emit();
   try {
     const raw = await runAI('classify', { image: photo.data, device: app.ai.device });
-    if (app.photo !== photo) return;
+    if (app.photo !== photo || app.busy !== job) return;
     const candidates = photoCandidates(raw?.scores);
     app.ai.vision = 'ready';
     finishDownload('vision');
@@ -1375,59 +1437,56 @@ export async function analyzePhoto() {
     photo.candidates = candidates;
     const top = candidates[0];
     const sure = !!top && top.p >= PHOTO_CONFIDENT;
+    const sameRoom = photo.roomId === app.state.roomId;
     const pct = (c) => `${Math.round(c.p * 100)}%`;
     photo.type = sure ? top.type : null;
-    if (sure) {
-      const base = app.draft && app.draft.type === top.type ? app.draft : makeItem(top.type);
-      const next = structuredClone(base);
-      next.name = TYPES[top.type].name;
-      for (let i = 0; i < 3; i++)
-        if (!String(next.sources[i]).startsWith('사용자')) next.sources[i] = '사진 유형 · 기본값';
-      app.draft = ops.sanitizeItem(next);
-      app.target = { type: 'draft' };
-      app.selected = null;
-    }
+    if (sure && sameRoom) makePhotoDraft(photo, top.type);
     const names = candidates.map((c) => TYPES[c.type].name);
-    push({
+    const turn = push({
       role: 'assistant',
       engine: 'siglip',
-      text: sure
-        ? `사진은 ${josa(names[0], '으로/로')} 보여요. 그 유형의 기본 크기로 초안을 띄웠어요. 사진만으로는 실제 cm를 알 수 없으니 아는 치수를 알려주세요.`
-        : top
-          ? `사진만으로는 종류를 확신하기 어려워요. 가까운 후보는 ${josa(names.join(', '), '이에요/예요')}. 맞는 것을 눌러 주세요.`
-          : '사진에서 가구 종류를 읽지 못했어요. 아래에서 종류를 골라 주세요.',
+      text: !sameRoom
+        ? '사진 판별 중 공간이 바뀌어 초안을 만들지 않았어요. 사진을 보낸 공간으로 돌아온 뒤 종류를 골라 주세요.'
+        : sure
+          ? `사진은 ${josa(names[0], '으로/로')} 보여요. 크기는 유형 기본값이며 사진에서 실제 cm를 잰 값은 아니에요.`
+          : top
+            ? `사진만으로는 종류를 확신하기 어려워요. 가까운 후보는 ${josa(names.join(', '), '이에요/예요')}. 맞는 것을 고르면 함께 보낸 설명도 반영해요.`
+            : '사진에서 가구 종류를 읽지 못했어요. 아래에서 종류를 골라 주세요. 함께 보낸 설명은 보관하고 있어요.',
       photoScores:
         candidates.map((c) => `${TYPES[c.type].name} ${pct(c)}`).join(' · ') || undefined,
-      surfaces: sure
-        ? [{ kind: 'furniture-size', target: { type: 'draft', id: app.draft.id } }]
-        : [{ kind: 'catalog', target: roomTarget() }],
-      receipt: sure ? [{ label: '사진 판별', to: names[0], tag: `SigLIP ${pct(top)}` }] : [],
-      suggestions: sure
-        ? [
-            { label: '방에 놓기', action: 'place', primary: true },
-            ...candidates.slice(1).map((c) => ({
-              label: `${josa(TYPES[c.type].name, '이었/였')}나요?`,
+      surfaces:
+        sure && sameRoom
+          ? [{ kind: 'furniture-size', target: { type: 'draft', id: app.draft.id } }]
+          : [{ kind: 'catalog', target: roomTarget() }],
+      receipt:
+        sure && sameRoom ? [{ label: '사진 판별', to: names[0], tag: `SigLIP ${pct(top)}` }] : [],
+      suggestions:
+        sure && sameRoom
+          ? [
+              { label: '방에 놓기', action: 'place', primary: true },
+              ...candidates.slice(1).map((c) => ({
+                label: `${josa(TYPES[c.type].name, '이었/였')}나요?`,
+                action: 'draft',
+                arg: c.type,
+              })),
+            ]
+          : candidates.map((c, i) => ({
+              label: `${josa(TYPES[c.type].name, '으로/로')} 잡기`,
               action: 'draft',
               arg: c.type,
+              primary: i === 0,
             })),
-          ]
-        : candidates.map((c, i) => ({
-            label: `${josa(TYPES[c.type].name, '으로/로')} 잡기`,
-            action: 'draft',
-            arg: c.type,
-            primary: i === 0,
-          })),
     });
-  } catch (e) {
-    app.ai.vision = 'error';
-    app.ai.error = explainLoadError(e.message);
-    failDownload('vision', app.ai.error);
-    toast(`사진 판별: ${app.ai.error}`);
-  } finally {
     app.busy = null;
-    // 사진을 바꾸거나 취소해 중간에 끝났으면 아일랜드에 준비 중이 남지 않게 지운다.
-    if (app.ai.download?.task === 'vision' && ['init', 'fetch'].includes(app.ai.download.phase))
-      app.ai.download = null;
+    if (sure && sameRoom) await applyPhotoCaption(photo, turn);
+  } catch (e) {
+    if (app.photo !== photo || app.busy !== job) return;
+    app.ai.vision = 'error';
+    app.ai.visionError = explainLoadError(e.message);
+    failDownload('vision', app.ai.visionError);
+    toast(`사진 판별: ${app.ai.visionError}`);
+  } finally {
+    if (app.busy === job) app.busy = null;
     persist();
     emit();
   }
@@ -1547,17 +1606,16 @@ export async function loadText({ auto = false, fresh = false } = {}) {
   app.ai.progress = 0;
   app.ai.error = '';
   // 위쪽 아일랜드에 준비 중임을 알린다. 보관해 둔 모델이면 접힌 채 잠깐 보이고, 새로 받으면 펼쳐진다.
-  app.ai.download = {
+  setLaneDownload('text', {
     task: 'text',
     phase: 'init',
     name: choice.name,
     cached: true,
     at: Date.now(),
-  };
-  app.view.downloadOpen = false;
-  // 받겠다고 방금 누른 경우에는 물어본 자리에서 그대로 받는 중으로 이어 보여 준다.
+  });
+  if (app.ai.download?.task === 'text') app.view.downloadOpen = false;
   if (fresh) {
-    app.ai.download = {
+    setLaneDownload('text', {
       task: 'text',
       phase: 'connect',
       name: app.view.asked?.name || choice.name,
@@ -1565,9 +1623,11 @@ export async function loadText({ auto = false, fresh = false } = {}) {
       totalMB: app.view.asked?.total || choice.downloadMB,
       progress: 0,
       at: Date.now(),
-    };
-    app.view.downloadOpen = true;
-    app.view.downloadAuto = true;
+    });
+    if (app.ai.download?.task === 'text') {
+      app.view.downloadOpen = true;
+      app.view.downloadAuto = true;
+    }
   }
   emit();
   try {
@@ -1618,33 +1678,31 @@ export function setModelChoice(key) {
   } catch {}
   if (pending) interruptModel();
   app.modelSeq++;
-  stopAI('상담 모델을 바꿔요.');
-  app.busy = null;
+  stopAI('상담 모델을 바꿔요.', 'text');
+  if (app.busy?.kind === 'model') app.busy = null;
+  setLaneDownload('text', null);
   app.ai = {
     ...app.ai,
     text: 'off',
-    vision: 'off',
     model: null,
     progress: 0,
     label: '',
     why: '',
-    download: null,
   };
   setModelOn(true);
 }
 export function unloadAI() {
   if (pending) interruptModel();
   app.modelSeq++;
-  stopAI('모델을 껐어요.');
-  app.busy = null;
+  stopAI('모델을 껐어요.', 'text');
+  if (app.busy?.kind === 'model') app.busy = null;
+  setLaneDownload('text', null);
   app.ai = {
     ...app.ai,
     text: 'off',
-    vision: 'off',
     model: null,
     progress: 0,
     label: '',
-    download: null,
   };
   toast('모델을 껐어요. 규칙으로 계속 답해요.');
 }
@@ -1652,41 +1710,42 @@ export function unloadAI() {
 // ---------- 내려받기 안내 ----------
 // 모델 파일을 실제로 내려받는 동안에는 다이얼로그로 알린다. 이미 보관한 모델을 불러올 때는 띄우지 않는다.
 const visionFiles = new Map();
+function laneDownload(task) {
+  return app.ai.downloads[task] || (app.ai.download?.task === task ? app.ai.download : null);
+}
+function setLaneDownload(task, download, focus = false) {
+  app.ai.downloads[task] = download;
+  if (focus || !app.ai.download || app.ai.download.task === task) {
+    const before = app.ai.download;
+    app.ai.download = download || app.ai.downloads[task === 'text' ? 'vision' : 'text'];
+    if (before?.task !== app.ai.download?.task && app.ai.download?.phase === 'error')
+      app.view.downloadOpen = true;
+  }
+}
 function trackDownload(task, patch) {
-  const now = app.ai.download,
-    // 준비만 하던 중에 실제로 받기 시작하면 새 내려받기로 본다.
-    fresh =
-      !now ||
-      now.task !== task ||
-      now.phase === 'done' ||
-      (['connect', 'fetch'].includes(patch.phase) && now.cached);
-  if (fresh && ['connect', 'fetch'].includes(patch.phase)) {
+  const now = laneDownload(task);
+  const fresh =
+    !now || now.phase === 'done' || (['connect', 'fetch'].includes(patch.phase) && now.cached);
+  const before = fresh ? {} : now;
+  const moved = fresh || patch.phase !== before.phase || (patch.mb || 0) > (before.mb || 0);
+  setLaneDownload(task, { ...before, task, ...patch, at: moved ? Date.now() : before.at });
+  if (fresh && ['connect', 'fetch'].includes(patch.phase) && app.ai.download?.task === task) {
     app.view.downloadOpen = true;
     app.view.downloadAuto = true;
   }
-  const before = fresh ? {} : now;
-  // 받은 양이 늘어난 시각을 적어 둔다. 오래 그대로면 화면에서 네트워크를 확인하라고 알린다.
-  const moved = fresh || patch.phase !== before.phase || (patch.mb || 0) > (before.mb || 0);
-  app.ai.download = { ...before, task, ...patch, at: moved ? Date.now() : before.at };
 }
-// 이어서 실패한 횟수. 다시 시도까지 잠깐 기다리게 해 끊긴 네트워크에 요청이 몰리지 않게 한다.
 const downloadFailures = { text: 0, vision: 0 };
 const RETRY_WAIT = [0, 3000, 6000, 12000];
 function finishDownload(task, name) {
   downloadFailures[task] = 0;
-  if (app.ai.download?.task !== task) return;
-  // 준비가 끝나면 아일랜드가 잠깐 완료를 알리고 사라진다. 펼쳐 둔 채였으면 조금 더 둔다.
-  const done = {
-    ...app.ai.download,
-    phase: 'done',
-    progress: 1,
-    name: name || app.ai.download.name,
-  };
-  app.ai.download = done;
+  const before = laneDownload(task);
+  if (!before) return;
+  const done = { ...before, phase: 'done', progress: 1, name: name || before.name };
+  setLaneDownload(task, done);
   setTimeout(
     () => {
-      if (app.ai.download === done) {
-        app.ai.download = null;
+      if (laneDownload(task) === done) {
+        setLaneDownload(task, null);
         emit();
       }
     },
@@ -1694,16 +1753,17 @@ function finishDownload(task, name) {
   );
 }
 function failDownload(task, message) {
-  if (app.ai.download?.task !== task) return;
+  const before = laneDownload(task);
+  if (!before) return;
   const attempts = ++downloadFailures[task];
-  app.ai.download = {
-    ...app.ai.download,
+  setLaneDownload(task, {
+    ...before,
     phase: 'error',
     error: message,
     attempts,
     retryAt: Date.now() + RETRY_WAIT[Math.min(attempts, RETRY_WAIT.length) - 1],
-  };
-  app.view.downloadOpen = true;
+  });
+  if (app.ai.download?.task === task) app.view.downloadOpen = true;
 }
 export function setDownloadOpen(open) {
   app.view.downloadOpen = open;
@@ -1712,20 +1772,20 @@ export function setDownloadOpen(open) {
 }
 export function closeDownload() {
   if (app.ai.download?.phase === 'error') downloadFailures[app.ai.download.task] = 0;
-  app.ai.download = null;
+  if (app.ai.download) setLaneDownload(app.ai.download.task, null);
   emit();
 }
 export function cancelDownload() {
   const task = app.ai.download?.task;
   if (task) downloadFailures[task] = 0;
-  app.ai.download = null;
+  if (task) setLaneDownload(task, null);
   if (task === 'vision') cancelModel();
   else setModelOn(false);
 }
 export function retryDownload() {
   const task = app.ai.download?.task;
   if (Date.now() < (app.ai.download?.retryAt || 0)) return;
-  app.ai.download = null;
+  if (task) setLaneDownload(task, null);
   if (task === 'vision') analyzePhoto();
   else setModelOn(true, { confirmed: true });
 }
@@ -1740,8 +1800,17 @@ onAIStatus((data) => {
   }
   if (data.event === 'unloaded' && data.task === 'vision') app.ai.vision = 'off';
   if (data.event === 'reset') {
-    app.ai.text = 'off';
-    app.ai.vision = 'off';
+    // 실행 중 실패는 해당 요청의 catch가 오류 안내를 마무리한다. 먼저 off로 바꾸면
+    // loadText가 취소로 오인해 실패 이유와 다시 시도를 놓친다.
+    if ((!data.task || data.task === 'text') && (!data.failed || app.ai.text !== 'loading')) {
+      app.ai.text = data.failed ? 'error' : 'off';
+      app.ai.model = null;
+      if (data.failed) app.ai.error = explainLoadError(data.error);
+    }
+    if ((!data.task || data.task === 'vision') && (!data.failed || app.ai.vision !== 'loading')) {
+      app.ai.vision = data.failed ? 'error' : 'off';
+      if (data.failed) app.ai.visionError = explainLoadError(data.error);
+    }
   }
   if (data.event === 'progress') {
     let label = data.text || '모델 준비 중';
@@ -1771,9 +1840,8 @@ onAIStatus((data) => {
       } else if (
         // 다 받은 뒤 오는 준비 단계에서만 '준비 중'으로 넘긴다. 로더의 시작 문장은 받기 전에도 오므로 무시한다.
         step.phase !== 'start' &&
-        app.ai.download?.task === 'text' &&
-        app.ai.download.phase === 'fetch' &&
-        app.ai.download.progress > 0.9
+        laneDownload('text')?.phase === 'fetch' &&
+        laneDownload('text').progress > 0.9
       )
         trackDownload('text', { phase: 'init', progress: 1 });
     } else {
@@ -1791,11 +1859,17 @@ onAIStatus((data) => {
           totalMB: Math.round(total / 1048576),
           progress: loaded / total,
         });
-      else if (app.ai.download?.task === 'vision' && total && loaded >= total)
+      else if (laneDownload('vision') && total && loaded >= total)
         trackDownload('vision', { phase: 'init', progress: 1 });
     }
-    app.ai.label = label;
-    if (Number.isFinite(data.progress)) app.ai.progress = Math.min(1, Math.max(0, data.progress));
+    if (data.task === 'vision') {
+      app.ai.visionLabel = label;
+      if (Number.isFinite(data.progress))
+        app.ai.visionProgress = Math.min(1, Math.max(0, data.progress));
+    } else {
+      app.ai.label = label;
+      if (Number.isFinite(data.progress)) app.ai.progress = Math.min(1, Math.max(0, data.progress));
+    }
   }
   const now = performance.now();
   if (data.event !== 'progress' || now - lastProgressEmit > 120) {

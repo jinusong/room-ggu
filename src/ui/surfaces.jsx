@@ -1019,11 +1019,13 @@ function Photo({ spec }) {
           {p.analyzed ? (
             <>
               <p class="photo-result">
-                {p.type
-                  ? `${josa(TYPES[p.type].name, '으로/로')} 보여요.`
-                  : p.candidates?.length
-                    ? '종류를 확신하지 못했어요. 후보를 골라 주세요.'
-                    : '종류를 읽지 못했어요.'}
+                {p.chosenType
+                  ? `직접 고른 종류: ${TYPES[p.chosenType].name}`
+                  : p.type
+                    ? `${josa(TYPES[p.type].name, '으로/로')} 보여요.`
+                    : p.candidates?.length
+                      ? '종류를 확신하지 못했어요. 후보를 골라 주세요.'
+                      : '종류를 읽지 못했어요.'}
               </p>
               {p.candidates?.length > 0 && (
                 <ul class="photo-candidates">
@@ -1076,10 +1078,10 @@ function Photo({ spec }) {
                   size={16}
                   className={loading ? 'spin' : ''}
                 />
-                {loading ? app.ai.label || '사진 판별 중' : '사진으로 종류 확인'}
+                {loading ? app.ai.visionLabel || '사진 판별 중' : '사진으로 종류 확인'}
               </button>
               {loading && (
-                <progress max="1" value={app.ai.progress} aria-label="사진 모델 진행률" />
+                <progress max="1" value={app.ai.visionProgress} aria-label="사진 모델 진행률" />
               )}
             </>
           )}
