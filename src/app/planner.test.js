@@ -220,3 +220,31 @@ test('이름 하나만 말해도 목록에 없는 물건이면 없다고 답하�
   for (const t of ['네이비', '서재', '안녕', '도와줘', '모던', '이거', '더 크고 넉넉하게', '넓게'])
     assert.equal(planTurn(t, { state: s, target: onDesk }).unlisted, undefined, t);
 });
+test('고른 가구와 다른 가구를 말하면 그 가구에 하고, 없거나 여럿이면 실행하지 않는다', () => {
+  const s = exampleState();
+  const desk = s.items.find((a) => a.type === 'desk');
+  const bed = s.items.find((a) => a.type === 'bed');
+  const onDesk = { type: 'item', id: desk.id };
+  const del = planTurn('침대 빼줘', { state: s, target: onDesk });
+  assert.equal(del.action, 'delete');
+  assert.equal(del.arg.id, bed.id);
+  const turn = planTurn('침대 90도 돌려줘', { state: s, target: onDesk });
+  assert.deepEqual(turn.arg, { deg: 90, id: bed.id });
+  assert.equal(planTurn('이거 빼줘', { state: s, target: onDesk }).arg.id, desk.id);
+  assert.equal(planTurn('침대 빼줘', { state: s, target: room }).arg.id, bed.id);
+  for (const target of [onDesk, room]) {
+    const none = planTurn('소파 빼줘', { state: s, target });
+    assert.equal(none.action, undefined);
+    assert.equal(none.reply, '이 방에는 소파가 없어요.');
+  }
+  s.items.push({ ...makeItem('chair'), id: 'c2', x: 1, z: 1 });
+  const two = planTurn('의자 빼줘', { state: s, target: onDesk });
+  assert.equal(two.action, undefined);
+  assert.match(two.reply, /^의자가 2개 있어요/);
+  // 같은 종류의 초안이 떠 있으면 초안 이야기다.
+  const draft = makeItem('sofa');
+  assert.equal(
+    planTurn('소파 돌려줘', { state: s, target: { type: 'draft' }, draft }).action,
+    undefined,
+  );
+});

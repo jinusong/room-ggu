@@ -362,7 +362,8 @@ function placeDraftInto(turn) {
 
 function runAction(action, arg, turn) {
   const s = app.state;
-  const item = subject();
+  // 문장에 적은 가구(arg.id)가 있으면 그 가구, 아니면 고른 가구에 한다.
+  const item = (arg?.id && s.items.find((a) => a.id === arg.id)) || subject();
   switch (action) {
     case 'undo':
       if (!undo()) turn.text = '되돌릴 내용이 없어요.';
@@ -428,8 +429,11 @@ function runAction(action, arg, turn) {
     case 'delete':
       snapshot();
       ops.removeItem(s, item.id);
-      app.selected = null;
-      app.target = app.draft ? { type: 'draft' } : { type: 'room' };
+      // 고르지 않은 가구를 뺐으면 고른 가구는 그대로 둔다.
+      if (app.selected === item.id || app.target?.id === item.id) {
+        app.selected = null;
+        app.target = app.draft ? { type: 'draft' } : { type: 'room' };
+      }
       turn.text = `${josa(nameOf(item), '을/를')} 뺐어요. 되돌리기로 다시 놓을 수 있어요.`;
       turn.receipt.push({ label: '삭제', to: nameOf(item) });
       break;

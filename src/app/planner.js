@@ -70,6 +70,28 @@ export function matchSpace(text, state) {
   );
 }
 
+// “침대 빼줘”처럼 동작할 가구를 문장에 적었으면 그 가구에 한다. 이름이 없거나 고른 가구와 같으면 고른 가구다.
+// 말한 가구가 방에 없거나 여럿이면 실행하지 않고 알려 준다. 같은 종류의 초안이 떠 있으면 초안 이야기로 넘긴다.
+export function actionSubject(t, state, item, verb, draft = null) {
+  const type = detectType(t);
+  if (!type || type === item?.type) return item ? { item } : null;
+  const found = state.items.filter((a) => a.type === type);
+  if (found.length === 1) return { item: found[0] };
+  if (!found.length && draft?.type === type) return null;
+  const name = TYPES[type].name;
+  return {
+    plan: {
+      intent: 'meta',
+      scope: null,
+      reply: found.length
+        ? `${josa(name, '이/가')} ${found.length}개 있어요. ${verb} ${josa(name, '을/를')} 도면에서 눌러 고른 뒤 다시 말해 주세요.`
+        : `이 방에는 ${josa(name, '이/가')} 없어요.`,
+      surfaces: found.length ? [surface('items')] : [],
+      suggestions: [],
+    },
+  };
+}
+
 function planMeta(t, ctx, item) {
   const { state, draft } = ctx;
   const numbers = Object.keys(extractDimensions(t)).length > 0;
@@ -118,14 +140,18 @@ function planMeta(t, ctx, item) {
     return metaPlan('relocate', '');
   if (/빈\s*방(?:으로|에서)|가구\s*(?:를\s*)?(?:다|모두|전부)\s*(?:치워|비워|빼)/.test(t))
     return metaPlan('clear', '');
-  if (item) {
-    if (/회전|돌려/.test(t)) {
+  const rotate = /회전|돌려/.test(t);
+  if (rotate || /삭제|지워|빼\s*줘|없애|치워\s*줘/.test(t)) {
+    const who = actionSubject(t, state, item, rotate ? '돌릴' : '뺄', ctx.draft);
+    if (who?.plan) return who.plan;
+    if (who && rotate) {
       const m = t.match(/(-?\d{1,3})\s*도/);
-      return metaPlan('rotate', '', { arg: { deg: m ? +m[1] : 90 } });
+      return metaPlan('rotate', '', { arg: { deg: m ? +m[1] : 90, id: who.item.id } });
     }
-    if (!type && /복제|하나\s*더|똑같은\s*(?:거|것)/.test(t)) return metaPlan('duplicate', '');
-    if (/삭제|지워|빼\s*줘|없애|치워\s*줘/.test(t)) return metaPlan('delete', '');
+    if (who) return metaPlan('delete', '', { arg: { id: who.item.id } });
   }
+  if (item && !type && /복제|하나\s*더|똑같은\s*(?:거|것)/.test(t))
+    return metaPlan('duplicate', '');
   if (
     draft &&
     (!type || type === draft.type) &&

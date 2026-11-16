@@ -245,3 +245,16 @@ test('모델이 책상을 골라도 목록에 없는 물건이면 가구를 만�
   });
   assert.equal(del.action, undefined);
 });
+
+test('모델이 삭제를 골라도 문장에 적은 가구를 뺀다', () => {
+  const s = exampleState();
+  const desk = s.items.find((a) => a.type === 'desk');
+  const bed = s.items.find((a) => a.type === 'bed');
+  const p = planFromModel(
+    model({ intent: 'action', action: 'delete', furniture: 'bed' }),
+    '침대 빼줘',
+    { state: s, target: { type: 'item', id: desk.id } },
+  );
+  assert.equal(p.action, 'delete');
+  assert.equal(p.arg.id, bed.id);
+});

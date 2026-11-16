@@ -33,6 +33,7 @@ import {
   ROOM_REFERENCE,
   ROOM_TALK,
   noteUnlisted,
+  actionSubject,
 } from './planner.js';
 import { usableReply } from './model-turn.js';
 import { dimsText, josa } from './text.js';
@@ -234,7 +235,12 @@ function actionPlan(v, t, ctx, item, named, fixes) {
     return null;
   }
   if (['rotate', 'duplicate', 'delete'].includes(a)) {
-    if (!item)
+    const who =
+      a === 'duplicate'
+        ? item && { item }
+        : actionSubject(t, ctx.state, item, a === 'rotate' ? '돌릴' : '뺄', ctx.draft);
+    if (who?.plan) return who.plan;
+    if (!who)
       return {
         intent: 'meta',
         scope: null,
@@ -244,9 +250,9 @@ function actionPlan(v, t, ctx, item, named, fixes) {
       };
     if (a === 'rotate') {
       const m = t.match(/(-?\d{1,3})\s*도/);
-      return metaPlan('rotate', '', { arg: { deg: m ? +m[1] : 90 } });
+      return metaPlan('rotate', '', { arg: { deg: m ? +m[1] : 90, id: who.item.id } });
     }
-    return metaPlan(a, '');
+    return metaPlan(a, '', { arg: { id: who.item.id } });
   }
   if (a === 'new_space') {
     const literal = detectRoomType(t);
