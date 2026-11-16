@@ -1738,8 +1738,12 @@ button.row:hover,
   font-size: 16px;
   line-height: 1.5;
 }
+/* 안내 문구는 글꼴이 달라도 한 줄을 지킨다. 넘치면 줄이지 않고 말줄임한다. */
 .composer-box textarea::placeholder {
+  overflow: hidden;
   color: var(--ink-3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .composer-box .icon-btn {
   width: 44px;
@@ -2592,6 +2596,9 @@ button.avatar-tag {
 .sheet.is-mobile .send {
   width: 40px;
   height: 40px;
+}
+.sheet.is-mobile .composer-box {
+  padding: 4px;
 }
 .sheet.is-mobile .composer-box textarea {
   min-height: 40px;
