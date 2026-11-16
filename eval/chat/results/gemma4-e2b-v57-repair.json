@@ -9,13 +9,27 @@
   "progress": 1,
   "label": "이 기기에 맞게 상담 모델을 준비하는 중",
   "error": "",
+  "visionLabel": "",
+  "visionProgress": 0,
+  "visionError": "",
   "download": {
    "task": "text",
    "phase": "done",
    "name": "Gemma 4 E2B",
    "cached": true,
-   "at": 1794838753711,
+   "at": 1794839595931,
    "progress": 1
+  },
+  "downloads": {
+   "text": {
+    "task": "text",
+    "phase": "done",
+    "name": "Gemma 4 E2B",
+    "cached": true,
+    "at": 1794839595931,
+    "progress": 1
+   },
+   "vision": null
   }
  },
  "results": [
@@ -42,7 +56,7 @@
    "scope": "house 3d",
    "label": "Gemma가 해석 · 앱이 숫자·범위 확인",
    "prompt": "화장실 옆에 방하나 추가하자. 거기는 거실임",
-   "ms": 6899
+   "ms": 6858
   },
   {
    "engine": "gemma",
@@ -65,7 +79,7 @@
    "scope": "house 3d",
    "label": "Gemma가 해석 · 앱이 1곳 바로잡음아니라고 한 유형은 고르지 않고 앞 대화를 따름",
    "prompt": "왜 화장실로 생성하는거야",
-   "ms": 7181
+   "ms": 7294
   },
   {
    "engine": "gemma",
@@ -94,7 +108,7 @@
    "scope": "house 3d",
    "label": "Gemma가 해석 · 앱이 1곳 바로잡음방 이야기와 가구 여럿을 나눠 처리",
    "prompt": "거실이라고 그리고 거기에 소파랑 밥먹을 수 있는 식탁이 있었으면 좋겠어. 거실 평수는 대략 6평정도야",
-   "ms": 7683
+   "ms": 7669
   },
   {
    "engine": "gemma",
@@ -118,7 +132,7 @@
    "scope": "house 3d",
    "label": "Gemma가 해석 · 앱이 1곳 바로잡음문장의 명령(모두 놓기)을 따름",
    "prompt": "둘 다 놓아줘",
-   "ms": 7586
+   "ms": 7699
   },
   {
    "engine": "gemma",
@@ -141,7 +155,7 @@
    "scope": "house 3d",
    "label": "Gemma가 해석 · 앱이 1곳 바로잡음공간 이동은 문장에 그 공간의 이름이나 유형이 있을 때만 실행",
    "prompt": "아니 거실이라니까 왜 자꾸 화장실로 고정하냐고!!!!",
-   "ms": 6979
+   "ms": 7147
   },
   {
    "engine": "gemma",
@@ -162,7 +176,7 @@
    "scope": "house 3d",
    "label": "Gemma가 해석 · 앱이 숫자·범위 확인",
    "prompt": "거실로 바꿨는데 겹치잖아...",
-   "ms": 7500
+   "ms": 7484
   },
   {
    "engine": "gemma",
@@ -185,7 +199,7 @@
    "scope": "house 3d",
    "label": "Gemma가 해석 · 앱이 1곳 바로잡음문장의 명령(방 돌리기)을 따름",
    "prompt": "이 방 90도 돌려줘",
-   "ms": 6765
+   "ms": 6583
   },
   {
    "engine": "gemma",
@@ -215,7 +229,7 @@
    "scope": "house 3d",
    "label": "Gemma가 해석 · 앱이 1곳 바로잡음공간 이동은 문장에 그 공간의 이름이나 유형이 있을 때만 실행",
    "prompt": "거실 말고 침실로 바꿔줘",
-   "ms": 7118
+   "ms": 7117
   },
   {
    "engine": "gemma",
@@ -242,7 +256,7 @@
    "scope": "house 3d",
    "label": "Gemma가 해석 · 앱이 1곳 바로잡음문장에 없는 동작(놓기)은 실행하지 않음",
    "prompt": "침실 옆에 서재 하나 붙여줘",
-   "ms": 6735
+   "ms": 6888
   },
   {
    "engine": "gemma",
@@ -268,7 +282,7 @@
    "scope": "house 3d",
    "label": "Gemma가 해석 · 앱이 1곳 바로잡음가구 여럿을 나눠 처리",
    "prompt": "책상이랑 의자 놓고 싶어",
-   "ms": 6904
+   "ms": 6998
   },
   {
    "engine": "gemma",
@@ -287,7 +301,7 @@
    "scope": "house 3d",
    "label": "Gemma가 해석 · 앱이 숫자·범위 확인",
    "prompt": "방 하나 더 만들어줘",
-   "ms": 6719
+   "ms": 6859
   },
   {
    "engine": "gemma",
@@ -306,7 +320,7 @@
    "scope": "house 3d",
    "label": "Gemma가 해석 · 앱이 숫자·범위 확인",
    "prompt": "아니 그게 아니라",
-   "ms": 6535
+   "ms": 6618
   },
   {
    "engine": "gemma",
@@ -325,7 +339,7 @@
    "scope": "house 3d",
    "label": "Gemma가 해석 · 앱이 숫자·범위 확인",
    "prompt": "방 초기화할래",
-   "ms": 6268
+   "ms": 6399
   }
  ],
  "errors": []

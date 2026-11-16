@@ -1,0 +1,348 @@
+{
+ "ai": {
+  "text": "ready",
+  "why": "",
+  "model": "Qwen3-0.6B-q4f32_1-MLC",
+  "choice": "light",
+  "vision": "off",
+  "device": "webgpu",
+  "progress": 1,
+  "label": "이 기기에 맞게 상담 모델을 준비하는 중",
+  "error": "",
+  "visionLabel": "",
+  "visionProgress": 0,
+  "visionError": "",
+  "download": {
+   "task": "text",
+   "phase": "done",
+   "name": "Qwen3 0.6B",
+   "cached": false,
+   "at": 1794839761850,
+   "mb": 335.372288,
+   "totalMB": 335.372288,
+   "progress": 1
+  },
+  "downloads": {
+   "text": {
+    "task": "text",
+    "phase": "done",
+    "name": "Qwen3 0.6B",
+    "cached": false,
+    "at": 1794839761850,
+    "mb": 335.372288,
+    "totalMB": 335.372288,
+    "progress": 1
+   },
+   "vision": null
+  }
+ },
+ "results": [
+  {
+   "engine": "qwen",
+   "fixes": [],
+   "text": "나의 화장실 오른쪽에 나의 거실을 붙였어요. 가로 5.5m, 세로 4.5m예요. 크기를 알려주면 바로 맞출게요.",
+   "surfaces": [
+    "room-size"
+   ],
+   "receipt": [
+    "새 공간:나의 거실",
+    "자리:나의 화장실 오른쪽",
+    "크기:5.5 × 4.5 × 2.5m"
+   ],
+   "room": "나의 거실 living 5.5x4.5x2.5 wall #faf9f5 floor #e0d4bf",
+   "draft": null,
+   "items": 0,
+   "spaces": 2,
+   "target": "room",
+   "house": "나의 거실[living 5.5x4.5] | 나의 화장실[bathroom 1.8x2.2]",
+   "queue": "",
+   "avatar": "off",
+   "scope": "house 3d",
+   "label": "Qwen가 해석 · 앱이 숫자·범위 확인",
+   "prompt": "화장실 옆에 방하나 추가하자. 거기는 거실임",
+   "ms": 2050
+  },
+  {
+   "engine": "qwen",
+   "fixes": [
+    "아니라고 한 유형은 고르지 않고 앞 대화를 따름"
+   ],
+   "text": "이 공간은 지금 화장실이 아니라 거실이에요. 다른 공간으로 바꾸려면 아래에서 골라 주세요.",
+   "surfaces": [
+    "room-type"
+   ],
+   "receipt": [],
+   "room": "나의 거실 living 5.5x4.5x2.5 wall #faf9f5 floor #e0d4bf",
+   "draft": null,
+   "items": 0,
+   "spaces": 2,
+   "target": "room",
+   "house": "나의 거실[living 5.5x4.5] | 나의 화장실[bathroom 1.8x2.2]",
+   "queue": "",
+   "avatar": "off",
+   "scope": "house 3d",
+   "label": "Qwen가 해석 · 앱이 1곳 바로잡음아니라고 한 유형은 고르지 않고 앞 대화를 따름",
+   "prompt": "왜 화장실로 생성하는거야",
+   "ms": 2062
+  },
+  {
+   "engine": "qwen",
+   "fixes": [
+    "방 이야기와 가구 여럿을 나눠 처리"
+   ],
+   "text": "6평(약 19.8m²)에 맞춰 가로 4.9m, 세로 4.05m로 잡았어요. 소파와 식탁 초안을 준비했어요. 소파부터 규격을 골라 보세요. 놓으면 다음 초안이 이어져요.",
+   "surfaces": [
+    "furniture-size",
+    "room-size"
+   ],
+   "receipt": [
+    "가로:5.5m→4.9m",
+    "세로:4.5m→4.05m",
+    "새 초안:소파 · 180 × 90 × 82cm",
+    "다음 초안:식탁 · 140 × 80 × 74cm"
+   ],
+   "room": "나의 거실 living 4.9x4.05x2.5 wall #faf9f5 floor #e0d4bf",
+   "draft": "sofa 180/82/90 #b29a80 [유형 기본값 | 유형 기본값 | 유형 기본값]",
+   "items": 0,
+   "spaces": 2,
+   "target": "draft",
+   "house": "나의 거실[living 4.9x4.05] | 나의 화장실[bathroom 1.8x2.2]",
+   "queue": "dining",
+   "avatar": "off",
+   "scope": "house 3d",
+   "label": "Qwen가 해석 · 앱이 1곳 바로잡음방 이야기와 가구 여럿을 나눠 처리",
+   "prompt": "거실이라고 그리고 거기에 소파랑 밥먹을 수 있는 식탁이 있었으면 좋겠어. 거실 평수는 대략 6평정도야",
+   "ms": 2250
+  },
+  {
+   "engine": "rule",
+   "fallback": "invalid",
+   "text": "나의 소파와 나의 식탁을 방에 놓았어요. 도면에서 끌어 옮기거나 회전할 수 있어요.",
+   "note": "모델 답을 쓰지 못했어요: 모델 답이 길어져 중단했어요.",
+   "surfaces": [],
+   "receipt": [
+    "배치:나의 소파 · 180 × 90 × 82cm",
+    "배치:나의 식탁 · 140 × 80 × 74cm"
+   ],
+   "room": "나의 거실 living 4.9x4.05x2.5 wall #faf9f5 floor #e0d4bf",
+   "draft": null,
+   "items": 2,
+   "spaces": 2,
+   "target": "item",
+   "house": "나의 거실[living 4.9x4.05] | 나의 화장실[bathroom 1.8x2.2]",
+   "queue": "",
+   "avatar": "off",
+   "scope": "house 3d",
+   "label": "모델 답을 쓸 수 없어서 규칙으로 처리",
+   "prompt": "둘 다 놓아줘",
+   "ms": 4968
+  },
+  {
+   "engine": "qwen",
+   "fixes": [],
+   "text": "이 공간은 이미 거실이에요. 크기나 가구를 정해 볼까요?",
+   "surfaces": [
+    "room-size"
+   ],
+   "receipt": [],
+   "room": "나의 거실 living 4.9x4.05x2.5 wall #faf9f5 floor #e0d4bf",
+   "draft": null,
+   "items": 2,
+   "spaces": 2,
+   "target": "item",
+   "house": "나의 거실[living 4.9x4.05] | 나의 화장실[bathroom 1.8x2.2]",
+   "queue": "",
+   "avatar": "off",
+   "scope": "house 3d",
+   "label": "Qwen가 해석 · 앱이 숫자·범위 확인",
+   "prompt": "아니 거실이라니까 왜 자꾸 화장실로 고정하냐고!!!!",
+   "ms": 2332
+  },
+  {
+   "engine": "qwen",
+   "fixes": [
+    "문장의 명령(자리 정리)을 따름"
+   ],
+   "text": "겹친 공간도, 겹치거나 벽을 넘은 가구도 없어요.",
+   "surfaces": [
+    "impact"
+   ],
+   "receipt": [],
+   "room": "나의 거실 living 4.9x4.05x2.5 wall #faf9f5 floor #e0d4bf",
+   "draft": null,
+   "items": 2,
+   "spaces": 2,
+   "target": "item",
+   "house": "나의 거실[living 4.9x4.05] | 나의 화장실[bathroom 1.8x2.2]",
+   "queue": "",
+   "avatar": "off",
+   "scope": "house 3d",
+   "label": "Qwen가 해석 · 앱이 1곳 바로잡음문장의 명령(자리 정리)을 따름",
+   "prompt": "거실로 바꿨는데 겹치잖아...",
+   "ms": 2049
+  },
+  {
+   "engine": "qwen",
+   "fixes": [
+    "문장의 명령(방 돌리기)을 따름"
+   ],
+   "text": "나의 거실을 오른쪽으로 90° 돌렸어요. 이제 가로 4.05m, 세로 4.9m이고 가구도 함께 돌렸어요.",
+   "surfaces": [],
+   "receipt": [
+    "방 돌리기:4.9 × 4.05m→4.05 × 4.9m"
+   ],
+   "room": "나의 거실 living 4.05x4.9x2.5 wall #faf9f5 floor #e0d4bf",
+   "draft": null,
+   "items": 2,
+   "spaces": 2,
+   "target": "item",
+   "house": "나의 거실[living 4.05x4.9] | 나의 화장실[bathroom 1.8x2.2]",
+   "queue": "",
+   "avatar": "off",
+   "scope": "house 3d",
+   "label": "Qwen가 해석 · 앱이 1곳 바로잡음문장의 명령(방 돌리기)을 따름",
+   "prompt": "이 방 90도 돌려줘",
+   "ms": 1934
+  },
+  {
+   "engine": "qwen",
+   "fixes": [],
+   "text": "침실을 가로 4m, 세로 3.5m, 천장 2.4m로 반영했어요.",
+   "surfaces": [
+    "room-type",
+    "impact"
+   ],
+   "receipt": [
+    "공간 유형:거실→침실",
+    "가로:4.05m→4m",
+    "세로:4.9m→3.5m",
+    "천장:2.5m→2.4m",
+    "이름:나의 거실→나의 침실"
+   ],
+   "room": "나의 침실 bedroom 4x3.5x2.4 wall #faf9f5 floor #e0d4bf",
+   "draft": null,
+   "items": 2,
+   "spaces": 2,
+   "target": "item",
+   "house": "나의 침실[bedroom 4x3.5] | 나의 화장실[bathroom 1.8x2.2]",
+   "queue": "",
+   "avatar": "off",
+   "scope": "house 3d",
+   "label": "Qwen가 해석 · 앱이 숫자·범위 확인",
+   "prompt": "거실 말고 침실로 바꿔줘",
+   "ms": 2283
+  },
+  {
+   "engine": "qwen",
+   "fixes": [
+    "문장에 없는 동작(놓기)은 실행하지 않음"
+   ],
+   "text": "나의 침실 오른쪽에 나의 서재를 붙였어요. 가로 3.5m, 세로 3m예요. 크기를 알려주면 바로 맞출게요.",
+   "surfaces": [
+    "room-size"
+   ],
+   "receipt": [
+    "새 공간:나의 서재",
+    "자리:나의 침실 오른쪽",
+    "크기:3.5 × 3 × 2.4m"
+   ],
+   "room": "나의 서재 office 3.5x3x2.4 wall #faf9f5 floor #e0d4bf",
+   "draft": null,
+   "items": 0,
+   "spaces": 3,
+   "target": "room",
+   "house": "나의 서재[office 3.5x3] | 나의 화장실[bathroom 1.8x2.2] | 나의 침실[bedroom 4x3.5]",
+   "queue": "",
+   "avatar": "off",
+   "scope": "house 3d",
+   "label": "Qwen가 해석 · 앱이 1곳 바로잡음문장에 없는 동작(놓기)은 실행하지 않음",
+   "prompt": "침실 옆에 서재 하나 붙여줘",
+   "ms": 1967
+  },
+  {
+   "engine": "qwen",
+   "fixes": [
+    "가구 여럿을 나눠 처리"
+   ],
+   "text": "책상과 의자 초안을 준비했어요. 책상부터 규격을 골라 보세요. 놓으면 다음 초안이 이어져요.",
+   "surfaces": [
+    "furniture-size"
+   ],
+   "receipt": [
+    "새 초안:책상 · 120 × 60 × 74cm",
+    "다음 초안:의자 · 48 × 50 × 82cm"
+   ],
+   "room": "나의 서재 office 3.5x3x2.4 wall #faf9f5 floor #e0d4bf",
+   "draft": "desk 120/74/60 #b29a80 [유형 기본값 | 유형 기본값 | 유형 기본값]",
+   "items": 0,
+   "spaces": 3,
+   "target": "draft",
+   "house": "나의 서재[office 3.5x3] | 나의 화장실[bathroom 1.8x2.2] | 나의 침실[bedroom 4x3.5]",
+   "queue": "chair",
+   "avatar": "off",
+   "scope": "house 3d",
+   "label": "Qwen가 해석 · 앱이 1곳 바로잡음가구 여럿을 나눠 처리",
+   "prompt": "책상이랑 의자 놓고 싶어",
+   "ms": 2134
+  },
+  {
+   "engine": "qwen",
+   "fixes": [],
+   "text": "어떤 공간을 추가할까요? 아래에서 고르거나 “거실 추가해줘”처럼 말해 주세요.",
+   "surfaces": [],
+   "receipt": [],
+   "room": "나의 서재 office 3.5x3x2.4 wall #faf9f5 floor #e0d4bf",
+   "draft": "desk 120/74/60 #b29a80 [유형 기본값 | 유형 기본값 | 유형 기본값]",
+   "items": 0,
+   "spaces": 3,
+   "target": "draft",
+   "house": "나의 서재[office 3.5x3] | 나의 화장실[bathroom 1.8x2.2] | 나의 침실[bedroom 4x3.5]",
+   "queue": "chair",
+   "avatar": "off",
+   "scope": "house 3d",
+   "label": "Qwen가 해석 · 앱이 숫자·범위 확인",
+   "prompt": "방 하나 더 만들어줘",
+   "ms": 1931
+  },
+  {
+   "engine": "qwen",
+   "fixes": [],
+   "text": "어디가 다르게 됐는지 알려 주세요. 방금 바꾼 내용은 되돌릴 수 있어요.",
+   "surfaces": [],
+   "receipt": [],
+   "room": "나의 서재 office 3.5x3x2.4 wall #faf9f5 floor #e0d4bf",
+   "draft": "desk 120/74/60 #b29a80 [유형 기본값 | 유형 기본값 | 유형 기본값]",
+   "items": 0,
+   "spaces": 3,
+   "target": "draft",
+   "house": "나의 서재[office 3.5x3] | 나의 화장실[bathroom 1.8x2.2] | 나의 침실[bedroom 4x3.5]",
+   "queue": "chair",
+   "avatar": "off",
+   "scope": "house 3d",
+   "label": "Qwen가 해석 · 앱이 숫자·범위 확인",
+   "prompt": "아니 그게 아니라",
+   "ms": 1867
+  },
+  {
+   "engine": "rule",
+   "fallback": "invalid",
+   "text": "이미 빈 방이에요.",
+   "note": "모델 답을 쓰지 못했어요: 모델 답이 길어져 중단했어요.",
+   "surfaces": [],
+   "receipt": [],
+   "room": "나의 서재 office 3.5x3x2.4 wall #faf9f5 floor #e0d4bf",
+   "draft": "desk 120/74/60 #b29a80 [유형 기본값 | 유형 기본값 | 유형 기본값]",
+   "items": 0,
+   "spaces": 3,
+   "target": "draft",
+   "house": "나의 서재[office 3.5x3] | 나의 화장실[bathroom 1.8x2.2] | 나의 침실[bedroom 4x3.5]",
+   "queue": "chair",
+   "avatar": "off",
+   "scope": "house 3d",
+   "label": "모델 답을 쓸 수 없어서 규칙으로 처리",
+   "prompt": "방 초기화할래",
+   "ms": 4783
+  }
+ ],
+ "errors": []
+}
