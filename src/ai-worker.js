@@ -1,5 +1,5 @@
 // 브라우저 Worker에서 공개 가중치 모델을 실행한다. 대화와 사진은 이 기기 밖으로 보내지 않는다.
-// - 상담 모델: Gemma 4 E2B가 기본이다. 메모리가 부족하면 Gemma 3 1B를 직접 고른다.
+// - 상담 모델: Gemma 4 E2B가 기본이며 Gemma 3 1B·Qwen3 0.6B·1.7B도 직접 고른다.
 //   어느 모델이든 문장을 해석해 같은 JSON 스키마로 답한다.
 // - 사진 모델: Transformers.js의 SigLIP이 사진과 20가지 가구 이름을 비교해 점수를 낸다.
 import { TYPES, ROOM_TYPES, WALL_COLORS, FLOOR_COLORS, FURNITURE_COLORS } from './catalog.js';
@@ -7,6 +7,7 @@ import { MODEL_ACTIONS, MODEL_UI } from './ui-schema.js';
 import { PHOTO_MODEL, PHOTO_LABELS } from './app/photo.js';
 import { textModel, modelCached } from './app/models.js';
 import { prepareTextModel } from './app/model-download.js';
+import { designSchema, designPrompt } from './app/design.js';
 
 let engine = null,
   textId = null,
@@ -91,7 +92,7 @@ const REQUIRED = [
   'ui',
   'reply',
 ];
-function interpretSchema(spaces) {
+function interpretSchema(spaces, compact = false) {
   return {
     type: 'object',
     properties: {
@@ -108,7 +109,7 @@ function interpretSchema(spaces) {
       wall: { type: 'string', enum: [...names(WALL_COLORS), 'none'] },
       floor: { type: 'string', enum: [...names(FLOOR_COLORS), 'none'] },
       ui: { type: 'string', enum: [...Object.keys(MODEL_UI), 'none'] },
-      reply: { type: 'string' },
+      reply: compact ? { type: 'string', enum: [''] } : { type: 'string' },
     },
     required: REQUIRED,
     additionalProperties: false,
@@ -138,6 +139,7 @@ const typeList = (obj) =>
 
 async function interpret(payload) {
   await loadText();
+  const compact = textId.startsWith('Qwen3-0.6B');
   const c = payload.context || {};
   const spaces = (c.spaces || []).filter((s) => typeof s === 'string' && s).slice(0, 12);
   const prompt = `방 꾸미기 앱의 해석기입니다. 사용자 문장을 읽고 앱이 할 일을 JSON으로 정하세요.
@@ -149,7 +151,7 @@ space: 이동할 공간 이름. 없으면 none.
 seats: 소파에 앉는 사람 수 1~4, 모르면 null. size: compact 작게, standard 보통, large 크게, 모르면 unknown. depth: shallow 얕게, deep 깊게. height: low 낮게, tall 높게.
 color: 가구 색 ${names(FURNITURE_COLORS).join(', ')}. wall: 벽 색 ${names(WALL_COLORS).join(', ')}. floor: 바닥 ${names(FLOOR_COLORS).join(', ')}. 색을 말하지 않았으면 none.
 ui: 다음에 보여줄 도구. room_size 방 치수, room_type 공간 유형, finishes 벽·바닥, furniture_sizes 가구 규격 비교, furniture_dims 가구 치수 입력, furniture_color 가구 색, 필요 없으면 none.
-reply: 한국어 한두 문장. 숫자와 단위를 쓰지 말고, 사용자 문장을 되풀이하지 말고, 다음에 정할 것 하나를 물어보세요.
+reply: ${compact ? '반드시 빈 문자열. 앱이 실제 변경 결과를 바탕으로 답 문장을 씁니다.' : '한국어 한두 문장. 숫자와 단위를 쓰지 말고, 사용자 문장을 되풀이하지 말고, 다음에 정할 것 하나를 물어보세요.'}
 숫자 치수는 앱이 문장에서 직접 읽습니다. 사용자가 말하지 않은 속성은 none이나 unknown으로 두세요.
 예시) 대상: 방 / 사용자: 두 명이 앉는 낮은 소파
 ${example({ furniture: 'sofa', seats: 2, height: 'low', ui: 'furniture_sizes', reply: '둘이 앉는 낮은 소파로 잡았어요. 앉는 깊이도 중요한가요?' })}
@@ -162,16 +164,42 @@ ${example({ intent: 'action', action: 'delete', furniture: 'chair', reply: '의�
 사진 정보: ${c.photo || '없음'}. 사진이 있더라도 분류 후보만 전달받으며, 이미지를 직접 보거나 치수를 측정했다고 말하지 마세요.
 다른 공간: ${spaces.join(', ') || '없음'}
 직전 대화: ${JSON.stringify((payload.history || []).slice(-4))}
-사용자: ${String(payload.text || '').slice(0, 600)}
+사용자: ${String(payload.text || '').slice(0, 1500)}
 JSON:`;
   const r = await engine.chat.completions.create({
     messages: [{ role: 'user', content: prompt }],
-    max_tokens: 280,
+    max_tokens: 384,
     temperature: 0.1,
-    response_format: { type: 'json_object', schema: JSON.stringify(interpretSchema(spaces)) },
-    ...(textId.startsWith('Qwen3') ? { extra_body: { enable_thinking: false } } : {}),
+    response_format: {
+      type: 'json_object',
+      schema: JSON.stringify(interpretSchema(spaces, compact)),
+    },
+    ...(textId.startsWith('Qwen3') ? { enable_thinking: false } : {}),
   });
   if (r.choices[0]?.finish_reason === 'length') throw Error('모델 답이 길어져 중단했어요.');
+  return r.choices[0]?.message?.content || '';
+}
+
+async function design(payload) {
+  await loadText();
+  const r = await engine.chat.completions.create({
+    messages: [
+      {
+        role: 'user',
+        content:
+          designPrompt(payload.request) +
+          (payload.correction
+            ? `\nPrevious proposal failed validation: ${payload.correction}. Rewrite the COMPLETE JSON including all required rooms and furniture.`
+            : ''),
+      },
+    ],
+    max_tokens: 1800,
+    temperature: 0.1,
+    response_format: { type: 'json_object', schema: JSON.stringify(designSchema(payload.request)) },
+    ...(textId.startsWith('Qwen3') ? { enable_thinking: false } : {}),
+  });
+  if (r.choices[0]?.finish_reason === 'length')
+    throw Error('집 전체 초안이 길어져 중단했어요. 공간 수를 나눠 요청해 주세요.');
   return r.choices[0]?.message?.content || '';
 }
 
@@ -234,6 +262,9 @@ self.onmessage = ({ data }) => {
           break;
         case 'interpret':
           result = await interpret(data.payload);
+          break;
+        case 'design':
+          result = await design(data.payload);
           break;
         case 'classify':
           result = await classify(data.payload);

@@ -80,6 +80,31 @@ export function surfacePlan(kind, reply, suggestions = []) {
   return { intent: 'meta', scope: null, reply, surfaces: [surface(kind)], suggestions };
 }
 
+// 이름으로 고치라고 한 가구가 하나뿐이면 도면에서 먼저 고르지 않아도 그 가구를 다룬다.
+export function editSubject(text, ctx) {
+  if (ctx.target?.type === 'draft' || /새로|추가|하나\s*더|놓고|놓아|배치|만들/.test(text))
+    return null;
+  if (!/바꿔|바꾸|줄여|늘려|넓혀|좁혀|가로|세로|높이|너비|깊이|색/.test(text)) return null;
+  const names = furnitureMentions(text).filter((m) => !m.ref);
+  if (names.length !== 1 || /벽|바닥|천장/.test(text)) return null;
+  const hits = ctx.state.items.filter((i) => i.type === names[0].type);
+  if (ctx.target?.type === 'item' && hits.some((i) => i.id === ctx.target.id)) return null;
+  if (hits.length === 1) return { item: hits[0] };
+  if (hits.length > 1)
+    return {
+      plan: {
+        intent: 'furniture',
+        ask: 'item',
+        scope: null,
+        reply: `${josa(TYPES[names[0].type].name, '이/가')} ${hits.length}개 있어요. 고칠 가구를 도면이나 목록에서 먼저 골라 주세요.`,
+        changes: {},
+        surfaces: [surface('items')],
+        suggestions: [],
+      },
+    };
+  return null;
+}
+
 export function matchSpace(text, state) {
   if (!/(?:이동|전환|열어|보여|가자|넘어가|바꿔)/.test(text)) return null;
   return (
@@ -435,7 +460,7 @@ export function splitRequest(text) {
     });
   }
   if (!pieces.length || (!roomText && pieces.length < 2)) return null;
-  return { roomText, furnitureText: parts.join(', '), pieces: pieces.slice(0, 4) };
+  return { roomText, furnitureText: parts.join(', '), pieces };
 }
 const roomChanged = (plan) => !!(plan?.changes?.room || plan?.changes?.addSpace);
 // 방 계획과 가구 초안들을 한 턴으로 합친다. drafts[0]이 방에 먼저 뜨고 나머지는 차례를 기다린다.
@@ -493,6 +518,15 @@ function draftFrom(piece, ctx) {
 function planCompound(t, ctx, item) {
   const req = splitRequest(t);
   if (!req) return null;
+  if (req.pieces.length > 24)
+    return {
+      intent: 'compound',
+      batchLimit: true,
+      error: true,
+      reply: '한 번에 가구 24개까지 준비해요. 요청을 나눠 말해 주세요.',
+      surfaces: [],
+      suggestions: [],
+    };
   const room = req.roomText ? planRoom(req.roomText, ctx) : null;
   if (room?.error) return room;
   // 가구가 하나뿐이고 방에서 바뀔 것도 없으면 보통 경로가 더 잘 처리한다(선택한 가구 고치기 등).
@@ -712,7 +746,7 @@ function changesSomething(plan, ctx, item) {
 export function planTurn(text, ctx) {
   const t = String(text).trim().slice(0, 1500);
   const target = ctx.target || roomTarget;
-  const item = target.type === 'item' ? ctx.state.items.find((a) => a.id === target.id) : null;
+  let item = target.type === 'item' ? ctx.state.items.find((a) => a.id === target.id) : null;
   const meta = planMeta(t, ctx, item);
   // 목록에 없는 물건 찾기는 동사 앞 낱말을 물건으로 읽는다. 방을 만들거나 고쳐 달라는 말("방하나 추가하자",
   // "왜 화장실로 만들어")을 물건 이름으로 읽지 않도록, 방 이야기가 분명하면 건너뛴다.
@@ -724,6 +758,9 @@ export function planTurn(text, ctx) {
   if (unlisted) return unlisted;
   const compound = planCompound(t, ctx, item);
   if (compound) return compound;
+  const edit = editSubject(t, ctx);
+  if (edit?.plan) return edit.plan;
+  if (edit?.item) item = edit.item;
   // 무엇을 가리키는지 없는 불만은 가구 이야기로 넘기지 않고 되묻는다.
   if (
     COMPLAINT.test(t) &&
@@ -769,6 +806,7 @@ export const STARTERS = [
   { label: '집 전체로 잇기', detail: '화장실까지 2D·3D로', action: 'tool', arg: 'floorplan' },
 ];
 export const EXAMPLE_PROMPTS = [
+  '100평 집 전체를 재팬디로 꾸며줘',
   '6평 원룸, 천장 2.4m',
   '두 명이 앉는 소파',
   '벽은 세이지, 바닥은 월넛',

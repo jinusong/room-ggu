@@ -19,6 +19,7 @@ import { photoCandidates, PHOTO_CONFIDENT } from './photo.js';
 import { josa, dimsText } from './text.js';
 import { parseComparisonCommand, avatarLayout, poseAccepts, standAt } from '../avatar.js';
 import { connections } from '../floorplan.js';
+import { designRequest, readDesign, templateDesign, THEMES } from './design.js';
 import {
   TEXT_MODELS,
   DEFAULT_TEXT_MODEL,
@@ -78,6 +79,7 @@ export const app = {
   draft: null,
   // 한 문장에서 가구를 여럿 말했을 때 차례를 기다리는 초안. 앞의 초안을 놓으면 다음 것이 뜬다.
   queue: [],
+  design: null,
   selected: null,
   target: { type: 'room' },
   photo: null,
@@ -234,7 +236,10 @@ function saveThread() {
       const { photo, status, ...rest } = t;
       return photo ? { ...rest, hadPhoto: true } : rest;
     });
-    localStorage.setItem(THREAD_KEY, JSON.stringify({ turns, draft: app.draft, queue: app.queue }));
+    localStorage.setItem(
+      THREAD_KEY,
+      JSON.stringify({ turns, draft: app.draft, queue: app.queue, design: app.design }),
+    );
   } catch {}
 }
 try {
@@ -243,7 +248,30 @@ try {
     app.thread = raw.turns.slice(-MAX_TURNS).map(sanitizeTurn).filter(Boolean);
   if (raw?.draft) app.draft = ops.sanitizeItem(raw.draft);
   if (app.draft && Array.isArray(raw?.queue))
-    app.queue = raw.queue.slice(0, 4).map(ops.sanitizeItem);
+    app.queue = raw.queue.slice(0, 23).map(ops.sanitizeItem);
+  try {
+    if (
+      raw?.design &&
+      Object.hasOwn(THEMES, raw.design.theme) &&
+      typeof raw.design.surfaceId === 'string' &&
+      typeof raw.design.base === 'string' &&
+      raw.design.base.length < 300000
+    ) {
+      app.design = {
+        surfaceId: raw.design.surfaceId.slice(0, 100),
+        base: raw.design.base,
+        theme: raw.design.theme,
+        mode: raw.design.mode === 'theme' ? 'theme' : 'house',
+        state: validateState(raw.design.state),
+        applied: !!raw.design.applied,
+        omitted: Array.isArray(raw.design.omitted)
+          ? raw.design.omitted.slice(0, 120).map((x) => cleanText(x, 100))
+          : [],
+      };
+    }
+  } catch {
+    app.design = null;
+  }
 } catch {
   app.thread = [];
   app.queue = [];
@@ -264,6 +292,10 @@ export function snapshot() {
 function restore(json) {
   const roomBefore = app.state.roomId;
   Object.assign(app.state, validateState(JSON.parse(json)));
+  if (app.design) {
+    if (designBase() === app.design.base) app.design.applied = false;
+    else if (designBase() === designBase(app.design.state)) app.design.applied = true;
+  }
   if (!app.state.items.some((a) => a.id === app.selected)) {
     app.selected = null;
     if (app.target.type === 'item') app.target = app.draft ? { type: 'draft' } : { type: 'room' };
@@ -313,7 +345,14 @@ function spaceEvent() {
   event(`${app.state.name} · ${ROOM_TYPES[r.type].name} ${r.w} × ${r.d}m`);
 }
 export function clearThread() {
+  if (pending) {
+    app.modelSeq++;
+    pending = null;
+    interruptAI();
+  }
+  if (app.busy?.kind === 'model') app.busy = null;
   app.thread = [];
+  app.design = null;
   app.draft = null;
   app.queue = [];
   app.photo = null;
@@ -410,6 +449,9 @@ function placeOne(d) {
 function placeAllInto(turn) {
   const list = [app.draft, ...app.queue].filter(Boolean);
   if (!list.length) return placeDraftInto(turn);
+  if (app.state.items.length + list.length > ops.MAX_ITEMS)
+    throw Error('한 방에 가구 100개까지 놓을 수 있어요. 가구를 빼거나 나눠 놓아 주세요.');
+  list.forEach(ops.sanitizeItem);
   snapshot();
   const names = [];
   let crowded = 0;
@@ -592,6 +634,12 @@ function applyPlan(plan, turn) {
   if (c.item) {
     snapshot();
     turn.receipt.push(...ops.updateItem(s, c.item.id, c.item.next));
+    // 이름으로 고친 가구를 다음 말의 대상으로 이어 준다. 답을 기다리며 새로 고른 대상은 유지한다.
+    const sameTarget = (a, b) => a?.type === b?.type && a?.id === b?.id && a?.roomId === b?.roomId;
+    if (!plan.sourceTarget || sameTarget(app.target, plan.sourceTarget)) {
+      app.selected = c.item.id;
+      app.target = { type: 'item', id: c.item.id };
+    }
   }
   if (c.draft) {
     const before = app.draft;
@@ -606,7 +654,7 @@ function applyPlan(plan, turn) {
     else turn.receipt.push(...ops.diffItem(before, app.draft).map((r) => ({ ...r, tag: '초안' })));
     // 새 초안을 잡으면 예전에 기다리던 초안은 버리고, 이번에 함께 말한 가구만 차례로 둔다.
     if (plan.mode === 'new' || c.queue)
-      app.queue = (c.queue || []).slice(0, 4).map(ops.sanitizeItem);
+      app.queue = (c.queue || []).slice(0, 23).map(ops.sanitizeItem);
     for (const q of c.queue ? app.queue : [])
       turn.receipt.push({
         label: '다음 초안',
@@ -729,6 +777,52 @@ export async function send(raw) {
 }
 
 async function respondToText(text, turn, history, extra = []) {
+  if (
+    app.design &&
+    /^(?:이대로\s*)?(?:초안\s*|집\s*전체\s*)?(?:적용|반영)(?:해\s*줘|해줘|해|하자|할게|해요)?[.!]?$/u.test(
+      text.trim(),
+    )
+  ) {
+    const error = applyDesign();
+    finishTurn(
+      turn,
+      {
+        reply: error || '초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.',
+        surfaces: [{ kind: 'floorplan', target: { type: 'room' } }],
+      },
+      { engine: 'app' },
+    );
+    return;
+  }
+  const design = designRequest(text);
+  if (design) return respondToDesign(design, turn);
+  // “안방 침대 가로 180cm로 바꿔줘”는 공간 이동만 하고 끝내지 않고 그 방의 가구에 이어서 적용한다.
+  if (!/추가|새로|붙여|붙이/.test(text) && /가로|세로|높이|너비|깊이|색|벽|바닥/.test(text)) {
+    const hit = spaces(app.state)
+      .filter((r) => r.name.length >= 2)
+      .sort((a, b) => b.name.length - a.name.length)
+      .find((r) => {
+        const at = text.indexOf(r.name);
+        return at >= 0 && !/^\s*(?:옆|앞|뒤|말고|처럼)/.test(text.slice(at + r.name.length));
+      });
+    if (hit) {
+      if (hit.roomId !== app.state.roomId) {
+        snapshot();
+        ops.switchSpace(app.state, hit.roomId);
+        app.selected = null;
+        app.target = { type: 'room' };
+        app.draft = null;
+        app.queue = [];
+        app.state.scope = 'room';
+        turn.roomId = hit.roomId;
+        turn.receipt.push({ label: '대상 공간', to: hit.name });
+      }
+      text = text
+        .replace(hit.name, '')
+        .replace(/^\s*(?:의|에서|은|는)(?:\s+|$)/, '')
+        .trim();
+    }
+  }
   const comparison = parseComparisonCommand(text, { avatarOn: !!avatarLayout(app.state) });
   if (comparison) {
     let reply;
@@ -768,17 +862,25 @@ async function respondToText(text, turn, history, extra = []) {
     return;
   }
   if (app.ai.text !== 'ready') {
-    finishTurn(turn, withPhoto(planTurn(text, context()), extra), {
-      engine: 'rule',
-      fallback: fallbackReason(),
-    });
+    finishTurn(
+      turn,
+      withPhoto({ ...planTurn(text, context()), sourceTarget: structuredClone(app.target) }, extra),
+      {
+        engine: 'rule',
+        fallback: fallbackReason(),
+      },
+    );
     return;
   }
   const version = ++app.modelSeq;
+  const turnContext = structuredClone(context()),
+    base = designBase(),
+    draftBase = JSON.stringify(app.draft);
+  const stale = () => base !== designBase() || draftBase !== JSON.stringify(app.draft);
   turn.status = 'thinking';
   turn.engine = engineName();
   app.busy = { kind: 'model', turnId: turn.id };
-  pending = { version, turn, text, extra };
+  pending = { version, turn, text, extra, ctx: turnContext, base, draftBase };
   emit();
   let plan, meta;
   try {
@@ -792,24 +894,171 @@ async function respondToText(text, turn, history, extra = []) {
       ),
     ]);
     if (version !== app.modelSeq) return;
-    plan = planFromModel(raw, text, context());
+    if (stale())
+      throw Object.assign(Error('상담 중에 배치가 바뀌었어요. 지금 상태에서 다시 말해 주세요.'), {
+        stale: true,
+      });
+    plan = planFromModel(raw, text, turnContext);
     if (plan.fallback) {
       meta = { engine: 'rule', fallback: plan.fallback };
-      plan = planTurn(text, context());
+      plan = planTurn(text, turnContext);
     } else meta = { engine: engineName(), fixes: plan.fixes };
   } catch (e) {
     if (version !== app.modelSeq) return;
     if (e.timeout) interruptAI();
-    meta = {
-      engine: 'rule',
-      fallback: e.timeout ? 'timeout' : 'invalid',
-      note: e.timeout ? undefined : `모델 답을 쓰지 못했어요: ${e.message}`,
-    };
-    plan = planTurn(text, context());
+    if (e.stale || stale()) {
+      plan = {
+        reply: '상담 중에 배치가 바뀌었어요. 지금 상태에서 다시 말해 주세요.',
+        surfaces: [],
+      };
+      meta = { engine: 'app' };
+    } else {
+      meta = {
+        engine: 'rule',
+        fallback: e.timeout ? 'timeout' : 'invalid',
+        note: e.timeout ? undefined : `모델 답을 쓰지 못했어요: ${e.message}`,
+      };
+      plan = planTurn(text, turnContext);
+    }
   }
   pending = null;
   app.busy = null;
-  finishTurn(turn, withPhoto(plan, extra), meta);
+  finishTurn(turn, withPhoto({ ...plan, sourceTarget: turnContext.target }, extra), meta);
+}
+
+// 보기 전환은 초안을 만료시키지 않는다. 방·가구·문을 실제로 편집했을 때만 다시 상담한다.
+const canonical = (v) =>
+  Array.isArray(v)
+    ? v.map(canonical)
+    : v && typeof v === 'object'
+      ? Object.fromEntries(
+          Object.entries(v)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([k, x]) => [k, canonical(x)]),
+        )
+      : v;
+const designBase = (state = app.state) =>
+  JSON.stringify(
+    canonical({
+      rooms: spaces(state)
+        .slice()
+        .sort((a, b) => a.roomId.localeCompare(b.roomId)),
+      floorplan: state.floorplan,
+      avatar: state.avatar,
+    }),
+  );
+export function designStale() {
+  return !!app.design && app.design.base !== designBase();
+}
+export function applyDesign() {
+  const d = app.design;
+  if (!d || d.applied) return '적용할 새 초안이 없어요. 원하는 구성을 다시 말해 주세요.';
+  if (designStale()) return '초안 뒤에 배치가 바뀌었어요. 지금 배치를 기준으로 다시 요청해 주세요.';
+  // 검증을 끝낸 뒤 스냅샷 한 번으로 전체 변경을 기록한다.
+  const next = validateState(d.state);
+  snapshot();
+  Object.assign(app.state, next);
+  app.selected = null;
+  app.draft = null;
+  app.queue = [];
+  app.target = { type: 'room' };
+  d.applied = true;
+  push({
+    role: 'event',
+    text: `${THEMES[d.theme].name} ${d.mode === 'house' ? '집 전체' : '마감'} 초안을 적용했어요. 실행 취소로 되돌릴 수 있어요.`,
+  });
+  persist();
+  emit();
+  return null;
+}
+async function respondToDesign(request, turn) {
+  const version = ++app.modelSeq,
+    base = designBase();
+  const model = app.ai.text === 'ready';
+  let timer;
+  turn.status = 'thinking';
+  turn.engine = model ? engineName() : 'rule';
+  app.busy = { kind: 'model', turnId: turn.id };
+  pending = { version, turn, text: request.text, extra: [], design: request };
+  emit();
+  try {
+    // 면적은 원문에서 읽은 값만 쓰고 모델이 새로 정하지 않는다.
+    if (
+      request.mode === 'house' &&
+      (!Number.isFinite(request.areaM2) || request.areaM2 < 40 || request.areaM2 > 660)
+    )
+      throw Error('집 전체 면적을 40~660m²(약 12~200평)로 알려 주세요.');
+    const generate = async () => {
+      let correction;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const raw = await runAI('design', { request, correction });
+        if (version !== app.modelSeq) throw Error('초안 만들기를 멈췄어요.');
+        try {
+          return readDesign(raw, request);
+        } catch (e) {
+          if (attempt) throw e;
+          correction = e.correction || e.message;
+          turn.note = '빠진 공간과 가구를 확인해 초안을 보완하는 중이에요.';
+          emit();
+        }
+      }
+    };
+    const spec = model
+      ? await Promise.race([
+          generate(),
+          new Promise((_, reject) => {
+            timer = setTimeout(
+              () =>
+                reject(
+                  Object.assign(Error('집 전체 초안이 오래 걸려요. 다시 요청해 주세요.'), {
+                    timeout: true,
+                  }),
+                ),
+              90000,
+            );
+          }),
+        ])
+      : templateDesign(request);
+    if (version !== app.modelSeq) return;
+    if (base !== designBase())
+      throw Error('상담 중에 배치가 바뀌었어요. 지금 배치를 기준으로 다시 요청해 주세요.');
+    const built = ops.buildDesign(app.state, spec),
+      surfaceId = turnId();
+    app.design = { ...built, mode: spec.mode, theme: spec.theme, base, surfaceId, applied: false };
+    finishTurn(
+      turn,
+      {
+        reply:
+          spec.mode === 'house'
+            ? `${THEMES[spec.theme].name} 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.`
+            : `${THEMES[spec.theme].name} 테마로 모든 공간의 벽·바닥·가구 색을 맞춘 초안이에요. 크기와 위치는 유지해요.`,
+        surfaces: [{ id: surfaceId, kind: 'design', target: { type: 'room' } }],
+        note: !model ? '상담 모델을 쓰지 않은 기본 구성 초안이에요.' : undefined,
+      },
+      model ? { engine: engineName() } : { engine: 'rule', fallback: fallbackReason() },
+    );
+  } catch (e) {
+    if (version !== app.modelSeq) return;
+    if (e.timeout) interruptAI();
+    finishTurn(
+      turn,
+      {
+        reply: /[가-힣]/.test(e.message)
+          ? e.message
+          : '상담 모델이 초안을 완성하지 못했어요. 다시 요청하거나 다른 모델을 골라 주세요.',
+        surfaces: [],
+        error: true,
+      },
+      { engine: model ? engineName() : 'rule', note: '집 전체 초안을 적용하지 않았어요.' },
+    );
+  } finally {
+    clearTimeout(timer);
+    if (version === app.modelSeq) {
+      pending = null;
+      app.busy = null;
+      emit();
+    }
+  }
 }
 
 function fixRoomTargets(turn) {
@@ -823,15 +1072,24 @@ function fixRoomTargets(turn) {
 // 해석 중인 답을 멈추고 그 문장은 규칙으로 처리한다. 모델은 메모리에 그대로 둔다.
 export function interruptModel() {
   if (!pending) return;
-  const { turn, text, extra } = pending;
+  const { turn, text, extra, design, ctx, base, draftBase } = pending;
   pending = null;
   app.modelSeq++;
   interruptAI();
   app.busy = null;
-  finishTurn(turn, withPhoto(planTurn(text, context()), extra), {
-    engine: 'rule',
-    fallback: 'cancelled',
-  });
+  const stale = ctx && (base !== designBase() || draftBase !== JSON.stringify(app.draft));
+  finishTurn(
+    turn,
+    design
+      ? { reply: '집 전체 초안 만들기를 멈췄어요. 배치는 그대로예요.', surfaces: [] }
+      : stale
+        ? { reply: '상담을 멈췄어요. 직접 바꾼 배치는 그대로예요.', surfaces: [] }
+        : withPhoto({ ...planTurn(text, ctx || context()), sourceTarget: ctx?.target }, extra),
+    {
+      engine: 'rule',
+      fallback: 'cancelled',
+    },
+  );
 }
 
 // 답 생성과 사진 판별은 각각 멈춘다. 사진을 취소해도 Gemma 다운로드는 계속된다.
@@ -848,6 +1106,7 @@ export function cancelModel() {
 
 // ---------- 직접 연 도구와 버튼 동작 ----------
 const TOOL_TEXT = {
+  design: '집 전체 면적과 원하는 테마를 말해 주세요. 예: 100평 집 전체를 재팬디로 꾸며줘.',
   avatar:
     '키를 알려주면 가구와 같은 축척의 아바타를 세워요. 의자·소파·침대에는 앉히거나 눕혀 볼 수 있어요.',
   floorplan: '방과 화장실을 2D·3D로 함께 보세요. 공간 위치는 2D에서 끌어 맞출 수 있어요.',
@@ -1754,6 +2013,7 @@ export function declineModel() {
 export async function loadText({ auto = false, fresh = false } = {}) {
   if (app.ai.text === 'loading' || app.ai.text === 'ready') return;
   const choice = textModel(app.ai.choice);
+  const version = app.modelSeq;
   app.ai.text = 'loading';
   app.ai.why = '';
   app.ai.label = '상담 모델 준비 중';
@@ -1786,12 +2046,14 @@ export async function loadText({ auto = false, fresh = false } = {}) {
   emit();
   try {
     const model = await runAI('load-text', { choice: choice.key });
-    if (app.ai.text !== 'loading') return;
+    if (app.ai.text !== 'loading' || version !== app.modelSeq || choice.key !== app.ai.choice)
+      return;
     app.ai.text = 'ready';
     app.ai.model = model;
     finishDownload('text', modelName(model));
   } catch (e) {
-    if (app.ai.text !== 'loading') return;
+    if (app.ai.text !== 'loading' || version !== app.modelSeq || choice.key !== app.ai.choice)
+      return;
     // 브라우저나 GPU가 아예 지원하지 않을 때만 '쓸 수 없음'으로 둔다. 그 밖의 실패는 다시 시도할 수 있다.
     app.ai.text = /WebGPU를 지원하지|GPU를 찾지 못했|shader-f16/.test(e.message)
       ? 'unsupported'

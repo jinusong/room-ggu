@@ -61,11 +61,13 @@ test.describe('휴대 기기', () => {
     await page.keyboard.press('Enter');
     await expect(ask).toBeVisible();
     await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => document.activeElement.id)).toBe('ask-model-select');
+    await page.keyboard.press('Tab');
     expect(await page.evaluate(() => document.activeElement.id)).toBe('ask-later');
     await page.keyboard.press('Tab');
     expect(await page.evaluate(() => document.activeElement.id)).toBe('ask-go');
     await page.keyboard.press('Tab');
-    expect(await page.evaluate(() => document.activeElement.id)).toBe('ask-later');
+    expect(await page.evaluate(() => document.activeElement.id)).toBe('ask-model-select');
     expect(requested).toEqual([]);
 
     await page.locator('#ask-later').click();
@@ -201,4 +203,28 @@ test('컴퓨터에서는 묻지 않고 바로 준비를 시작한다', async ({ 
   const state = await ai(page);
   expect(state.why).toBe('');
   expect(['loading', 'ready', 'error', 'unsupported']).toContain(state.text);
+});
+
+test('휴대 기기 첫 다운로드 안내에서 Qwen3로 바꿔도 동의 전에는 모델 파일을 받지 않는다', async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.addInitScript(() =>
+    Object.defineProperty(navigator, 'userAgent', {
+      value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) Mobile',
+      configurable: true,
+    }),
+  );
+  const requested = await start(page, context),
+    ask = page.getByRole('dialog', { name: '상담 모델을 먼저 받아야 해요' });
+  await expect(ask).toBeVisible();
+  await page.getByRole('combobox', { name: '받을 상담 모델' }).selectOption('qwen');
+  await expect(ask.locator('.ask-facts')).toContainText('Qwen3 0.6B');
+  await expect(page.locator('#ask-go')).toContainText('350MB');
+  expect(requested).toEqual([]);
+  await expect(page.locator('#ask-later')).toBeInViewport();
+  await expect(page.locator('#ask-go')).toBeInViewport();
+  await page.locator('#ask-later').click();
+  expect(requested).toEqual([]);
 });

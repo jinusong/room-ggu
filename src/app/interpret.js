@@ -42,6 +42,7 @@ import {
   COMPLAINT,
   noteUnlisted,
   actionSubject,
+  editSubject,
 } from './planner.js';
 import { usableReply } from './model-turn.js';
 import { dimsText, josa } from './text.js';
@@ -154,7 +155,7 @@ export function planFromModel(raw, text, ctx) {
   const t = String(text).trim().slice(0, 1500);
   const fixes = [];
   const target = ctx.target || { type: 'room' };
-  const item =
+  let item =
     target.type === 'item' ? ctx.state.items.find((a) => a.id === target.id) || null : null;
   const named = mentionedTypes(t);
   const literal = literalScope(t, named);
@@ -170,6 +171,10 @@ export function planFromModel(raw, text, ctx) {
 
   // "되돌려줘", "공간 목록", "파일로 저장"처럼 문장에 명령이 분명한데 모델이 다른 일을 고르면 명령을 따른다.
   const rule = planTurn(t, ctx);
+  if (rule.batchLimit) return done(rule);
+  if (rule.ask === 'item') return done(rule);
+  const edit = editSubject(t, ctx);
+  if (edit?.item) item = edit.item;
   if (rule.intent === 'meta') {
     const command = rule.action || rule.surfaces[0]?.kind;
     const modelCommand = v.action === 'switch_space' ? 'switch' : v.action;
@@ -249,7 +254,7 @@ export function planFromModel(raw, text, ctx) {
     // (작은 모델이 “네이비로 바꿔줘”를 방 이야기로 분류해 아무것도 바꾸지 않던 경우)
     if (
       subj &&
-      !plan.changes.room &&
+      !plan.changes?.room &&
       !literal &&
       !/방|공간|룸|집|벽|바닥|천장/.test(t) &&
       resolveScope(t, target) === 'furniture'

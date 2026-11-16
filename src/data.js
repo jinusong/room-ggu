@@ -1,6 +1,6 @@
 import { TYPES, ROOM_TYPES, makeRoom } from './catalog.js';
 import { defaultAvatar, validateAvatar } from './avatar.js';
-import { normalizeFloorplan } from './floorplan.js';
+import { normalizeFloorplan, roomOpenings } from './floorplan.js';
 export { TYPES, ROOM_TYPES, makeRoom } from './catalog.js';
 export const COLORS = ['#b29a80', '#e5ddcc', '#83917d', '#bc8065', '#8495a5', '#575c58'];
 export const DEFAULT_SOURCE = '유형 기본값';
@@ -207,12 +207,26 @@ export function overlaps(a, b) {
   }
   return true;
 }
+export function doorZones(s) {
+  if (!s.roomId || !s.floorplan?.positions) return [];
+  return roomOpenings(spaces(s), s.floorplan, s.roomId).map((o, n) => ({
+    id: `door-clearance-${n}`,
+    type: 'cabinet',
+    angle: 0,
+    dims: o.vertical ? [90, 100, (o.width + 0.4) * 100] : [(o.width + 0.4) * 100, 100, 90],
+    x: o.x + (o.vertical ? (o.x > 0 ? -0.45 : 0.45) : 0),
+    z: o.z + (!o.vertical ? (o.z > 0 ? -0.45 : 0.45) : 0),
+  }));
+}
 export function layoutWarnings(s) {
   const conflicts = new Set(),
-    oversized = new Set();
+    oversized = new Set(),
+    blockedDoors = new Set(),
+    doors = doorZones(s);
   for (let i = 0; i < s.items.length; i++) {
     const a = s.items[i],
       f = footprint(a);
+    if (doors.some((d) => overlaps(a, d))) blockedDoors.add(a.id);
     if (
       Math.abs(a.x) + f.w / 2 > s.room.w / 2 + 0.001 ||
       Math.abs(a.z) + f.d / 2 > s.room.d / 2 + 0.001 ||
@@ -225,5 +239,10 @@ export function layoutWarnings(s) {
         conflicts.add(s.items[j].id);
       }
   }
-  return { conflicts, oversized, all: new Set([...conflicts, ...oversized]) };
+  return {
+    conflicts,
+    oversized,
+    blockedDoors,
+    all: new Set([...conflicts, ...oversized, ...blockedDoors]),
+  };
 }

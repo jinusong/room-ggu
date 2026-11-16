@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { exampleState, freshState, makeItem, layoutWarnings, addRoom, spaces } from '../data.js';
+import {
+  exampleState,
+  freshState,
+  makeItem,
+  layoutWarnings,
+  addRoom,
+  spaces,
+  doorZones,
+} from '../data.js';
 import * as ops from './ops.js';
 
 test('방 치수·유형·크기 초안을 검증하고 사용자 치수를 보존한다', () => {
@@ -65,4 +73,19 @@ test('공간 삭제는 이웃 공간으로 이동하고 마지막 공간은 지�
   assert.equal(spaces(s).length, 2);
   ops.switchSpace(s, first);
   assert.equal(s.roomId, first);
+});
+
+test('문 앞을 막은 가구는 경고하고 자동 정리·새 가구 배치에서 통로를 비운다', () => {
+  const s = freshState(),
+    first = s.roomId;
+  ops.addSpace(s, 'bedroom', 'right');
+  ops.switchSpace(s, first);
+  const zone = doorZones(s)[0];
+  assert.ok(zone);
+  const item = { ...makeItem('desk'), x: zone.x, z: zone.z, dims: [60, 74, 50] };
+  s.items.push(item);
+  assert.equal(layoutWarnings(s).blockedDoors.has(item.id), true);
+  assert.equal(ops.relocateConflicts(s).remaining, 0);
+  ops.placeItem(s, makeItem('cabinet'));
+  assert.equal(layoutWarnings(s).blockedDoors.size, 0);
 });

@@ -1,23 +1,46 @@
-// 상담 모델 후보. id는 WebLLM 기본 목록의 이름이고, 크기는 공개 저장소에서 내려받는 파일 합계다(2026-11-14 확인).
+// 상담 모델 후보. ID·GPU 메모리는 설치된 WebLLM 목록과 대조하고, 다운로드는 공개 파일 합계의 대략값이다.
 // f16은 shader-f16을 지원하는 GPU, f32는 지원하지 않는 GPU에서 쓴다.
 export const TEXT_MODELS = {
-  light: {
-    key: 'light',
-    name: 'Gemma 3 1B',
-    note: '가벼운 모델',
-    f16: 'gemma3-1b-it-q4f16_1-MLC',
-    f32: 'Qwen3-0.6B-q4f32_1-MLC',
-    downloadMB: 600,
-    vramMB: 711,
-  },
   large: {
     key: 'large',
     name: 'Gemma 4 E2B',
-    note: '기본 · 컴퓨터용',
+    note: '기본 · 복잡한 상담부터',
     f16: 'gemma-4-E2B-it-q4f16_1-MLC',
     f32: 'gemma-4-E2B-it-q4f32_1-MLC',
     downloadMB: 2840,
     vramMB: 3387,
+    vramF32MB: 3863,
+  },
+  qwen: {
+    key: 'qwen',
+    name: 'Qwen3 0.6B',
+    note: '가장 작은 다운로드',
+    f16: 'Qwen3-0.6B-q4f16_1-MLC',
+    f32: 'Qwen3-0.6B-q4f32_1-MLC',
+    downloadMB: 350,
+    vramMB: 1403,
+    vramF32MB: 1925,
+  },
+  light: {
+    key: 'light',
+    name: 'Gemma 3 1B',
+    note: '적은 GPU 메모리',
+    f16: 'gemma3-1b-it-q4f16_1-MLC',
+    f32: 'Qwen3-0.6B-q4f32_1-MLC',
+    downloadMB: 600,
+    vramMB: 711,
+    vramF32MB: 1925,
+    f32Note: 'f16 미지원 기기에서는 Qwen3 0.6B 실행',
+  },
+  balanced: {
+    key: 'balanced',
+    name: 'Qwen3 1.7B',
+    note: '중간 크기 · 비교해 보기',
+    f16: 'Qwen3-1.7B-q4f16_1-MLC',
+    f32: 'Qwen3-1.7B-q4f32_1-MLC',
+    downloadMB: 1100,
+    vramMB: 2037,
+    vramF32MB: 2636,
   },
 };
 export const DEFAULT_TEXT_MODEL = 'large';
@@ -27,13 +50,17 @@ export function modelName(id) {
   const s = String(id || '');
   if (s.startsWith('gemma-4-E2B')) return 'Gemma 4 E2B';
   if (s.startsWith('gemma3-1b')) return 'Gemma 3 1B';
-  if (s.startsWith('Qwen3')) return 'Qwen3 0.6B';
+  if (s.startsWith('Qwen3-1.7B')) return 'Qwen3 1.7B';
+  if (s.startsWith('Qwen3-0.6B')) return 'Qwen3 0.6B';
   return '상담 모델';
 }
 // 실제로 받는 파일 기준의 크기(MB). f16을 못 쓰는 GPU에서는 다른 파일을 받는다.
 const DOWNLOAD_MB = {
   'gemma3-1b-it-q4f16_1-MLC': 600,
   'Qwen3-0.6B-q4f32_1-MLC': 350,
+  'Qwen3-0.6B-q4f16_1-MLC': 350,
+  'Qwen3-1.7B-q4f16_1-MLC': 1100,
+  'Qwen3-1.7B-q4f32_1-MLC': 1100,
   'gemma-4-E2B-it-q4f16_1-MLC': 2840,
   'gemma-4-E2B-it-q4f32_1-MLC': 2840,
 };

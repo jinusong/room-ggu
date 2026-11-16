@@ -1,0 +1,1179 @@
+{
+  "at": "2026-11-16T15:32:10.485Z",
+  "model": "light",
+  "base": "http://127.0.0.1:4187/",
+  "build": "full-qa-20261117-r3",
+  "ms": 87837,
+  "results": [
+    {
+      "text": "100평 집 전체를 내추럴 테마로 빠짐없이 인테리어해줘",
+      "ms": 1934,
+      "engine": "gemma",
+      "reply": "내추럴 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\":\"minimal\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 6
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 6
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 6
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 50,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 134,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\":\"minimal\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 미니멀 테마로 빠짐없이 인테리어해줘",
+      "ms": 1439,
+      "engine": "gemma",
+      "reply": "미니멀 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\":\"minimal\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 6
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 6
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 6
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 50,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 110,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\":\"minimal\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 북유럽 테마로 빠짐없이 인테리어해줘",
+      "ms": 1439,
+      "engine": "gemma",
+      "reply": "북유럽 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\":\"minimal\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 6
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 6
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 6
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 50,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 108,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\":\"minimal\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 재팬디 테마로 빠짐없이 인테리어해줘",
+      "ms": 1459,
+      "engine": "gemma",
+      "reply": "재팬디 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\":\"minimal\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 6
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 6
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 6
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 50,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 104,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\":\"minimal\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 모던 테마로 빠짐없이 인테리어해줘",
+      "ms": 1427,
+      "engine": "gemma",
+      "reply": "모던 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\":\"modern\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 6
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 6
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 6
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 50,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 107,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\":\"modern\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 빈티지 테마로 빠짐없이 인테리어해줘",
+      "ms": 1442,
+      "engine": "gemma",
+      "reply": "빈티지 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\":\"vintage\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 6
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 6
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 6
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 50,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 102,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\":\"vintage\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 인더스트리얼 테마로 빠짐없이 인테리어해줘",
+      "ms": 1461,
+      "engine": "gemma",
+      "reply": "인더스트리얼 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\":\"industrial\",\"room1\":\"family\",\"room2\":\"family\",\"room3\":\"family\",\"room4\":\"family\",\"room5\":\"family\",\"room6\":\"family\",\"room7\":\"family\",\"room8\":\"family\",\"room9\":\"family\",\"room10\":\"family\",\"room11\":\"family\",\"room12\":\"family\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 5
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 5
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 4
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 46,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 100,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\":\"industrial\",\"room1\":\"family\",\"room2\":\"family\",\"room3\":\"family\",\"room4\":\"family\",\"room5\":\"family\",\"room6\":\"family\",\"room7\":\"family\",\"room8\":\"family\",\"room9\":\"family\",\"room10\":\"family\",\"room11\":\"family\",\"room12\":\"family\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 코지 테마로 빠짐없이 인테리어해줘",
+      "ms": 1482,
+      "engine": "gemma",
+      "reply": "코지 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\":\"cozy\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 6
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 6
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 6
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 50,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 105,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\":\"cozy\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 침실 3개 욕실 2개로 구성하고 가족들이 책 읽기 좋은 재팬디로 인테리어해줘",
+      "ms": 1447,
+      "engine": "gemma",
+      "reply": "재팬디 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\":\"minimal\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "초안 적용해줘",
+      "ms": 106,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\":\"minimal\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "안방 침대 가로 180cm로 바꿔줘",
+      "ms": 2580,
+      "engine": "gemma",
+      "reply": "침대 크기는 180 × 200 × 55cm예요. 아래 도구에서 더 조절할 수 있어요.",
+      "fixes": [
+        "도구는 요청 단어에 맞춰 치수 직접 입력"
+      ],
+      "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"bed\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":1, \"size\": \"large\", \"depth\": \"deep\", \"height\": \"tall\", \"color\":\"none\", \"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"침대 가로 180cm로 바꿔주었어요.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "안방 침대 네이비로 바꿔줘",
+      "ms": 2247,
+      "engine": "gemma",
+      "reply": "침대 색을 네이비로 바꿨어요.",
+      "fixes": [
+        "가구 종류는 문장에 적힌 침대"
+      ],
+      "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"sofa\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":2,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"네이비\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"안방 침대 네이비를 적용했어요. 네이비 색상으로 바꿔 드릴게요.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "다이닝룸 의자 색을 화이트로 바꿔줘",
+      "ms": 2413,
+      "engine": "gemma",
+      "reply": "의자가 4개 있어요. 고칠 가구를 도면이나 목록에서 먼저 골라 주세요.",
+      "fixes": [],
+      "raw": "{\"intent\":\"action\",\"action\":\"none\",\"furniture\":\"sofa\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"의자를 화이트로 바꿔 드릴게요. 어떤 색을 원하시나요?\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "거실 벽은 세이지로 바꿔줘",
+      "ms": 2459,
+      "engine": "gemma",
+      "reply": "벽은 세이지로 바꿨어요.",
+      "fixes": [],
+      "raw": "{\"intent\":\"room\",\"action\":\"none\",\"furniture\":\"bed\",\"room_type\":\"living\",\"space\":\"none\",\"seats\":4,\"size\":\"large\",\"depth\":\"deep\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"세이지\",\"floor\":\"none\",\"ui\":\"finishes\",\"reply\":\"벽은 세이지로 바꿔주었어요. 어떤 색깔을 원하시나요?\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "소파랑 식탁이랑 책상이랑 의자랑 책장이랑 화분이랑 조명 놓고 싶어",
+      "ms": 2761,
+      "engine": "gemma",
+      "reply": "소파와 식탁과 책상과 의자와 책장·선반과 화분과 스탠드조명 초안을 준비했어요. 소파부터 규격을 골라 보세요. 놓으면 다음 초안이 이어져요.",
+      "fixes": [
+        "가구 여럿을 나눠 처리"
+      ],
+      "raw": "{\"intent\": \"furniture\", \"action\": \"none\", \"furniture\": \"sofa\", \"room_type\": \"living\", \"space\": \"none\", \"seats\": 4, \"size\": \"unknown\", \"depth\": \"unknown\", \"height\": \"low\", \"color\": \"none\", \"wall\": \"none\", \"floor\": \"none\", \"ui\": \"furniture_sizes\", \"reply\": \"소파와 식탁을 놓았어요. 어떤 종류의 가구를 놓을 건가요?\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "모두 놓아줘",
+      "ms": 2209,
+      "engine": "gemma",
+      "reply": "나의 소파와 나의 식탁과 나의 책상과 나의 의자와 나의 책장·선반과 나의 화분과 나의 스탠드조명을 방에 놓았어요. 도면에서 끌어 옮기거나 회전할 수 있어요.",
+      "fixes": [
+        "문장의 명령(모두 놓기)을 따름"
+      ],
+      "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"sofa\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"소파를 놓아주세요. 놓을 때의 키를 알려주세요.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "되돌려줘",
+      "ms": 2045,
+      "engine": "gemma",
+      "reply": "방금 바꾼 내용을 되돌렸어요.",
+      "fixes": [
+        "문장의 명령(되돌리기)을 따름"
+      ],
+      "raw": "{\"intent\":\"action\",\"action\":\"none\",\"furniture\":\"chair\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"소파와 식탁을 되돌려줘.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "집 전체 빈티지 말고 미니멀로 바꿔줘",
+      "ms": 261,
+      "engine": "gemma",
+      "reply": "미니멀 테마로 모든 공간의 벽·바닥·가구 색을 맞춘 초안이에요. 크기와 위치는 유지해요.",
+      "raw": "{\"theme\": \"vintage\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "초안 적용해줘",
+      "ms": 58,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\": \"vintage\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "새로 소파 하나 놓고 싶어",
+      "ms": 2508,
+      "engine": "gemma",
+      "reply": "소파 초안은 180 × 90 × 82cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "문장에 없는 동작(놓기)은 실행하지 않음"
+      ],
+      "raw": "{\"intent\": \"furniture\", \"action\": \"place\", \"furniture\": \"sofa\", \"room_type\": \"none\", \"space\": \"none\", \"seats\": 2, \"size\": \"unknown\", \"depth\": \"unknown\", \"height\": \"low\", \"color\": \"none\", \"wall\": \"none\", \"floor\": \"none\", \"ui\": \"furniture_sizes\", \"reply\": \"소파 하나 놓았어요.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "sofa",
+      "dims": [
+        180,
+        82,
+        90
+      ]
+    },
+    {
+      "text": "새로 라운지체어 하나 놓고 싶어",
+      "ms": 2698,
+      "engine": "gemma",
+      "reply": "라운지체어 초안은 80 × 80 × 85cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "가구 종류는 문장에 적힌 라운지체어"
+      ],
+      "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"sofa\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":2,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"새로 라운지체어를 놓았어요. 라운지체어는 180 × 90 × 82cm로, 방에 놓기 전에 가구 치수를 비교해 보세요.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "armchair",
+      "dims": [
+        80,
+        85,
+        80
+      ]
+    },
+    {
+      "text": "새로 침대 하나 놓고 싶어",
+      "ms": 2554,
+      "engine": "gemma",
+      "reply": "새로운 침대 하나 놓았어요.",
+      "fixes": [],
+      "raw": "{\"intent\": \"furniture\", \"action\": \"none\", \"furniture\": \"bed\", \"room_type\": \"none\", \"space\": \"none\", \"seats\": 2, \"size\": \"unknown\", \"depth\": \"unknown\", \"height\": \"unknown\", \"color\": \"none\", \"wall\": \"none\", \"floor\": \"none\", \"ui\": \"furniture_sizes\", \"reply\": \"새로운 침대 하나 놓았어요.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "bed",
+      "dims": [
+        150,
+        55,
+        200
+      ]
+    },
+    {
+      "text": "새로 책상 하나 놓고 싶어",
+      "ms": 2547,
+      "engine": "gemma",
+      "reply": "새로운 책상 하나 놓았어요.",
+      "fixes": [],
+      "raw": "{\"intent\": \"furniture\", \"action\": \"none\", \"furniture\": \"desk\", \"room_type\": \"none\", \"space\": \"none\", \"seats\": 1, \"size\": \"standard\", \"depth\": \"unknown\", \"height\": \"low\", \"color\": \"none\", \"wall\": \"none\", \"floor\": \"none\", \"ui\": \"furniture_sizes\", \"reply\": \"새로운 책상 하나 놓았어요.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "desk",
+      "dims": [
+        120,
+        74,
+        60
+      ]
+    },
+    {
+      "text": "새로 식탁 하나 놓고 싶어",
+      "ms": 2138,
+      "engine": "gemma",
+      "reply": "식탁 초안은 140 × 80 × 74cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "가구 종류는 문장에 적힌 식탁"
+      ],
+      "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"desk\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":1,\"size\":\"standard\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"새로운 식탁 하나 놓았어요. 식탁은 어떤 크기입니까?\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "dining",
+      "dims": [
+        140,
+        74,
+        80
+      ]
+    },
+    {
+      "text": "새로 의자 하나 놓고 싶어",
+      "ms": 2109,
+      "engine": "gemma",
+      "reply": "새로 의자를 놓았어요. 의자 종류를 알려주세요.",
+      "fixes": [],
+      "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"chair\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":1,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"새로 의자를 놓았어요. 의자 종류를 알려주세요.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "chair",
+      "dims": [
+        48,
+        82,
+        50
+      ]
+    },
+    {
+      "text": "새로 소파테이블 하나 놓고 싶어",
+      "ms": 2540,
+      "engine": "gemma",
+      "reply": "소파테이블 초안은 100 × 60 × 40cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "문장에 없는 동작(놓기)은 실행하지 않음",
+        "가구 종류는 문장에 적힌 소파테이블"
+      ],
+      "raw": "{\"intent\": \"action\", \"action\": \"place\", \"furniture\": \"sofa\", \"room_type\": \"none\", \"space\": \"none\", \"seats\": 2, \"size\": \"unknown\", \"depth\": \"unknown\", \"height\": \"low\", \"color\": \"none\", \"wall\": \"none\", \"floor\": \"none\", \"ui\": \"furniture_sizes\", \"reply\": \"소파테이블 하나 놓았어요.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "coffee",
+      "dims": [
+        100,
+        40,
+        60
+      ]
+    },
+    {
+      "text": "새로 협탁 하나 놓고 싶어",
+      "ms": 2541,
+      "engine": "gemma",
+      "reply": "협탁 초안은 45 × 40 × 50cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "가구 종류는 문장에 적힌 협탁"
+      ],
+      "raw": "{\"intent\":\"action\",\"action\":\"none\",\"furniture\":\"desk\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"새로운 협탁 하나 놓았어요. 협탁 치수는 100 × 60 × 40cm입니다. 가구 치수 비교를 알려주세요.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "side",
+      "dims": [
+        45,
+        50,
+        40
+      ]
+    },
+    {
+      "text": "새로 TV장 하나 놓고 싶어",
+      "ms": 2482,
+      "engine": "gemma",
+      "reply": "TV장 초안은 160 × 40 × 45cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\"intent\": \"furniture\", \"action\": \"none\", \"furniture\": \"tvstand\", \"room_type\": \"none\", \"space\": \"none\", \"seats\": 2, \"size\": \"unknown\", \"depth\": \"unknown\", \"height\": \"low\", \"color\": \"none\", \"wall\": \"none\", \"floor\": \"none\", \"ui\": \"furniture_sizes\", \"reply\": \"TV장 하나 놓았어요.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "tvstand",
+      "dims": [
+        160,
+        45,
+        40
+      ]
+    },
+    {
+      "text": "새로 옷장 하나 놓고 싶어",
+      "ms": 2550,
+      "engine": "gemma",
+      "reply": "옷장 초안은 100 × 60 × 200cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"wardrobe\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"옷장 하나 놓았어요. 옷장 치수는 160 × 40 × 45cm입니다. 방에 놓기 전에 아래에서 규격을 비교해 보세요.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "wardrobe",
+      "dims": [
+        100,
+        200,
+        60
+      ]
+    },
+    {
+      "text": "새로 서랍장 하나 놓고 싶어",
+      "ms": 2721,
+      "engine": "gemma",
+      "reply": "서랍장 초안은 90 × 45 × 100cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "가구 종류는 문장에 적힌 서랍장"
+      ],
+      "raw": "{\"intent\":\"action\",\"action\":\"none\",\"furniture\":\"wardrobe\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"unknown\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"새로 서랍장 하나 놓았어요. 서랍장 치수는 100 × 60 × 200cm입니다. 방에 놓기 전에 어떤 규격으로 분류해야 할까요?\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "dresser",
+      "dims": [
+        90,
+        100,
+        45
+      ]
+    },
+    {
+      "text": "새로 수납장 하나 놓고 싶어",
+      "ms": 2411,
+      "engine": "gemma",
+      "reply": "수납장 초안은 100 × 40 × 80cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "가구 종류는 문장에 적힌 수납장"
+      ],
+      "raw": "{\"intent\":\"action\",\"action\":\"none\",\"furniture\":\"wardrobe\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"unknown\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"새로 수납장을 놓았어요. 수납장 치수는 90 × 45 × 100cm입니다.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "cabinet",
+      "dims": [
+        100,
+        80,
+        40
+      ]
+    },
+    {
+      "text": "새로 책장·선반 하나 놓고 싶어",
+      "ms": 2589,
+      "engine": "gemma",
+      "reply": "책장·선반 초안은 90 × 35 × 160cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "가구 종류는 문장에 적힌 책장·선반"
+      ],
+      "raw": "{\"intent\":\"action\",\"action\":\"none\",\"furniture\":\"dresser\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"unknown\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"새로운 책장 하나 놓았어요. 책장 치수는 100 × 40 × 80cm입니다. 방에 놓기 전에 어떤 규격인가요?\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "shelf",
+      "dims": [
+        90,
+        160,
+        35
+      ]
+    },
+    {
+      "text": "새로 신발장 하나 놓고 싶어",
+      "ms": 2144,
+      "engine": "gemma",
+      "reply": "신발장 초안은 80 × 35 × 120cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "가구 종류는 문장에 적힌 신발장"
+      ],
+      "raw": "{\"intent\":\"action\",\"action\":\"none\",\"furniture\":\"wardrobe\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"새로운 신발장 하나를 놓았어요. 어떤 크기인가요?\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "shoe_cabinet",
+      "dims": [
+        80,
+        120,
+        35
+      ]
+    },
+    {
+      "text": "새로 벤치 하나 놓고 싶어",
+      "ms": 2173,
+      "engine": "gemma",
+      "reply": "새로 벤치를 놓았어요. 벤치 높이도 고려해야 할까요?",
+      "fixes": [],
+      "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"bench\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":1,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"새로 벤치를 놓았어요. 벤치 높이도 고려해야 할까요?\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "bench",
+      "dims": [
+        110,
+        45,
+        38
+      ]
+    },
+    {
+      "text": "새로 러그 하나 놓고 싶어",
+      "ms": 2143,
+      "engine": "gemma",
+      "reply": "러그 초안은 160 × 230 × 1cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"rug\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"unknown\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"새로 러그 하나 놓았어요. 높이도 고려해야 할까요?\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "rug",
+      "dims": [
+        160,
+        1,
+        230
+      ]
+    },
+    {
+      "text": "새로 스탠드조명 하나 놓고 싶어",
+      "ms": 2465,
+      "engine": "gemma",
+      "reply": "스탠드조명 초안은 40 × 40 × 160cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "문장에 없는 동작(놓기)은 실행하지 않음"
+      ],
+      "raw": "{\"intent\": \"action\", \"action\": \"place\", \"furniture\": \"lamp\", \"room_type\": \"none\", \"space\": \"none\", \"seats\": null, \"size\": \"unknown\", \"depth\": \"unknown\", \"height\": \"low\", \"color\": \"none\", \"wall\": \"none\", \"floor\": \"none\", \"ui\": \"furniture_sizes\", \"reply\": \"스탠드조명 하나 놓았어요.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "lamp",
+      "dims": [
+        40,
+        160,
+        40
+      ]
+    },
+    {
+      "text": "새로 화분 하나 놓고 싶어",
+      "ms": 1955,
+      "engine": "gemma",
+      "reply": "화분 하나 놓을 건가요?",
+      "fixes": [],
+      "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"plant\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"화분 하나 놓을 건가요?\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "plant",
+      "dims": [
+        40,
+        100,
+        40
+      ]
+    },
+    {
+      "text": "새로 냉장고 하나 놓고 싶어",
+      "ms": 2327,
+      "engine": "gemma",
+      "reply": "냉장고 초안은 70 × 70 × 175cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"fridge\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"unknown\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"냉장고 하나를 놓았어요. 냉장고 치수는 40 × 40 × 160cm입니다.\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "fridge",
+      "dims": [
+        70,
+        175,
+        70
+      ]
+    },
+    {
+      "text": "새로 세탁기 하나 놓고 싶어",
+      "ms": 2116,
+      "engine": "gemma",
+      "reply": "새로 세탁기를 놓았어요. 세탁기 치수는 어떻게 되나요?",
+      "fixes": [],
+      "raw": "{\"intent\":\"action\",\"action\":\"none\",\"furniture\":\"washer\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"새로 세탁기를 놓았어요. 세탁기 치수는 어떻게 되나요?\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "washer",
+      "dims": [
+        60,
+        85,
+        65
+      ]
+    },
+    {
+      "text": "새로 변기 하나 놓고 싶어",
+      "ms": 2066,
+      "engine": "gemma",
+      "reply": "새로운 변기를 놓았어요. 변기 치수는 어떻게 되나요?",
+      "fixes": [],
+      "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"toilet\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":1,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"새로운 변기를 놓았어요. 변기 치수는 어떻게 되나요?\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "toilet",
+      "dims": [
+        42,
+        75,
+        68
+      ]
+    },
+    {
+      "text": "새로 세면대 하나 놓고 싶어",
+      "ms": 2049,
+      "engine": "gemma",
+      "reply": "새로운 세면대를 놓았어요. 세면대 치수는 어떻게 되나요?",
+      "fixes": [],
+      "raw": "{\"intent\":\"action\",\"action\":\"none\",\"furniture\":\"basin\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"새로운 세면대를 놓았어요. 세면대 치수는 어떻게 되나요?\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "basin",
+      "dims": [
+        50,
+        82,
+        40
+      ]
+    },
+    {
+      "text": "새로 샤워부스 하나 놓고 싶어",
+      "ms": 2123,
+      "engine": "gemma",
+      "reply": "새로운 샤워부스를 놓았어요. 샤워부스 치수는 어떻게 되나요?",
+      "fixes": [],
+      "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"shower\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":1,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"새로운 샤워부스를 놓았어요. 샤워부스 치수는 어떻게 되나요?\"}",
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "shower",
+      "dims": [
+        80,
+        170,
+        80
+      ]
+    }
+  ],
+  "errors": []
+}

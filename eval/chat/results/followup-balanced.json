@@ -1,0 +1,60 @@
+{
+  "at": "2026-11-16T15:43:13.107Z",
+  "model": "balanced",
+  "base": "http://127.0.0.1:4187/",
+  "build": "full-qa-20261117-followup",
+  "ms": 12414,
+  "results": [
+    {
+      "text": "100평 집 전체를 재팬디로 꾸며줘",
+      "ms": 1911,
+      "engine": "qwen",
+      "reply": "재팬디 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\n\n\n    \"theme\": \"japandi\",\n    \"room1\": \"reading\",\n    \"room2\": \"standard\",\n    \"room3\": \"standard\",\n    \"room4\": \"standard\",\n    \"room5\": \"standard\",\n    \"room6\": \"standard\",\n    \"room7\": \"standard\",\n    \"room8\": \"standard\",\n    \"room9\": \"standard\",\n    \"room10\": \"standard\",\n    \"room11\": \"standard\",\n    \"room12\": \"standard\"\n    \n}",
+      "model": "Qwen3-1.7B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "초안 적용해줘",
+      "ms": 130,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\n\n\n    \"theme\": \"japandi\",\n    \"room1\": \"reading\",\n    \"room2\": \"standard\",\n    \"room3\": \"standard\",\n    \"room4\": \"standard\",\n    \"room5\": \"standard\",\n    \"room6\": \"standard\",\n    \"room7\": \"standard\",\n    \"room8\": \"standard\",\n    \"room9\": \"standard\",\n    \"room10\": \"standard\",\n    \"room11\": \"standard\",\n    \"room12\": \"standard\"\n    \n}",
+      "model": "Qwen3-1.7B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "안방 침대 가로 180cm로 바꿔줘",
+      "ms": 3323,
+      "engine": "qwen",
+      "reply": "침대 크기는 180 × 200 × 55cm예요. 아래 도구에서 더 조절할 수 있어요.",
+      "fixes": [],
+      "raw": "{\n\n\n    \"intent\": \"furniture\",\n    \"action\": \"none\",\n    \"furniture\": \"bed\",\n    \"room_type\": \"none\",\n    \"space\": \"none\",\n    \"seats\": null,\n    \"size\": \"standard\",\n    \"depth\": \"deep\",\n    \"height\": \"tall\",\n    \"color\": \"none\",\n    \"wall\": \"none\",\n    \"floor\": \"none\",\n    \"ui\": \"furniture_dims\",\n    \"reply\": \"침대의 가로 치수를 180cm로 설정했어요. 깊이와 높이도 중요해요?\"\n    \n}",
+      "model": "Qwen3-1.7B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "높이는 60cm로 바꿔줘",
+      "ms": 2995,
+      "engine": "qwen",
+      "reply": "침대 크기는 180 × 200 × 60cm예요. 아래 도구에서 더 조절할 수 있어요.",
+      "fixes": [
+        "도구는 요청 단어에 맞춰 치수 직접 입력"
+      ],
+      "raw": "{\n\n\n    \"intent\": \"furniture\",\n    \"action\": \"none\",\n    \"furniture\": \"bed\",\n    \"room_type\": \"none\",\n    \"space\": \"none\",\n    \"seats\": null,\n    \"size\": \"unknown\",\n    \"depth\": \"unknown\",\n    \"height\": \"low\",\n    \"color\": \"none\",\n    \"wall\": \"none\",\n    \"floor\": \"none\",\n    \"ui\": \"furniture_sizes\",\n    \"reply\": \"높이를 낮게 설정했어요. 다른 가구 색도 맞춰 볼까요?\"\n    \n}",
+      "model": "Qwen3-1.7B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "네이비로 바꿔줘",
+      "ms": 2748,
+      "engine": "qwen",
+      "reply": "네이비로 침대를 바꿔줘요.",
+      "fixes": [],
+      "raw": "{\n\n\n    \"intent\": \"action\",\n    \"action\": \"none\",\n    \"furniture\": \"bed\",\n    \"room_type\": \"none\",\n    \"space\": \"none\",\n    \"seats\": null,\n    \"size\": \"unknown\",\n    \"depth\": \"unknown\",\n    \"height\": \"unknown\",\n    \"color\": \"none\",\n    \"wall\": \"none\",\n    \"floor\": \"none\",\n    \"ui\": \"none\",\n    \"reply\": \"네이비로 침대를 바꿔줘요.\"\n    \n}",
+      "model": "Qwen3-1.7B-q4f16_1-MLC",
+      "passed": true
+    }
+  ],
+  "errors": []
+}

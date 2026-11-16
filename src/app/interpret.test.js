@@ -548,3 +548,23 @@ test('가리키는 것 없는 불만은 떠 있는 초안 이야기로 받지 �
   );
   assert.equal(q.reply, '무엇을 말씀하고 싶으신가요?');
 });
+
+test('실제 Qwen의 가구 높이 오분류: 방 높이 검증이 실패해도 고른 침대에 60cm를 반영한다', () => {
+  const s = freshState(),
+    bed = makeItem('bed');
+  bed.dims[0] = 180;
+  bed.sources[0] = '사용자 설정 · 대화';
+  s.items = [bed];
+  const p = planFromModel(model({ intent: 'room', ui: 'finishes' }), '높이는 60cm로 바꿔줘', {
+    state: s,
+    target: { type: 'item', id: bed.id },
+    draft: null,
+    said: [],
+  });
+  assert.equal(p.decidedBy, 'model');
+  assert.equal(p.fallback, undefined);
+  assert.equal(p.changes.item.id, bed.id);
+  assert.deepEqual(p.changes.item.next.dims, [180, 60, 200]);
+  assert.equal(s.room.h, 2.4);
+  assert.ok(p.fixes.length);
+});
