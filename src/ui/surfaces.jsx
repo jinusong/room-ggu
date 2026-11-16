@@ -17,6 +17,7 @@ import { josa } from '../app/text.js';
 import { avatarLayout, poseAccepts, poseFor, POSES } from '../avatar.js';
 import { floorplanWarnings, connections, DOOR } from '../floorplan.js';
 import { TEXT_MODELS, sizeText } from '../app/models.js';
+import { THEMES } from '../app/design.js';
 import { Icon } from './icons.js';
 import {
   Stepper,
@@ -881,7 +882,11 @@ function Impact() {
                 <span class="row-main">
                   <strong>{a.name}</strong>
                   <small>
-                    {warn.oversized.has(a.id) ? '방보다 크거나 벽을 넘어요' : '다른 가구와 겹쳐요'}
+                    {warn.oversized.has(a.id)
+                      ? '방보다 크거나 벽을 넘어요'
+                      : warn.blockedDoors.has(a.id)
+                        ? '문 앞 통로를 막고 있어요'
+                        : '다른 가구와 겹쳐요'}
                   </small>
                 </span>
                 <Icon name="chevron-right" size={16} />
@@ -1155,6 +1160,78 @@ function Photo({ spec }) {
   );
 }
 
+function Design({ spec }) {
+  const d = app.design;
+  if (!d || d.surfaceId !== spec.id)
+    return (
+      <p class="surface-gone">
+        새 초안은 마지막 상담에 있어요. 면적과 테마를 말하면 다시 준비해 드려요.
+      </p>
+    );
+  const rooms = spaces(d.state),
+    area = rooms.reduce((n, r) => n + r.room.w * r.room.d, 0),
+    stale = !d.applied && store.designStale();
+  return (
+    <>
+      <Head
+        icon="house"
+        title={`${THEMES[d.theme].name} · ${d.mode === 'house' ? '집 전체 초안' : '마감 초안'}`}
+        meta={`${rooms.length}개 공간 · 약 ${(area / 3.3058).toFixed(1)}평`}
+      />
+      <div class="design-palette" aria-label="테마 색상">
+        {[THEMES[d.theme].wall, THEMES[d.theme].floor, ...THEMES[d.theme].colors].map(
+          (color, i) => (
+            <span key={i} style={{ background: color }} />
+          ),
+        )}
+        <small>벽 · 바닥 · 가구</small>
+      </div>
+      <ul class="design-rooms" aria-label="공간별 구성">
+        {rooms.map((r) => (
+          <li key={r.roomId}>
+            <Icon name={ROOM_TYPES[r.room.type].icon} size={16} />
+            <div>
+              <strong>{r.name}</strong>
+              <small>{r.items.map((i) => TYPES[i.type].name).join(' · ') || '가구 없음'}</small>
+            </div>
+            <span class="mono">{(r.room.w * r.room.d).toFixed(1)}m²</span>
+          </li>
+        ))}
+      </ul>
+      {!!d.omitted.length && (
+        <p class="warn-text" role="status">
+          빈자리가 없어 남겨 둔 가구: {d.omitted.join(', ')}. 공간을 넓히거나 가구를 직접 더해
+          주세요.
+        </p>
+      )}
+      <p class="surface-hint">
+        가구와 마감을 배치하는 초안이에요. 공간별 치수는 면적을 나눈 가정값이며 직접 고칠 수 있어요.
+      </p>
+      <footer class="surface-foot">
+        <span class="foot-note" role="status">
+          {d.applied
+            ? '적용됨 · 실행 취소로 되돌리기'
+            : stale
+              ? '배치가 바뀌었어요. 지금 배치를 기준으로 다시 요청해 주세요.'
+              : d.mode === 'house'
+                ? '적용하면 현재 배치를 바꿔요'
+                : '치수와 위치는 유지해요'}
+        </span>
+        <button
+          class="btn primary"
+          disabled={d.applied || stale}
+          onClick={() => {
+            const error = store.applyDesign();
+            if (error) store.toast(error);
+          }}
+        >
+          {d.applied ? '적용됨' : '초안 적용'}
+        </button>
+      </footer>
+    </>
+  );
+}
+
 function AIPanel() {
   const ai = app.ai;
   const loading = ai.text === 'loading';
@@ -1206,22 +1283,45 @@ function AIPanel() {
           <button
             key={m.key}
             role="radio"
+            aria-label={m.name}
             aria-checked={ai.choice === m.key}
+            tabIndex={ai.choice === m.key ? 0 : -1}
             data-model={m.key}
             class={`model-choice ${ai.choice === m.key ? 'is-active' : ''}`}
             disabled={ai.text === 'unsupported'}
             onClick={() => store.setModelChoice(m.key)}
+            onKeyDown={(e) => {
+              const keys = Object.keys(TEXT_MODELS),
+                at = keys.indexOf(m.key);
+              const next =
+                e.key === 'Home'
+                  ? 0
+                  : e.key === 'End'
+                    ? keys.length - 1
+                    : ['ArrowRight', 'ArrowDown'].includes(e.key)
+                      ? (at + 1) % keys.length
+                      : ['ArrowLeft', 'ArrowUp'].includes(e.key)
+                        ? (at + keys.length - 1) % keys.length
+                        : null;
+              if (next === null) return;
+              e.preventDefault();
+              store.setModelChoice(keys[next]);
+              e.currentTarget.parentElement.querySelector(`[data-model="${keys[next]}"]`)?.focus();
+            }}
           >
             <strong>{m.name}</strong>
             <small>{m.note}</small>
             <span class="mono">내려받기 약 {sizeText(m.downloadMB)}</span>
-            <span class="mono">GPU 메모리 약 {(m.vramMB / 1000).toFixed(1)}GB</span>
+            <span class="mono">
+              GPU 약 {(m.vramMB / 1000).toFixed(1)}~{(m.vramF32MB / 1000).toFixed(1)}GB
+            </span>
+            {m.f32Note && <small>{m.f32Note}</small>}
           </button>
         ))}
       </div>
       <p class="surface-hint model-note">
-        기본은 Gemma 4 E2B예요. 메모리가 부족하면 가벼운 Gemma 3 1B를 골라 주세요. 모델을 바꾸면 새
-        모델을 한 번 내려받아요.
+        기본은 Gemma 4 E2B예요. 다운로드를 줄이려면 Qwen3 0.6B, GPU 메모리를 아끼려면 Gemma 3 1B를
+        골라 보세요. 모델에 따라 상담 결과와 속도가 달라요. 고르면 새 모델을 한 번 받아요.
       </p>
       <div class="model-row">
         <span class={`status-dot is-${ai.vision}`} />
@@ -1336,6 +1436,7 @@ function OtherSpace({ roomId }) {
 }
 
 const BODIES = {
+  design: Design,
   avatar: Avatar,
   floorplan: Floorplan,
   'room-size': RoomSize,

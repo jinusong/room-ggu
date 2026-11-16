@@ -442,3 +442,14 @@ test('"앉을 만한 거 하나"의 "거"처럼 물건을 대신하는 말은 �
   );
   assert.equal(planTurn('컴퓨터 하나 놓아줘', { state: s, target: room }).intent, 'chat');
 });
+
+test('가구 여럿의 요청은 다섯 번째부터도 빠뜨리지 않고 과도한 일괄 요청은 거절한다', () => {
+  const req = splitRequest('소파랑 식탁이랑 책상이랑 의자랑 책장이랑 화분이랑 조명 놓고 싶어');
+  assert.equal(req.pieces.length, 7);
+  const p = planTurn(Array(26).fill('소파').join('랑 ') + ' 놓고 싶어', {
+    state: freshState(),
+    target: room,
+  });
+  assert.equal(p.error, true);
+  assert.equal(p.batchLimit, true);
+});

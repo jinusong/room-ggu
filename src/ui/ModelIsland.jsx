@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import * as store from '../app/store.js';
 import { app } from '../app/store.js';
-import { sizeText } from '../app/models.js';
+import { sizeText, TEXT_MODELS } from '../app/models.js';
 import { Icon } from './icons.js';
 
 // 화면 위 가운데에 뜨는 모델 아일랜드. 모델을 내려받거나 준비하는 동안 진행 상황을 한 줄로 보여 주고,
@@ -55,9 +55,9 @@ function ModelAsk({ ask }) {
         e.stopPropagation();
         store.declineModel();
       }
-      // 팝업이 떠 있는 동안 초점은 두 단추 사이에서만 돈다.
+      // 팝업이 떠 있는 동안 모델 선택과 두 단추 사이에서만 초점이 돈다.
       if (e.key === 'Tab') {
-        const list = [...ref.current.querySelectorAll('button')],
+        const list = [...ref.current.querySelectorAll('button,select')],
           i = list.indexOf(document.activeElement),
           next = i < 0 ? (e.shiftKey ? list.length - 1 : 0) : i + (e.shiftKey ? -1 : 1);
         e.preventDefault();
@@ -99,6 +99,21 @@ function ModelAsk({ ask }) {
               ? '받다 만 모델이 있어요. 남은 만큼만 이어서 받으면 돼요. 대화는 서버로 보내지 않고 이 기기에서 해석해요.'
               : '룸꾸는 대화를 서버로 보내지 않고 이 기기에서 해석해요. 그래서 처음 한 번 모델을 받아 둬야 해요.'}
           </p>
+          <label class="ask-model-choice">
+            상담 모델
+            <select
+              id="ask-model-select"
+              aria-label="받을 상담 모델"
+              value={app.ai.choice}
+              onChange={(e) => store.setModelChoice(e.currentTarget.value)}
+            >
+              {Object.values(TEXT_MODELS).map((m) => (
+                <option key={m.key} value={m.key}>
+                  {m.name} · 약 {sizeText(m.downloadMB)}
+                </option>
+              ))}
+            </select>
+          </label>
           <dl class="ask-facts">
             <div>
               <dt>모델</dt>
@@ -299,6 +314,17 @@ export function ModelIsland() {
               </p>
             )}
             <footer>
+              {d.task === 'text' && (
+                <button
+                  class="island-btn"
+                  onClick={() => {
+                    store.setDownloadOpen(false);
+                    store.openTool('ai');
+                  }}
+                >
+                  모델 바꾸기
+                </button>
+              )}
               {busy && (
                 <button
                   class="island-btn"

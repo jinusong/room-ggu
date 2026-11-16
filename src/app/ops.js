@@ -20,6 +20,10 @@ import {
   switchRoom,
   spaces,
   exampleState,
+  freshState,
+  makeItem,
+  validateState,
+  doorZones,
   DEFAULT_SOURCE,
 } from '../data.js';
 import { defaultAvatar, POSES, poseAccepts, standAt, standSpot } from '../avatar.js';
@@ -32,11 +36,200 @@ import {
   doorPlacement,
   findDoor,
   roomOpenings,
+  connections,
   floorplanWarnings,
   DOOR,
 } from '../floorplan.js';
 import { bathroomFixtures } from '../house-geometry.js';
 import { josa } from './text.js';
+import { THEMES } from './design.js';
+
+// 일괄 상담도 이 경계에서만 실제 상태로 바꾼다. 완성한 별도 상태를 검증한 뒤 store가 한 번에 적용한다.
+export function buildDesign(state, spec) {
+  if (!Object.hasOwn(THEMES, spec.theme)) throw Error('테마를 다시 골라 주세요.');
+  const theme = THEMES[spec.theme];
+  if (spec.mode === 'theme') {
+    const next = structuredClone(state);
+    for (const r of [next, ...next.otherRooms]) {
+      r.room.wallColor = theme.wall;
+      r.room.floorColor = r.room.type === 'bathroom' ? '#dce1dc' : theme.floor;
+      r.items.forEach((i, n) => {
+        i.color = theme.colors[n % theme.colors.length];
+      });
+    }
+    return { state: validateState(next), omitted: [] };
+  }
+  const next = freshState(),
+    omitted = [],
+    list = [];
+  const total = spec.rooms.reduce((n, r) => n + r.weight, 0);
+  const width = round2(Math.sqrt(spec.areaM2 * 1.25));
+  next.floorplan.positions = {};
+  // 면적을 반씩 나눠 긴 띠 대신 방에 가까운 비율로 연결한다.
+  const partition = (rooms, left, top, w, d) => {
+    if (rooms.length === 1) {
+      const r = rooms[0];
+      if (w < 1.5 || w > 15 || d < 1.5 || d > 15)
+        throw Error('공간 비율이 너무 치우쳤어요. 공간 구성을 나눠 다시 요청해 주세요.');
+      const room = makeRoom(r.type),
+        roomId = newId();
+      Object.assign(room, {
+        w,
+        d,
+        h: 2.5,
+        wallColor: theme.wall,
+        floorColor: r.type === 'bathroom' ? '#dce1dc' : theme.floor,
+        sources: {
+          w: '대화 추정 · 집 전체 면적 배분',
+          d: '대화 추정 · 집 전체 면적 배분',
+          h: '상담 초안',
+        },
+      });
+      list.push({ roomId, name: r.name, room, items: [], requested: r.items });
+      next.floorplan.positions[roomId] = { x: round3(left + w / 2), z: round3(top + d / 2) };
+      return;
+    }
+    const sum = rooms.reduce((n, r) => n + r.weight, 0);
+    let cut = 1,
+      weight = rooms[0].weight,
+      best = Math.abs(sum / 2 - weight),
+      acc = weight;
+    for (let i = 1; i < rooms.length - 1; i++) {
+      acc += rooms[i].weight;
+      if (Math.abs(sum / 2 - acc) < best) {
+        cut = i + 1;
+        weight = acc;
+        best = Math.abs(sum / 2 - acc);
+      }
+    }
+    if (w >= d) {
+      const first = round2((w * weight) / sum);
+      partition(rooms.slice(0, cut), left, top, first, d);
+      partition(rooms.slice(cut), left + first, top, round2(w - first), d);
+    } else {
+      const first = round2((d * weight) / sum);
+      partition(rooms.slice(0, cut), left, top, w, first);
+      partition(rooms.slice(cut), left, top + first, w, round2(d - first));
+    }
+  };
+  if (!Number.isFinite(total) || total <= 0 || spec.rooms.length < 2 || spec.rooms.length > 12)
+    throw Error('공간 구성을 다시 요청해 주세요.');
+  partition(
+    [...spec.rooms].sort((a, b) => b.weight - a.weight),
+    -width / 2,
+    0,
+    width,
+    round2(spec.areaM2 / width),
+  );
+  const first = list[0];
+  Object.assign(next, {
+    roomId: first.roomId,
+    name: first.name,
+    room: first.room,
+    items: first.items,
+    otherRooms: list.slice(1).map(({ requested, ...r }) => r),
+    roomOrder: list.map((r) => r.roomId),
+    scope: 'house',
+    view: state.view,
+  });
+  // 맞닿은 벽마다 문을 만들지 않고, 공용 공간을 우선해 모든 방을 잇는 문만 남긴다.
+  const links = connections(list, next.floorplan),
+    seen = new Set([first.roomId]),
+    chosen = new Set();
+  while (seen.size < list.length) {
+    const candidates = links.filter((l) => seen.has(l.ids[0]) !== seen.has(l.ids[1]));
+    candidates.sort((a, b) => {
+      const cost = (l) => {
+        const parent = list.find((r) => r.roomId === l.ids.find((id) => seen.has(id)));
+        return ['living', 'dining', 'kitchen'].includes(parent.room.type)
+          ? 0
+          : parent.room.type === 'bathroom'
+            ? 100
+            : 10;
+      };
+      return cost(a) - cost(b);
+    });
+    const link = candidates[0];
+    if (!link) throw Error('연결할 수 없는 공간이 있어요. 구성을 다시 요청해 주세요.');
+    chosen.add(link);
+    link.ids.forEach((id) => seen.add(id));
+  }
+  for (const link of links) if (!chosen.has(link)) setDoor(next, ...link.ids, { closed: true });
+  for (const r of list) {
+    const local = { ...r };
+    // 문 앞의 통로를 가구처럼 빈자리 계산에만 넣고 저장하기 전에 거둔다.
+    const keepouts = roomOpenings(list, next.floorplan, r.roomId).map((o) => ({
+      ...makeItem('cabinet'),
+      dims: o.vertical ? [90, 100, (o.width + 0.4) * 100] : [(o.width + 0.4) * 100, 100, 90],
+      x: o.x + (o.vertical ? (o.x > 0 ? -0.45 : 0.45) : 0),
+      z: o.z + (!o.vertical ? (o.z > 0 ? -0.45 : 0.45) : 0),
+    }));
+    local.items = [...keepouts];
+    for (const [index, type] of r.requested.entries()) {
+      const item = makeItem(type);
+      item.name = TYPES[type].name;
+      item.color = theme.colors[index % theme.colors.length];
+      item.sources = item.sources.map(() => '상담 배치 초안');
+      // 좌석은 책상·식탁 앞으로, 협탁은 침대 머리맡으로 묶어 쓰임새를 유지한다.
+      const candidates = [];
+      const anchor = (type) =>
+        local.items.find((i) => i.type === type && !keepouts.some((k) => k.id === i.id));
+      const table = anchor('dining'),
+        desk = anchor('desk'),
+        bed = anchor('bed'),
+        sofa = anchor('sofa');
+      if (type === 'dining') candidates.push({ x: 0, z: 0, angle: 0 });
+      if (type === 'coffee' && sofa)
+        candidates.push({
+          x: sofa.x,
+          z: sofa.z + (sofa.dims[2] + item.dims[2]) / 200 + 0.4,
+          angle: 0,
+        });
+      if (type === 'chair' && (table || desk)) {
+        const a = table || desk,
+          count = local.items.filter((i) => i.type === 'chair').length;
+        const spots = table
+          ? [
+              { x: a.x, z: a.z + (a.dims[2] + item.dims[2]) / 200 + 0.15, angle: 0 },
+              { x: a.x, z: a.z - (a.dims[2] + item.dims[2]) / 200 - 0.15, angle: 180 },
+              { x: a.x - (a.dims[0] + item.dims[2]) / 200 - 0.15, z: a.z, angle: 90 },
+              { x: a.x + (a.dims[0] + item.dims[2]) / 200 + 0.15, z: a.z, angle: 270 },
+            ]
+          : [{ x: a.x, z: a.z + (a.dims[2] + item.dims[2]) / 200 + 0.15, angle: 0 }];
+        candidates.push(...spots.slice(count), ...spots.slice(0, count));
+      }
+      if (type === 'side' && bed)
+        for (const sign of [-1, 1])
+          candidates.push({
+            x: bed.x + sign * ((bed.dims[0] + item.dims[0]) / 200 + 0.1),
+            z: bed.z - bed.dims[2] / 200 + item.dims[2] / 200,
+            angle: 0,
+          });
+      const preferred = candidates.find((p) => {
+        const c = { ...item, ...p },
+          bounded = { ...c };
+        clampItem(bounded, local.room);
+        return (
+          Math.abs(c.x - bounded.x) < 0.001 &&
+          Math.abs(c.z - bounded.z) < 0.001 &&
+          freeAt(c, local.items, MARGIN)
+        );
+      });
+      let spot = preferred ? { ...preferred, free: true } : findFreeSpot(local, item);
+      if (!spot.free) {
+        item.dims = [...TYPES[type].presets[0].dims];
+        spot = findFreeSpot(local, item);
+      }
+      if (!spot.free) {
+        omitted.push(`${r.name} · ${TYPES[type].name}`);
+        continue;
+      }
+      local.items.push({ ...item, x: spot.x, z: spot.z, angle: spot.angle });
+    }
+    r.items.push(...local.items.slice(keepouts.length));
+  }
+  return { state: validateState(next), omitted };
+}
 
 export const round2 = (n) => Math.round(n * 100) / 100;
 // 공간 위치는 mm까지 둔다. 벽을 맞붙일 때 폭의 절반(5mm 단위)이 그대로 맞아야 겹침으로 잡히지 않는다.
@@ -307,7 +500,7 @@ function gridSpots(room, angle) {
 }
 export function findFreeSpot(state, item) {
   const room = state.room,
-    others = state.items.filter((o) => o.id !== item.id);
+    others = [...state.items.filter((o) => o.id !== item.id), ...doorZones(state)];
   const fallback = { ...item, x: 0, z: 0 };
   clampItem(fallback, room);
   const result = (c, free) => ({ x: c.x, z: c.z, angle: c.angle, free });

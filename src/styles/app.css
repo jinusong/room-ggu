@@ -3331,3 +3331,80 @@ button.avatar-tag {
     grid-template-columns: 1fr;
   }
 }
+
+/* 상담 속 집 전체 구성표. 팔레트만 색을 쓰고 편집 도구와 같은 종이 재질을 유지한다. */
+.design-palette {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 16px 0 8px;
+}
+.design-palette > span {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+}
+.design-palette > small {
+  margin-left: 8px;
+  color: var(--ink-3);
+}
+.design-rooms {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.design-rooms li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.design-rooms li > svg {
+  flex: none;
+  color: var(--ink-2);
+}
+.design-rooms li > div {
+  flex: 1;
+  min-width: 0;
+}
+.design-rooms strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+.design-rooms small {
+  display: block;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.design-rooms .mono {
+  flex: none;
+  color: var(--ink-2);
+  font-size: 11px;
+}
+.ask-model-choice {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  color: #e9e6de;
+  font-size: 12px;
+}
+.ask-model-choice select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid #6e6a62;
+  border-radius: 8px;
+  background: #35322c;
+  color: #fff;
+  font: inherit;
+}
+.ask-model-choice select:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}

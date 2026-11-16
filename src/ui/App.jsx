@@ -47,6 +47,7 @@ function useViewport() {
 function useShortcuts() {
   useEffect(() => {
     const onKey = (e) => {
+      if (e.defaultPrevented) return;
       const typing = e.target.closest?.('input,textarea,select,[contenteditable]');
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !typing) {
         e.preventDefault();
@@ -59,6 +60,10 @@ function useShortcuts() {
         return;
       }
       if (typing) return;
+      if (
+        e.target.closest?.('button,[role="radio"],[role="menu"],[role="dialog"],[role="separator"]')
+      )
+        return;
       if (e.key === '/') {
         e.preventDefault();
         document.getElementById('chat-input')?.focus();

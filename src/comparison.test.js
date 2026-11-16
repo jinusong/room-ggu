@@ -172,7 +172,9 @@ test('방을 돌리면 가로·세로와 가구·아바타가 함께 돌고 네 
   assert.ok(Math.abs(bed.x - -was.z) < 1e-9 && Math.abs(bed.z - was.x) < 1e-9);
   assert.equal(bed.angle, (was.angle + 270) % 360);
   assert.ok(Math.abs(s.avatar.x - -0.5) < 1e-9 && Math.abs(s.avatar.z - 1) < 1e-9);
-  assert.equal(layoutWarnings(s).all.size, 0);
+  // 방 회전 뒤 이웃과 맞닿은 문 자리는 바뀔 수 있다. 가구 경계와 가구끼리의 충돌만 이 불변식에 포함한다.
+  assert.equal(layoutWarnings(s).conflicts.size, 0);
+  assert.equal(layoutWarnings(s).oversized.size, 0);
   assert.equal(floorplanWarnings(spaces(s), s.floorplan).size, 0);
   for (let i = 0; i < 3; i++) rotateSpace(s);
   assert.deepEqual([s.room.w, s.room.d], [start.room.w, start.room.d]);

@@ -232,6 +232,14 @@ export function Sheet({ mobile, sheetRef }) {
           <Status />
         </div>
         <div class="sheet-actions">
+          <button
+            class="icon-btn"
+            aria-label="상담 모델 선택"
+            title="상담 모델 선택"
+            onClick={() => store.openTool('ai')}
+          >
+            <Icon name="cpu" />
+          </button>
           {app.thread.length > 0 &&
             (confirmClear ? (
               <button

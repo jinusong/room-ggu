@@ -137,3 +137,16 @@ test('모델 조각이 모두 보관돼 있을 때만 받아 둔 모델로 본�
     else delete globalThis.caches;
   }
 });
+
+test('선택한 Qwen 크기와 실제 실행 이름을 구분하고 모든 후보가 설치 SDK에서 실행 가능한 ID다', async () => {
+  const { prebuiltAppConfig } = await import('@mlc-ai/web-llm');
+  assert.equal(textModel('qwen').name, 'Qwen3 0.6B');
+  assert.equal(textModel('balanced').name, 'Qwen3 1.7B');
+  assert.equal(modelName(TEXT_MODELS.balanced.f16), 'Qwen3 1.7B');
+  for (const m of Object.values(TEXT_MODELS))
+    for (const id of [m.f16, m.f32])
+      assert.ok(
+        prebuiltAppConfig.model_list.some((r) => r.model_id === id),
+        id,
+      );
+});

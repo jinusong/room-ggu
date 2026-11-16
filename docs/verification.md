@@ -1,5 +1,57 @@
 # 검증 기록 · 2026-11-16
 
+## v5.8 집 전체 상담·모델 선택·종합 QA · 2026-11-17
+
+- Gemma 4 E2B를 기본으로 유지하고 Qwen3 0.6B·Gemma 3 1B·Qwen3 1.7B를 직접 고른다. 대화 머리와 다운로드 안내에서 선택하며, 휴대 기기에서는 고른 뒤에도 다운로드 동의를 받는다.
+- 100평 집 전체를 상담하면 12개 공간의 가구·마감 초안을 보여 준다. 8개 테마, 면적 배분, 필수 가구, 문 앞 통로와 충돌을 검사한다. 초안 적용과 실행 취소를 한 번씩 수행한다. 배치가 바뀐 뒤에는 이전 초안을 적용하지 않는다.
+- 방 이름과 가구를 지정한 수정, 그다음 높이·색 상담을 같은 대상에 연결했다. 여러 가구의 다섯 번째 이후가 빠지던 문제, 늦은 응답이 직접 편집을 덮어쓰던 문제, 모델 전환·대화 초기화의 경쟁 상태를 고쳤다.
+- 실제 실행에서 발견한 Qwen의 빈 think 블록, 생각 모드 옵션 위치, 긴 답의 잘림을 수정했다. 0.6B는 의도·조건만 구조화해 해석하고 안내 문장은 실제 변경 결과로 쓴다. 가구 높이를 방 높이로 잘못 읽었을 때 검증 예외가 나던 문제도 실제 응답으로 회귀 검사를 추가했다.
+
+### 실제 모델
+
+설치 SDK는 WebLLM 0.2.87이다. Mac의 Chrome·WebGPU에서 모델 가중치를 실제로 불러왔다. 5개 실행 구성에서 총 **275턴 통과**: 모델 해석 220턴, 초안 적용 등 앱 명령 55턴이다. 모델 검사에서 규칙 대체는 성공으로 세지 않았다. 앱이 이름·숫자·의도를 바로잡은 내용은 결과의 `fixes`에 남는다. 이 수치는 앱의 최종 상태 검사이며 원시 모델 답의 정확도 점수가 아니다.
+
+| 실제 실행 모델 | 집 전체·가구 23종 | 같은 가구로 이어지는 상담 |
+| --- | --- | --- |
+| Gemma 4 E2B · f16 | [50/50](../eval/chat/results/full-qa-large.json) | [5/5](../eval/chat/results/followup-large.json) |
+| Gemma 3 1B · f16 | [50/50](../eval/chat/results/full-qa-light.json) | [5/5](../eval/chat/results/followup-light.json) |
+| Qwen3 0.6B · f32 | [50/50](../eval/chat/results/full-qa-qwen.json) | [5/5](../eval/chat/results/followup-qwen.json) |
+| Qwen3 1.7B · f16 | [50/50](../eval/chat/results/full-qa-balanced.json) | [5/5](../eval/chat/results/followup-balanced.json) |
+| Qwen3 0.6B · f16 | [50/50](../eval/chat/results/full-qa-qwen-f16.json) | [5/5](../eval/chat/results/followup-qwen-f16.json) |
+
+각 50턴에는 100평·8테마, 침실 3개·욕실 2개, 독서 좌석과 책장, 방 이름으로 가구 수정, 여러 의자 중 대상 확인, 가구 일곱 개의 일괄 놓기와 되돌리기, 가구 23종의 상담 초안이 들어 있다. 후속 5턴은 집 생성·적용 → 안방 침대 가로 → 높이 → 색 순서다. 원시 응답·실제 모델 ID·시간·보정·대체 여부·실패 조건을 JSON으로 남겼다.
+
+### 자동·화면 검사
+
+| 검사 | 결과 |
+| --- | --- |
+| `npm run verify` | 단위 검사 195개, 스킬 참조·문법·배포 빌드 통과 |
+| Chrome | 77개 통과 |
+| Firefox | 75개 통과, WebGPU 관련 2개 제외 |
+| WebKit | 75개 통과, WebGPU 관련 2개 제외 |
+| 추가 대상 연결 회귀 | 19개 통과 |
+| 화면 | 1440·1024·900·390·320px, 입력창·초안 적용·모델 선택·저장 복원 확인 |
+| 직접 편집 | 방 12개를 각각 열어 2D 드래그·실행 취소, 데스크톱·모바일 2D/3D 가구 드래그 확인 |
+
+단위 검사는 8테마 × 5면적의 면적 오차·연결·문 앞 통로·가구 충돌·저장 왕복도 포함한다. 모델 선택의 키보드 포커스, 동의 전 요청 0건, 취소 후 늦은 결과 무시를 검사했다. 모바일 드래그 검사는 시트 전환이 끝난 좌표에서 실행한다. 기존 종이 모형 디자인을 유지하며 상태·접근성·한글 문구를 점검했다. 별도 기획 HTML은 추가하지 않았다.
+
+재현:
+
+```bash
+npm run build
+npm run preview -- --port 4180
+# 다른 터미널. MODEL=large|light|qwen|balanced
+MODEL=large CATALOG=1 npm run test:models -- http://127.0.0.1:4180/ eval/chat/results/full-qa-large.json
+MODEL=qwen F16=off CATALOG=1 npm run test:models -- http://127.0.0.1:4180/ eval/chat/results/full-qa-qwen.json
+MODEL=large SCENARIO=followup npm run test:models -- http://127.0.0.1:4180/ eval/chat/results/followup-large.json
+```
+
+[100평 집 데스크톱 화면](screenshots/whole-house-100.png) · [모바일 화면](screenshots/whole-house-100-mobile.png)
+
+이번 실행은 원본을 건드리지 않도록 복사한 평가 프로필을 썼다. 기존 캐시 origin(4187)은 `FORWARD_ORIGIN`으로 고정된 로컬 QA 빌드(5193)에 연결했다. `F16=off`는 shader-f16 선택만 바꿔 실제 f32 가중치·실행 파일을 사용한다.
+
+확인 범위는 카탈로그 23종·8테마·최대 12개 공간의 배치 초안이다. 실제 Android/iOS·Windows GPU, 시공 가능성·배관·전기·채광·구매 규격은 평가하지 않았다. 사진 경로는 브라우저 회귀 검사에 포함했으며 변경하지 않은 SigLIP 가중치 추론은 다시 평가하지 않았다.
+
 ## v5.7 말귀 · 겹치지 않는 집 · 화장실 설비 · 방 돌리기 · 2026-11-16
 
 요청: 사용자가 Gemma 4 E2B로 실제로 쓰다 막힌 대화 화면 네 장과, 말로 덧붙인 두 가지다.

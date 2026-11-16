@@ -1,4 +1,4 @@
-# 룸꾸 디자인 방향 · v5.6
+# 룸꾸 디자인 방향 · v5.8
 
 v4까지는 왼쪽 상담·오른쪽 도면의 2단 화면에 탭(상담·공간 도구·가구 찾기·목록)을 얹은 구조였다. v5는 탭을 없애고 방 모형을 화면 전체에 깔았으며, 대화는 그 위에 떠 있는 488px 카드였다. v5.5에서 이 카드를 버렸다. 처음 보는 사람에게는 대화가 설정 패널처럼 보였고, 모델 상태는 입력창 아래 구석에 있었고, 집 전체에서 방을 붙이려면 공간 목록 맨 아래를 찾아야 했기 때문이다. 지금은 왼쪽이 화면 높이를 다 쓰는 **상담 대화**, 오른쪽이 방이다. 색·글꼴·줄자 칩 같은 v5의 재료는 그대로 쓴다.
 
@@ -10,6 +10,12 @@ v5.6에서는 v5.5를 써 본 뒤 나온 네 가지를 고쳤다. 대화 열의 
 - **공간 붙이기:** FigJam은 고른 도형의 가장자리에 빠른 만들기 손잡이를 띄우고 그 방향으로 다음 도형을 미리 보여 준다. Live Home 3D는 방을 그리다 벽이 겹치면 하나의 벽으로 합친다. magicplan은 방 종류를 먼저 고르고 치수를 바꾼다. ([FigJam](https://help.figma.com/hc/en-us/articles/1500004291601), [Live Home 3D](https://www.livehome3d.com/support/lh3d-help/working-with-objects-walls), [magicplan](https://help.magicplan.app/create-a-room-with-the-square-room-feature))
 - **받기 전에 묻기:** Chrome의 내장 AI 안내서는 모델을 내려받아야 하는 기능에서 걸리는 시간을 사용자에게 미리 알리고(“It's best practice to alert the user to the time required to perform these downloads.”), 단추를 누른 뒤에 받기 시작해 진행률을 보여 주며, 다 받은 뒤 준비하는 동안에는 끝을 알 수 없는 표시로 바꾸라고 권한다. 룸꾸는 여기에 크기와 보관 위치를 더해 묻는다. ([Chrome for Developers](https://developer.chrome.com/docs/ai/inform-users-of-model-download))
 - **준비 알림:** Apple의 Live Activity는 접힌 모양에 꼭 필요한 값만 두고 누르면 펼치며, 일이 끝나면 바로 거둔다. Sonner의 진행 알림은 받는 동안 스스로 닫히지 않고 제자리에서 성공·실패로 바뀐다. ([Apple HIG](https://developer.apple.com/design/human-interface-guidelines/live-activities), [Sonner](https://sonner.emilkowal.ski/toast))
+
+## v5.8 상담 초안과 모델 선택
+
+집 전체 요청은 대화 속 구성표로 답한다. 테마의 벽·바닥·가구 색과 공간별 면적·가구를 보여 주고, 적용 전까지 실제 배치를 유지한다. 적용하면 실행 취소 한 번으로 되돌린다. 직접 편집한 뒤에는 오래된 초안을 비활성화하고 이유를 적는다.
+
+모델 선택은 대화 머리의 CPU 버튼에서 바로 연다. 네 후보의 다운로드 크기와 GPU 메모리를 함께 적고, 선택 상태는 테두리와 라디오 의미로 구별한다. 키보드 방향키는 모델 선택에만 작동한다. 모바일 첫 다운로드 팝업에도 선택란을 두며, 바꾼 모델의 실제 크기를 확인하고 동의해야 받는다.
 
 ## 방향 다섯 줄 (unslop)
 

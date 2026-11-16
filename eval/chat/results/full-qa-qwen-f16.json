@@ -1,0 +1,1171 @@
+{
+  "at": "2026-11-16T15:39:53.115Z",
+  "model": "qwen",
+  "base": "http://127.0.0.1:4187/",
+  "build": "full-qa-20261117-r4-qwen",
+  "ms": 79662,
+  "results": [
+    {
+      "text": "100평 집 전체를 내추럴 테마로 빠짐없이 인테리어해줘",
+      "ms": 1617,
+      "engine": "qwen",
+      "reply": "내추럴 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\": \"natural\", \"room1\": \"reading\", \"room2\": \"standard\", \"room3\": \"standard\", \"room4\": \"standard\", \"room5\": \"standard\", \"room6\": \"standard\", \"room7\": \"standard\", \"room8\": \"standard\", \"room9\": \"standard\", \"room10\": \"standard\", \"room11\": \"standard\", \"room12\": \"standard\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 4
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 4
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 4
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 44,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 119,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\": \"natural\", \"room1\": \"reading\", \"room2\": \"standard\", \"room3\": \"standard\", \"room4\": \"standard\", \"room5\": \"standard\", \"room6\": \"standard\", \"room7\": \"standard\", \"room8\": \"standard\", \"room9\": \"standard\", \"room10\": \"standard\", \"room11\": \"standard\", \"room12\": \"standard\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 미니멀 테마로 빠짐없이 인테리어해줘",
+      "ms": 1213,
+      "engine": "qwen",
+      "reply": "미니멀 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\": \"natural\", \"room1\": \"reading\", \"room2\": \"standard\", \"room3\": \"compact\", \"room4\": \"compact\", \"room5\": \"compact\", \"room6\": \"compact\", \"room7\": \"compact\", \"room8\": \"compact\", \"room9\": \"compact\", \"room10\": \"compact\", \"room11\": \"compact\", \"room12\": \"compact\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 3
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 3
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 3
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 3
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 40,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 99,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\": \"natural\", \"room1\": \"reading\", \"room2\": \"standard\", \"room3\": \"compact\", \"room4\": \"compact\", \"room5\": \"compact\", \"room6\": \"compact\", \"room7\": \"compact\", \"room8\": \"compact\", \"room9\": \"compact\", \"room10\": \"compact\", \"room11\": \"compact\", \"room12\": \"compact\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 북유럽 테마로 빠짐없이 인테리어해줘",
+      "ms": 1050,
+      "engine": "qwen",
+      "reply": "북유럽 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\": \"nordic\", \"room1\": \"reading\", \"room2\": \"family\", \"room3\": \"family\", \"room4\": \"family\", \"room5\": \"family\", \"room6\": \"family\", \"room7\": \"family\", \"room8\": \"family\", \"room9\": \"family\", \"room10\": \"family\", \"room11\": \"family\", \"room12\": \"family\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 5
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 5
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 4
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 46,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 103,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\": \"nordic\", \"room1\": \"reading\", \"room2\": \"family\", \"room3\": \"family\", \"room4\": \"family\", \"room5\": \"family\", \"room6\": \"family\", \"room7\": \"family\", \"room8\": \"family\", \"room9\": \"family\", \"room10\": \"family\", \"room11\": \"family\", \"room12\": \"family\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 재팬디 테마로 빠짐없이 인테리어해줘",
+      "ms": 1047,
+      "engine": "qwen",
+      "reply": "재팬디 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\": \"japandi\", \"room1\": \"reading\", \"room2\": \"family\", \"room3\": \"family\", \"room4\": \"family\", \"room5\": \"family\", \"room6\": \"family\", \"room7\": \"family\", \"room8\": \"family\", \"room9\": \"family\", \"room10\": \"family\", \"room11\": \"family\", \"room12\": \"family\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 5
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 5
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 4
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 46,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 99,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\": \"japandi\", \"room1\": \"reading\", \"room2\": \"family\", \"room3\": \"family\", \"room4\": \"family\", \"room5\": \"family\", \"room6\": \"family\", \"room7\": \"family\", \"room8\": \"family\", \"room9\": \"family\", \"room10\": \"family\", \"room11\": \"family\", \"room12\": \"family\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 모던 테마로 빠짐없이 인테리어해줘",
+      "ms": 999,
+      "engine": "qwen",
+      "reply": "모던 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\": \"modern\", \"room1\": \"reading\", \"room2\": \"standard\", \"room3\": \"standard\", \"room4\": \"standard\", \"room5\": \"standard\", \"room6\": \"standard\", \"room7\": \"standard\", \"room8\": \"standard\", \"room9\": \"standard\", \"room10\": \"standard\", \"room11\": \"standard\", \"room12\": \"standard\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 4
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 4
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 4
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 44,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 100,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\": \"modern\", \"room1\": \"reading\", \"room2\": \"standard\", \"room3\": \"standard\", \"room4\": \"standard\", \"room5\": \"standard\", \"room6\": \"standard\", \"room7\": \"standard\", \"room8\": \"standard\", \"room9\": \"standard\", \"room10\": \"standard\", \"room11\": \"standard\", \"room12\": \"standard\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 빈티지 테마로 빠짐없이 인테리어해줘",
+      "ms": 1066,
+      "engine": "qwen",
+      "reply": "빈티지 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\": \"nordic\", \"room1\": \"reading\", \"room2\": \"family\", \"room3\": \"family\", \"room4\": \"family\", \"room5\": \"family\", \"room6\": \"family\", \"room7\": \"family\", \"room8\": \"family\", \"room9\": \"family\", \"room10\": \"family\", \"room11\": \"family\", \"room12\": \"family\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 5
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 5
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 4
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 46,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 99,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\": \"nordic\", \"room1\": \"reading\", \"room2\": \"family\", \"room3\": \"family\", \"room4\": \"family\", \"room5\": \"family\", \"room6\": \"family\", \"room7\": \"family\", \"room8\": \"family\", \"room9\": \"family\", \"room10\": \"family\", \"room11\": \"family\", \"room12\": \"family\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 인더스트리얼 테마로 빠짐없이 인테리어해줘",
+      "ms": 1032,
+      "engine": "qwen",
+      "reply": "인더스트리얼 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\": \"industrial\", \"room1\": \"reading\", \"room2\": \"standard\", \"room3\": \"standard\", \"room4\": \"standard\", \"room5\": \"standard\", \"room6\": \"standard\", \"room7\": \"standard\", \"room8\": \"standard\", \"room9\": \"standard\", \"room10\": \"standard\", \"room11\": \"standard\", \"room12\": \"standard\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 4
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 4
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 4
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 44,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 101,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\": \"industrial\", \"room1\": \"reading\", \"room2\": \"standard\", \"room3\": \"standard\", \"room4\": \"standard\", \"room5\": \"standard\", \"room6\": \"standard\", \"room7\": \"standard\", \"room8\": \"standard\", \"room9\": \"standard\", \"room10\": \"standard\", \"room11\": \"standard\", \"room12\": \"standard\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 코지 테마로 빠짐없이 인테리어해줘",
+      "ms": 1018,
+      "engine": "qwen",
+      "reply": "코지 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\": \"cozy\", \"room1\": \"reading\", \"room2\": \"standard\", \"room3\": \"standard\", \"room4\": \"standard\", \"room5\": \"standard\", \"room6\": \"standard\", \"room7\": \"standard\", \"room8\": \"standard\", \"room9\": \"standard\", \"room10\": \"standard\", \"room11\": \"standard\", \"room12\": \"standard\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "areaM2": 330.5658,
+      "rooms": [
+        {
+          "name": "거실",
+          "type": "living",
+          "items": 8
+        },
+        {
+          "name": "주방",
+          "type": "kitchen",
+          "items": 3
+        },
+        {
+          "name": "안방",
+          "type": "bedroom",
+          "items": 4
+        },
+        {
+          "name": "침실 2",
+          "type": "bedroom",
+          "items": 4
+        },
+        {
+          "name": "다이닝룸",
+          "type": "dining",
+          "items": 5
+        },
+        {
+          "name": "아이 방",
+          "type": "kids",
+          "items": 4
+        },
+        {
+          "name": "서재",
+          "type": "office",
+          "items": 4
+        },
+        {
+          "name": "공용 욕실",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "욕실 2",
+          "type": "bathroom",
+          "items": 3
+        },
+        {
+          "name": "드레스룸",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "다용도실",
+          "type": "studio",
+          "items": 2
+        },
+        {
+          "name": "현관",
+          "type": "studio",
+          "items": 2
+        }
+      ],
+      "items": 44,
+      "omitted": []
+    },
+    {
+      "text": "이대로 적용해줘",
+      "ms": 99,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\": \"cozy\", \"room1\": \"reading\", \"room2\": \"standard\", \"room3\": \"standard\", \"room4\": \"standard\", \"room5\": \"standard\", \"room6\": \"standard\", \"room7\": \"standard\", \"room8\": \"standard\", \"room9\": \"standard\", \"room10\": \"standard\", \"room11\": \"standard\", \"room12\": \"standard\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "100평 집 전체를 침실 3개 욕실 2개로 구성하고 가족들이 책 읽기 좋은 재팬디로 인테리어해줘",
+      "ms": 1033,
+      "engine": "qwen",
+      "reply": "재팬디 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\"theme\": \"japandi\", \"room1\": \"reading\", \"room2\": \"family\", \"room3\": \"family\", \"room4\": \"family\", \"room5\": \"family\", \"room6\": \"family\", \"room7\": \"family\", \"room8\": \"family\", \"room9\": \"family\", \"room10\": \"family\", \"room11\": \"family\", \"room12\": \"family\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "초안 적용해줘",
+      "ms": 99,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\": \"japandi\", \"room1\": \"reading\", \"room2\": \"family\", \"room3\": \"family\", \"room4\": \"family\", \"room5\": \"family\", \"room6\": \"family\", \"room7\": \"family\", \"room8\": \"family\", \"room9\": \"family\", \"room10\": \"family\", \"room11\": \"family\", \"room12\": \"family\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "안방 침대 가로 180cm로 바꿔줘",
+      "ms": 1823,
+      "engine": "qwen",
+      "reply": "침대 크기는 180 × 200 × 55cm예요. 아래 도구에서 더 조절할 수 있어요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "안방 침대 네이비로 바꿔줘",
+      "ms": 1676,
+      "engine": "qwen",
+      "reply": "침대 색을 네이비로 바꿨어요.",
+      "fixes": [
+        "가구 이야기로 처리"
+      ],
+      "raw": "{\n\n\n\"intent\": \"room\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"finishes\",\n\"reply\": \"\"\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "다이닝룸 의자 색을 화이트로 바꿔줘",
+      "ms": 1765,
+      "engine": "qwen",
+      "reply": "의자가 4개 있어요. 고칠 가구를 도면이나 목록에서 먼저 골라 주세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"room\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"finishes\",\n\"reply\": \"\"\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "거실 벽은 세이지로 바꿔줘",
+      "ms": 1811,
+      "engine": "qwen",
+      "reply": "벽은 세이지로 바꿨어요.",
+      "fixes": [
+        "벽 색은 문장에 적힌 색 유지",
+        "말하지 않은 바닥 색 변경은 막음"
+      ],
+      "raw": "{\n\n\n\"intent\": \"room\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"샌드\",\n\"floor\": \"월넛\",\n\"ui\": \"finishes\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "소파랑 식탁이랑 책상이랑 의자랑 책장이랑 화분이랑 조명 놓고 싶어",
+      "ms": 1659,
+      "engine": "qwen",
+      "reply": "소파와 식탁과 책상과 의자와 책장·선반과 화분과 스탠드조명 초안을 준비했어요. 소파부터 규격을 골라 보세요. 놓으면 다음 초안이 이어져요.",
+      "fixes": [
+        "가구 여럿을 나눠 처리"
+      ],
+      "raw": "{\n\n\n\"intent\": \"room\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "모두 놓아줘",
+      "ms": 1760,
+      "engine": "qwen",
+      "reply": "나의 소파와 나의 식탁과 나의 책상과 나의 의자와 나의 책장·선반과 나의 화분과 나의 스탠드조명을 방에 놓았어요. 도면에서 끌어 옮기거나 회전할 수 있어요.",
+      "fixes": [
+        "문장의 명령(모두 놓기)을 따름"
+      ],
+      "raw": "{\n\n\n\"intent\": \"room\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"finishes\",\n\"reply\": \"\"\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "되돌려줘",
+      "ms": 1759,
+      "engine": "qwen",
+      "reply": "방금 바꾼 내용을 되돌렸어요.",
+      "fixes": [
+        "문장의 명령(되돌리기)을 따름"
+      ],
+      "raw": "{\n\n\n\"intent\": \"room\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"finishes\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "집 전체 빈티지 말고 미니멀로 바꿔줘",
+      "ms": 176,
+      "engine": "qwen",
+      "reply": "미니멀 테마로 모든 공간의 벽·바닥·가구 색을 맞춘 초안이에요. 크기와 위치는 유지해요.",
+      "raw": "{\"theme\": \"minimal\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "초안 적용해줘",
+      "ms": 46,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\"theme\": \"minimal\"}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true
+    },
+    {
+      "text": "새로 소파 하나 놓고 싶어",
+      "ms": 1407,
+      "engine": "qwen",
+      "reply": "소파 초안은 180 × 90 × 82cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "문장에 없는 동작(놓기)은 실행하지 않음"
+      ],
+      "raw": "{\n\n\n\"intent\":\"action\",\"action\":\"place\",\"furniture\":\"none\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":1,\"size\":\"compact\",\"depth\":\"shallow\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"\"\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "sofa",
+      "dims": [
+        180,
+        82,
+        90
+      ]
+    },
+    {
+      "text": "새로 라운지체어 하나 놓고 싶어",
+      "ms": 1682,
+      "engine": "qwen",
+      "reply": "라운지체어 초안은 80 × 80 × 85cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"furniture_sizes\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "armchair",
+      "dims": [
+        80,
+        85,
+        80
+      ]
+    },
+    {
+      "text": "새로 침대 하나 놓고 싶어",
+      "ms": 1739,
+      "engine": "qwen",
+      "reply": "침대 초안은 150 × 200 × 55cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "bed",
+      "dims": [
+        150,
+        55,
+        200
+      ]
+    },
+    {
+      "text": "새로 책상 하나 놓고 싶어",
+      "ms": 1377,
+      "engine": "qwen",
+      "reply": "책상 초안은 120 × 60 × 74cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\":\"action\",\"action\":\"none\",\"furniture\":\"none\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"unknown\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "desk",
+      "dims": [
+        120,
+        74,
+        60
+      ]
+    },
+    {
+      "text": "새로 식탁 하나 놓고 싶어",
+      "ms": 1737,
+      "engine": "qwen",
+      "reply": "식탁 초안은 140 × 80 × 74cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "가구 이야기로 처리"
+      ],
+      "raw": "{\n\n\n\"intent\": \"room\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"finishes\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "dining",
+      "dims": [
+        140,
+        74,
+        80
+      ]
+    },
+    {
+      "text": "새로 의자 하나 놓고 싶어",
+      "ms": 1745,
+      "engine": "qwen",
+      "reply": "의자 초안은 48 × 50 × 82cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "문장에 없는 동작(놓기)은 실행하지 않음"
+      ],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"place\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"furniture_sizes\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "chair",
+      "dims": [
+        48,
+        82,
+        50
+      ]
+    },
+    {
+      "text": "새로 소파테이블 하나 놓고 싶어",
+      "ms": 1756,
+      "engine": "qwen",
+      "reply": "소파테이블 초안은 100 × 60 × 40cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "가구 종류는 문장에 적힌 소파테이블"
+      ],
+      "raw": "{\n\n\n\"intent\": \"furniture\",\n\"action\": \"none\",\n\"furniture\": \"sofa\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": 1,\n\"size\": \"compact\",\n\"depth\": \"shallow\",\n\"height\": \"low\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"furniture_sizes\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "coffee",
+      "dims": [
+        100,
+        40,
+        60
+      ]
+    },
+    {
+      "text": "새로 협탁 하나 놓고 싶어",
+      "ms": 1694,
+      "engine": "qwen",
+      "reply": "협탁 초안은 45 × 40 × 50cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "side",
+      "dims": [
+        45,
+        50,
+        40
+      ]
+    },
+    {
+      "text": "새로 TV장 하나 놓고 싶어",
+      "ms": 1715,
+      "engine": "qwen",
+      "reply": "TV장 초안은 160 × 40 × 45cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "가구 이야기로 처리"
+      ],
+      "raw": "{\n\n\n\"intent\": \"room\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"finishes\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "tvstand",
+      "dims": [
+        160,
+        45,
+        40
+      ]
+    },
+    {
+      "text": "새로 옷장 하나 놓고 싶어",
+      "ms": 1750,
+      "engine": "qwen",
+      "reply": "옷장 초안은 100 × 60 × 200cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"furniture_sizes\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "wardrobe",
+      "dims": [
+        100,
+        200,
+        60
+      ]
+    },
+    {
+      "text": "새로 서랍장 하나 놓고 싶어",
+      "ms": 1704,
+      "engine": "qwen",
+      "reply": "서랍장 초안은 90 × 45 × 100cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "dresser",
+      "dims": [
+        90,
+        100,
+        45
+      ]
+    },
+    {
+      "text": "새로 수납장 하나 놓고 싶어",
+      "ms": 1694,
+      "engine": "qwen",
+      "reply": "수납장 초안은 100 × 40 × 80cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "cabinet",
+      "dims": [
+        100,
+        80,
+        40
+      ]
+    },
+    {
+      "text": "새로 책장·선반 하나 놓고 싶어",
+      "ms": 1693,
+      "engine": "qwen",
+      "reply": "책장·선반 초안은 90 × 35 × 160cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [
+        "가구 이야기로 처리"
+      ],
+      "raw": "{\n\n\n\"intent\": \"room\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"finishes\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "shelf",
+      "dims": [
+        90,
+        160,
+        35
+      ]
+    },
+    {
+      "text": "새로 신발장 하나 놓고 싶어",
+      "ms": 1689,
+      "engine": "qwen",
+      "reply": "신발장 초안은 80 × 35 × 120cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "shoe_cabinet",
+      "dims": [
+        80,
+        120,
+        35
+      ]
+    },
+    {
+      "text": "새로 벤치 하나 놓고 싶어",
+      "ms": 1739,
+      "engine": "qwen",
+      "reply": "벤치 초안은 110 × 38 × 45cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": 1,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"furniture_sizes\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "bench",
+      "dims": [
+        110,
+        45,
+        38
+      ]
+    },
+    {
+      "text": "새로 러그 하나 놓고 싶어",
+      "ms": 1726,
+      "engine": "qwen",
+      "reply": "러그 초안은 160 × 230 × 1cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"furniture\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"furniture_sizes\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "rug",
+      "dims": [
+        160,
+        1,
+        230
+      ]
+    },
+    {
+      "text": "새로 스탠드조명 하나 놓고 싶어",
+      "ms": 1733,
+      "engine": "qwen",
+      "reply": "스탠드조명 초안은 40 × 40 × 160cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "lamp",
+      "dims": [
+        40,
+        160,
+        40
+      ]
+    },
+    {
+      "text": "새로 화분 하나 놓고 싶어",
+      "ms": 1722,
+      "engine": "qwen",
+      "reply": "화분 초안은 40 × 40 × 100cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"furniture\",\n\"action\": \"none\",\n\"furniture\": \"plant\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"furniture_sizes\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "plant",
+      "dims": [
+        40,
+        100,
+        40
+      ]
+    },
+    {
+      "text": "새로 냉장고 하나 놓고 싶어",
+      "ms": 1694,
+      "engine": "qwen",
+      "reply": "냉장고 초안은 70 × 70 × 175cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "fridge",
+      "dims": [
+        70,
+        175,
+        70
+      ]
+    },
+    {
+      "text": "새로 세탁기 하나 놓고 싶어",
+      "ms": 1716,
+      "engine": "qwen",
+      "reply": "세탁기 초안은 60 × 65 × 85cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "washer",
+      "dims": [
+        60,
+        85,
+        65
+      ]
+    },
+    {
+      "text": "새로 변기 하나 놓고 싶어",
+      "ms": 1669,
+      "engine": "qwen",
+      "reply": "변기 초안은 42 × 68 × 75cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "toilet",
+      "dims": [
+        42,
+        75,
+        68
+      ]
+    },
+    {
+      "text": "새로 세면대 하나 놓고 싶어",
+      "ms": 1730,
+      "engine": "qwen",
+      "reply": "세면대 초안은 50 × 40 × 82cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"furniture_sizes\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "basin",
+      "dims": [
+        50,
+        82,
+        40
+      ]
+    },
+    {
+      "text": "새로 샤워부스 하나 놓고 싶어",
+      "ms": 1706,
+      "engine": "qwen",
+      "reply": "샤워부스 초안은 80 × 80 × 170cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "fixes": [],
+      "raw": "{\n\n\n\"intent\": \"action\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n\n}",
+      "model": "Qwen3-0.6B-q4f16_1-MLC",
+      "passed": true,
+      "furniture": "shower",
+      "dims": [
+        80,
+        170,
+        80
+      ]
+    }
+  ],
+  "errors": []
+}
