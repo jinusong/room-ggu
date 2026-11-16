@@ -239,7 +239,10 @@ function planFurniture(t, ctx, item) {
   const res = consult(t, structuredClone(base));
   const next = res.item,
     color = parseFurnitureColor(t);
-  if (color && /색|컬러|톤|(?:으로|로)\s*(?:바꿔|바꾸|해)|[가-힣]+색/.test(t)) next.color = color;
+  // “네이비”, “네이비로”처럼 색 이름만 말해도 색 이야기다.
+  const bareColor = color && t.split(/\s+/).length <= 2;
+  if (color && (bareColor || /색|컬러|톤|(?:으로|로)\s*(?:바꿔|바꾸|해)|[가-힣]+색/.test(t)))
+    next.color = color;
   else if (color && mode === 'new') next.color = color;
   // 색만 바꿨으면 치수 이야기를 되풀이하지 않고 바뀐 색을 말한다.
   const colorName = FURNITURE_COLORS.find(([, hex]) => hex === next.color)?.[0],
@@ -248,6 +251,8 @@ function planFurniture(t, ctx, item) {
       colorName &&
       next.color !== base.color &&
       next.dims.every((d, i) => d === base.dims[i]);
+  // 고른 가구나 초안에서 바뀐 것이 없으면 바꾼 것처럼 말하지 않고 무엇을 바꿀지 묻는다.
+  const same = mode !== 'new' && JSON.stringify(next) === JSON.stringify(base);
   const target = mode === 'item' ? { type: 'item', id: item.id } : { type: 'draft' };
   const pick = chooseSurface(t, 'furniture');
   const kind = surfaceKind('furniture', color && pick === 'sizes' ? 'colors' : pick);
@@ -263,11 +268,13 @@ function planFurniture(t, ctx, item) {
     mode,
     target,
     confident: confidentPick('furniture', pick) || !!color,
-    reply: colorOnly
-      ? `${next.name || TYPES[next.type].name} 색을 ${josa(colorName, '으로/로')} 바꿨어요.`
-      : mode === 'new'
-        ? res.reply.replace('치수 초안을 바꿨어요.', '치수 초안을 잡았어요.')
-        : res.reply,
+    reply: same
+      ? `${josa(next.name || TYPES[next.type].name, '은/는')} 그대로예요. “가로 140cm”, “초록색으로”, “조금 더 작게”처럼 바꿀 치수나 색을 알려주세요.`
+      : colorOnly
+        ? `${next.name || TYPES[next.type].name} 색을 ${josa(colorName, '으로/로')} 바꿨어요.`
+        : mode === 'new'
+          ? res.reply.replace('치수 초안을 바꿨어요.', '치수 초안을 잡았어요.')
+          : res.reply,
     changes: mode === 'item' ? { item: { id: item.id, next } } : { draft: next },
     surfaces,
     suggestions: furnitureChips(next, mode),
