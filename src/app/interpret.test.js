@@ -226,3 +226,22 @@ test('가구 초안을 가리키는 중에 모델이 방 이야기로 잘못 읽
   });
   assert.equal(none.intent, 'room');
 });
+
+test('모델이 책상을 골라도 목록에 없는 물건이면 가구를 만들지 않는다', () => {
+  const s = exampleState();
+  const desk = s.items.find((a) => a.type === 'desk');
+  const p = planFromModel(
+    model({ furniture: 'desk', reply: '책상을 하나 더 놓았어요.' }),
+    '책상에 컴퓨터 추가해줘',
+    { state: s, target: { type: 'item', id: desk.id } },
+  );
+  assert.equal(p.decidedBy, 'model');
+  assert.equal(p.changes, undefined);
+  assert.match(p.reply, /컴퓨터는 아직 가구 목록에 없어서/);
+  assert.match(p.fixes[0], /목록에 없는 물건\(컴퓨터\)/);
+  const del = planFromModel(model({ intent: 'action', action: 'delete' }), '모니터 빼줘', {
+    state: s,
+    target: { type: 'item', id: desk.id },
+  });
+  assert.equal(del.action, undefined);
+});
