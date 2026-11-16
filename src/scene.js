@@ -4,7 +4,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { furniture, disposeGroup } from './furniture.js';
 import { tapeCanvas, drawTags, PAPER } from './tape.js';
 import { avatarModel } from './avatar-three.js';
-import { avatarLayout, avatarSpace } from './avatar.js';
+import { avatarLayout, avatarSpace, avatarRect, HOME_VIEW } from './avatar.js';
 import { spaces } from './data.js';
 import { houseLayout } from './house-geometry.js';
 import { roomOpenings, doorSwing } from './floorplan.js';
@@ -260,10 +260,12 @@ export class RoomScene {
       const tapped =
         this.press && Math.hypot(e.clientX - this.press.x, e.clientY - this.press.y) < 5;
       if (this.drag) {
-        const started = this.drag.started;
+        const started = this.drag.started,
+          avatar = this.drag.id === 'avatar';
         this.drag = null;
         this.controls.enabled = true;
         this.renderer.domElement.style.cursor = '';
+        if (started && avatar) this.fitAvatar();
         if (started) this.cb.commit();
         else if (this.press?.avatar && tapped) this.cb.pickAvatar?.();
       } else if (this.press?.avatar && tapped) this.cb.pickAvatar?.();
@@ -333,10 +335,37 @@ export class RoomScene {
     }
     return null;
   }
+  // 화면에 담을 범위. 방 밖에 선 아바타가 있으면 그 자리까지 넓힌다.
   extent() {
-    return this.state.scope === 'house'
-      ? houseLayout(this.state)
-      : { ...this.state.room, x: 0, z: 0 };
+    const house = this.state.scope === 'house',
+      base = house ? houseLayout(this.state) : { ...this.state.room, x: 0, z: 0 },
+      space = house ? avatarSpace(this.state, spaces(this.state)) : null,
+      at = space ? this.state.floorplan.positions[space.roomId] : { x: 0, z: 0 },
+      r =
+        house && !space
+          ? null
+          : avatarRect(avatarLayout(space ? { ...this.state, ...space } : this.state));
+    if (!r || !at) return base;
+    const left = Math.min(base.x - base.w / 2, at.x + r.left),
+      right = Math.max(base.x + base.w / 2, at.x + r.right),
+      top = Math.min(base.z - base.d / 2, at.z + r.top),
+      bottom = Math.max(base.z + base.d / 2, at.z + r.bottom);
+    return {
+      ...base,
+      w: right - left,
+      d: bottom - top,
+      x: (left + right) / 2,
+      z: (top + bottom) / 2,
+    };
+  }
+  // 아바타가 방 밖으로 나가거나 들어와 담을 범위가 달라지면 시점을 다시 맞춘다. 끄는 동안과 사용자가 시점을 옮긴 뒤에는 그대로 둔다.
+  fitAvatar() {
+    if (this.drag) return;
+    const { w, d, x, z } = this.extent(),
+      sig = [this.state.scope, w, d, x, z].map((n) => (n.toFixed ? n.toFixed(2) : n)).join();
+    const changed = this.fitSig !== undefined && sig !== this.fitSig;
+    this.fitSig = sig;
+    if (changed && !this.userMoved) this.home();
   }
   setInsets(insets) {
     const next = { left: 0, right: 0, top: 0, bottom: 0, ...insets };
@@ -605,7 +634,7 @@ export class RoomScene {
     this.stopInertia();
     const { h, x, z } = this.extent();
     this.controls.target.set(x, h * 0.28, z);
-    const dir = new T.Vector3(0.66, 0.62, 0.8).normalize();
+    const dir = new T.Vector3(...HOME_VIEW).normalize();
     this.camera.position.copy(this.controls.target).addScaledVector(dir, this.fitDistance());
     this.controls.maxDistance = Math.max(30, this.fitDistance() * 3);
     this.controls.update();
@@ -652,6 +681,7 @@ export class RoomScene {
         a.z + offset.z - head[0] * Math.sin(rad) + head[2] * Math.cos(rad),
       );
     }
+    this.fitAvatar();
     this.dirty = true;
   }
   moveObject(id, x, z) {

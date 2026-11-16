@@ -33,7 +33,11 @@ test('화장실 포함 집 전체 3D: 회전·선택·편집·복원·PNG', asyn
   });
   expect(geometry.fixtures).toBe(3);
   expect(geometry.rooms).toBe(2);
-  expect(geometry.extent.w).toBeCloseTo(5.8);
+  // 집은 가로 5.8m이고, 방 밖 왼쪽에 선 아바타까지 화면에 담는다.
+  const avatar = initial.avatar;
+  expect(avatar.x).toBeLessThan(-2);
+  expect(geometry.extent.w).toBeGreaterThan(5.8 + (-2 - avatar.x));
+  expect(geometry.extent.w).toBeLessThan(5.8 + 1.2);
   const camera = await page.evaluate(() =>
     window.__roomggu.app.scenes.three.camera.position.toArray(),
   );

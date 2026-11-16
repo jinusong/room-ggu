@@ -17,6 +17,93 @@ export const defaultAvatar = () => ({
   z: 0.6,
   angle: 0,
 });
+// 아바타가 설 수 있는 범위. 방 안은 물론 벽 바깥 OUT(m)까지 세울 수 있고, 벽 두께 안에는 서지 않는다.
+export const AVATAR_OUT = 0.9;
+const WALL = 0.1;
+// 서 있는 몸이 벽에서 떨어져야 하는 거리(어깨 방향 x, 앞뒤 z).
+const standMargin = (h) => ({ x: h * 0.18, z: h * 0.1 });
+// 끌어 놓은 자리를 설 수 있는 가장 가까운 자리로 옮긴다. 벽에 걸치면 방 안쪽과 바깥쪽 중 가까운 쪽으로 보낸다.
+export function standAt(room, heightCm, x, z) {
+  const m = standMargin(heightCm / 100),
+    hw = room.w / 2,
+    hd = room.d / 2,
+    clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  x = clamp(x, -hw - AVATAR_OUT, hw + AVATAR_OUT);
+  z = clamp(z, -hd - AVATAR_OUT, hd + AVATAR_OUT);
+  const inX = Math.max(0, hw - m.x),
+    inZ = Math.max(0, hd - m.z),
+    outX = hw + WALL + m.x,
+    outZ = hd + WALL + m.z;
+  if (Math.abs(x) <= inX && Math.abs(z) <= inZ) return { x, z, outside: false };
+  if (Math.abs(x) >= outX || Math.abs(z) >= outZ) return { x, z, outside: true };
+  const side = (v) => (v < 0 ? -1 : 1),
+    options = [
+      { x: clamp(x, -inX, inX), z: clamp(z, -inZ, inZ), outside: false },
+      { x: side(x) * outX, z, outside: true },
+      { x, z: side(z) * outZ, outside: true },
+    ];
+  return options.reduce((best, o) =>
+    Math.hypot(o.x - x, o.z - z) < Math.hypot(best.x - x, best.z - z) ? o : best,
+  );
+}
+// 3D 기본 시점에서 카메라가 있는 방향(방 가운데 기준). 오른쪽 앞 위에서 내려다본다.
+export const HOME_VIEW = [0.66, 0.62, 0.8];
+// 아바타를 처음 세우는 자리: 방 바깥 앞쪽 왼 모서리 옆이다. 기본 3D 시점에서 방 안을 가리지 않고 벽 끝 옆에 서서
+// 벽 높이와 바로 견줄 수 있다. 그 자리가 다른 공간과 겹치거나 높은 벽 뒤에 숨으면 다음 후보로, 모두 막혔으면
+// 방 안에 세운다. blocked는 이 방 가운데를 원점으로 한 다른 공간들의 범위다.
+export function standSpot(room, heightCm, blocked = []) {
+  const m = standMargin(heightCm / 100),
+    hw = room.w / 2,
+    hd = room.d / 2,
+    sx = hw + WALL + m.x + 0.04,
+    sz = hd + WALL + m.z + 0.18,
+    nearX = Math.max(0, hw - 0.45),
+    nearZ = Math.max(0, hd - 0.45);
+  // 방 안을 가리지 않는 모서리 옆, 앞쪽 벽 앞, 오른쪽 벽 옆, 기본 시점에서 벽 뒤가 되는 자리 순서다.
+  const spots = [
+    [-sx, sz],
+    [sx, -sz],
+    [-nearX, sz],
+    [0, sz],
+    [nearX, sz],
+    [sx, nearZ],
+    [sx, 0],
+    [sx, -nearZ],
+    [sx, sz],
+    [-sx, nearZ],
+    [-sx, 0],
+    [-sx, -sz],
+    [0, -sz],
+  ];
+  const within = (x, z, b, pad) =>
+      x > b.left - pad && x < b.right + pad && z > b.top - pad && z < b.bottom + pad,
+    free = ([x, z]) =>
+      !blocked.some(
+        (b) =>
+          x + m.x > b.left - WALL &&
+          x - m.x < b.right + WALL &&
+          z + m.z > b.top - WALL &&
+          z - m.z < b.bottom + WALL,
+      );
+  // 카메라 쪽으로 3m 안에 공간이 있으면 그 공간의 높은 벽(왼쪽·뒤쪽)이 아바타를 가린다.
+  const own = { left: -hw, right: hw, top: -hd, bottom: hd },
+    step = Math.hypot(HOME_VIEW[0], HOME_VIEW[2]),
+    seen = ([x, z]) => {
+      for (let t = 0.2; t <= 3; t += 0.2) {
+        const px = x + (HOME_VIEW[0] / step) * t,
+          pz = z + (HOME_VIEW[2] / step) * t;
+        if ([own, ...blocked].some((b) => within(px, pz, b, WALL))) return false;
+      }
+      return true;
+    };
+  const spot = spots.find((s) => free(s) && seen(s)) || spots.find(free);
+  if (spot) return { x: spot[0], z: spot[1], outside: true };
+  return {
+    x: Math.min(0.7, Math.max(0, hw - m.x)),
+    z: Math.min(0.6, Math.max(0, hd - m.z)),
+    outside: false,
+  };
+}
 export function validateAvatar(value, rooms) {
   if (value === undefined) return defaultAvatar();
   if (
@@ -168,12 +255,9 @@ export function avatarLayout(state) {
   const seated = seat ? sitting(h, seat) : null;
   const joints = seated ? seated.joints : bed ? lying(h, bed) : standing(h);
   let { x, z, angle } = pose === 'standing' ? a : item;
-  if (pose === 'standing') {
-    const mx = Math.max(0, state.room.w / 2 - h * 0.18),
-      mz = Math.max(0, state.room.d / 2 - h * 0.1);
-    x = Math.max(-mx, Math.min(mx, x));
-    z = Math.max(-mz, Math.min(mz, z));
-  }
+  // 서 있을 때는 방 안이나 벽 바깥에 선다. 방 크기가 바뀌어 벽에 걸치게 되면 가까운 쪽으로 옮긴다.
+  let outside = false;
+  if (pose === 'standing') ({ x, z, outside } = standAt(state.room, a.height, x, z));
   const top = Math.max(...Object.values(joints).map((p) => p[1])) + h * BODY.headRadius;
   const cm = (m) => Math.round(m * 100);
   // 안내는 이 모형을 기준으로 한 어림값이다. 실측처럼 단정하지 않는다.
@@ -186,12 +270,13 @@ export function avatarLayout(state) {
     );
   if (seated?.dangling)
     warnings.push(`좌석이 높아 모형 기준으로 발이 바닥에서 약 ${cm(seated.dangling)}cm 떠요`);
-  if (top > state.room.h) warnings.push('아바타가 천장 높이를 넘어요');
+  if (top > state.room.h && !outside) warnings.push('아바타가 천장 높이를 넘어요');
   return {
     ...a,
     x,
     z,
     angle,
+    outside,
     pose,
     joints,
     h,
@@ -205,6 +290,30 @@ export function avatarLayout(state) {
 export function avatarSpace(state, list) {
   if (!state.avatar?.enabled) return null;
   return list.find((r) => r.roomId === (state.avatar.roomId || state.roomId)) || null;
+}
+
+// 방 밖에 선 아바타가 바닥에서 차지하는 범위(m, 방 가운데가 원점). 방 안에 있거나 앉아 있으면 null이다.
+export function avatarRect(layout) {
+  if (!layout?.outside) return null;
+  const m = standMargin(layout.h),
+    pad = 0.12;
+  return {
+    left: layout.x - m.x - pad,
+    right: layout.x + m.x + pad,
+    top: layout.z - m.z - pad,
+    bottom: layout.z + m.z + pad,
+  };
+}
+// 그 범위가 방을 얼마나 벗어나는지(m). 도면과 3D가 이만큼 자리를 더 잡아 아바타가 잘리지 않게 한다.
+export function avatarApron(layout, room) {
+  const r = avatarRect(layout);
+  if (!r) return { left: 0, right: 0, top: 0, bottom: 0 };
+  return {
+    left: Math.max(0, -room.w / 2 - r.left),
+    right: Math.max(0, r.right - room.w / 2),
+    top: Math.max(0, -room.d / 2 - r.top),
+    bottom: Math.max(0, r.bottom - room.d / 2),
+  };
 }
 
 // 바닥에 투영한 몸의 범위(m, 몸 좌표). 2D에서 누르는 영역과 이름표 위치에 쓴다.

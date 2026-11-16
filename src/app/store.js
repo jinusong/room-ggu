@@ -17,7 +17,7 @@ import { planTurn } from './planner.js';
 import { planFromModel } from './interpret.js';
 import { photoCandidates, PHOTO_CONFIDENT } from './photo.js';
 import { josa, dimsText } from './text.js';
-import { parseComparisonCommand, avatarLayout, poseAccepts } from '../avatar.js';
+import { parseComparisonCommand, avatarLayout, poseAccepts, standAt } from '../avatar.js';
 import { connections } from '../floorplan.js';
 import {
   TEXT_MODELS,
@@ -27,6 +27,8 @@ import {
   downloadSize,
   parseProgress,
   explainLoadError,
+  modelMissing,
+  handheld,
 } from './models.js';
 export { modelName, TEXT_MODELS };
 
@@ -90,6 +92,8 @@ export const app = {
     // 위쪽 모델 아일랜드를 펼쳐 둘지. 처음 내려받을 때와 실패했을 때만 저절로 펼친다.
     downloadOpen: false,
     downloadAuto: false,
+    // 휴대 기기에서 모델을 받기 전에 띄우는 물음. { name, mb }
+    modelAsk: null,
     toast: null,
     menu: null,
     webglError: false,
@@ -550,7 +554,11 @@ export async function send(raw) {
     extra = [{ id: pendingPhoto.surfaceId, kind: 'photo', target: { type: 'room' } }];
   }
   if (!text) {
-    const auto = app.ai.why !== 'user' && app.ai.why !== 'url';
+    // 모델을 꺼 두었거나 아직 받지 않기로 했으면 사진 모델도 저절로 받지 않는다. 휴대 기기에서는
+    // 이미 올라와 있을 때만 바로 판별하고, 아니면 크기를 적어 둔 단추를 눌러야 받는다.
+    const auto =
+      !['user', 'url', 'later', 'ask'].includes(app.ai.why) &&
+      (!handheld() || app.ai.vision === 'ready');
     finishTurn(
       turn,
       {
@@ -789,7 +797,9 @@ function avatarSentence() {
   if (!a.enabled || !layout) return `키 ${a.height}cm 아바타를 숨겼어요.`;
   const where =
     layout.pose === 'standing'
-      ? '방에 세웠어요'
+      ? layout.outside
+        ? '방 옆에 세웠어요. 끌어서 방 안으로 옮겨 보세요'
+        : '방에 세웠어요'
       : `${layout.item.name}에 ${layout.pose === 'lying' ? '눕혔어요' : '앉혔어요'}`;
   return `키 ${a.height}cm 아바타를 ${where}.${layout.warnings[0] ? ` ${layout.warnings[0]}.` : ''}`;
 }
@@ -1421,6 +1431,7 @@ export async function analyzePhoto() {
 
 // ---------- 상담 모델 ----------
 // 기본은 켜짐이다. 사용자가 끄면 이 기기에 기억하고, ?model=off는 이번 방문에만 끈다(테스트·데이터 절약).
+// 휴대 기기에서는 모델이 보관돼 있지 않으면 받기 전에 먼저 묻는다. '나중에'를 고르면 그것도 기억한다.
 const MODEL_PREF = 'room-ggu-model';
 const MODEL_CHOICE = 'room-ggu-model-choice';
 function offReason() {
@@ -1428,11 +1439,50 @@ function offReason() {
     if (new URLSearchParams(location.search).get('model') === 'off') return 'url';
   } catch {}
   try {
-    if (localStorage.getItem(MODEL_PREF) === 'off') return 'user';
+    const pref = localStorage.getItem(MODEL_PREF);
+    if (pref === 'off') return 'user';
+    if (pref === 'later') return 'later';
   } catch {}
   if (globalThis.navigator?.connection?.saveData) return 'save-data';
   if (globalThis.navigator?.deviceMemory && navigator.deviceMemory < 4) return 'memory';
   return '';
+}
+// 이 기기의 GPU가 모델을 돌릴 수 있는지, 어떤 가중치를 쓰는지. 한 번 확인한 결과를 다시 쓴다.
+let gpuInfo = null;
+async function gpu() {
+  if (gpuInfo) return gpuInfo;
+  let adapter = null;
+  try {
+    adapter = navigator.gpu ? await navigator.gpu.requestAdapter() : null;
+  } catch {}
+  const info = { ok: !!adapter, f16: !!adapter?.features?.has?.('shader-f16') };
+  if (info.ok) gpuInfo = info;
+  return info;
+}
+// 지금 고른 상담 모델로 이 기기가 실제로 받을 파일과 아직 받지 않은 양.
+// total: 모델 전체 크기(MB). mb: 지금 받아야 할 양. partial: 받다 만 것이 있어 일부만 받으면 된다.
+async function textTarget() {
+  const g = await gpu(),
+    choice = textModel(app.ai.choice),
+    id = g.f16 ? choice.f16 : choice.f32,
+    total = downloadSize(id) || choice.downloadMB,
+    state = g.ok ? await modelMissing(id) : { cached: false, missingMB: null },
+    partial = !state.cached && state.missingMB !== null && state.missingMB < total * 0.95;
+  return {
+    ok: g.ok,
+    id,
+    name: modelName(id),
+    total,
+    cached: state.cached,
+    partial,
+    mb: partial ? Math.max(1, state.missingMB) : total,
+  };
+}
+// 휴대 기기에서 아직 다 받지 않은 모델이면 받기 전에 물어야 한다.
+async function mustAsk() {
+  if (!handheld()) return false;
+  const target = await textTarget();
+  return target.ok && !target.cached;
 }
 export async function bootModel() {
   const why = offReason();
@@ -1442,19 +1492,49 @@ export async function bootModel() {
     emit();
     return;
   }
-  let adapter = null;
-  try {
-    adapter = navigator.gpu ? await navigator.gpu.requestAdapter() : null;
-  } catch {}
-  if (!adapter) {
+  if (!(await gpu()).ok) {
     app.ai.text = 'unsupported';
     app.ai.error = 'WebGPU를 쓸 수 없는 브라우저예요.';
     emit();
     return;
   }
+  if (await mustAsk()) {
+    app.ai.text = 'off';
+    app.ai.why = 'ask';
+    await openModelAsk();
+    return;
+  }
   loadText({ auto: true });
 }
-export async function loadText({ auto = false } = {}) {
+// 모델을 받을지 묻는 팝업. 누르기 전에는 아무것도 받지 않는다.
+export async function openModelAsk() {
+  const target = await textTarget();
+  app.view.modelAsk = {
+    name: target.name,
+    mb: target.mb,
+    total: target.total,
+    partial: target.partial,
+  };
+  emit();
+}
+export function acceptModel() {
+  if (!app.view.modelAsk) return;
+  app.view.asked = app.view.modelAsk;
+  app.view.modelAsk = null;
+  setModelOn(true, { confirmed: 'asked' });
+}
+export function declineModel() {
+  if (!app.view.modelAsk) return;
+  app.view.modelAsk = null;
+  try {
+    localStorage.setItem(MODEL_PREF, 'later');
+  } catch {}
+  app.ai.text = 'off';
+  app.ai.why = 'later';
+  toast('모델 없이 시작해요. 대화 위쪽 ‘모델 받기’로 언제든 받을 수 있어요.');
+  emit();
+}
+export async function loadText({ auto = false, fresh = false } = {}) {
   if (app.ai.text === 'loading' || app.ai.text === 'ready') return;
   const choice = textModel(app.ai.choice);
   app.ai.text = 'loading';
@@ -1471,6 +1551,20 @@ export async function loadText({ auto = false } = {}) {
     at: Date.now(),
   };
   app.view.downloadOpen = false;
+  // 받겠다고 방금 누른 경우에는 물어본 자리에서 그대로 받는 중으로 이어 보여 준다.
+  if (fresh) {
+    app.ai.download = {
+      task: 'text',
+      phase: 'fetch',
+      name: app.view.asked?.name || choice.name,
+      mb: 0,
+      totalMB: app.view.asked?.total || choice.downloadMB,
+      progress: 0,
+      at: Date.now(),
+    };
+    app.view.downloadOpen = true;
+    app.view.downloadAuto = true;
+  }
   emit();
   try {
     const model = await runAI('load-text', { choice: choice.key });
@@ -1490,14 +1584,19 @@ export async function loadText({ auto = false } = {}) {
     emit();
   }
 }
-export function setModelOn(on) {
+export function setModelOn(on, { confirmed = false } = {}) {
+  // 휴대 기기에서 켤 때는 받을 것이 남아 있으면 먼저 묻는다. 팝업에서 받겠다고 한 뒤에는 바로 진행한다.
+  if (on && !confirmed && handheld()) {
+    mustAsk().then((ask) => (ask ? openModelAsk() : setModelOn(true, { confirmed: true })));
+    return;
+  }
   try {
     if (on) localStorage.removeItem(MODEL_PREF);
     else localStorage.setItem(MODEL_PREF, 'off');
   } catch {}
   if (on) {
     app.ai.why = '';
-    loadText();
+    loadText({ fresh: confirmed === 'asked' });
     return;
   }
   unloadAI();
@@ -1527,7 +1626,7 @@ export function setModelChoice(key) {
     why: '',
     download: null,
   };
-  loadText();
+  setModelOn(true);
 }
 export function unloadAI() {
   if (pending) interruptModel();
@@ -1621,7 +1720,7 @@ export function retryDownload() {
   if (Date.now() < (app.ai.download?.retryAt || 0)) return;
   app.ai.download = null;
   if (task === 'vision') analyzePhoto();
-  else setModelOn(true);
+  else setModelOn(true, { confirmed: true });
 }
 
 let lastProgressEmit = 0;
@@ -1699,13 +1798,10 @@ export const sceneCallbacks = {
   pickAvatar: () => pickAvatar(),
   pickDoor: (ids) => pickDoor(ids),
   moveDoor: (ids, center) => setDoor(ids[0], ids[1], { center }, { live: true }),
+  // 아바타는 방 안팎 어디로든 끌 수 있다. 벽에 걸치는 자리는 가까운 쪽으로 붙는다.
   moveAvatar: (x, z) => {
-    const mx = app.state.room.w / 2,
-      mz = app.state.room.d / 2;
-    ops.setAvatar(app.state, {
-      x: Math.max(-mx, Math.min(mx, x)),
-      z: Math.max(-mz, Math.min(mz, z)),
-    });
+    const at = standAt(app.state.room, app.state.avatar.height, x, z);
+    ops.setAvatar(app.state, { x: at.x, z: at.z });
     emit();
   },
   select: (id) => select(id),

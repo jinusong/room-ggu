@@ -3,7 +3,7 @@ import { spaces } from './data.js';
 import { floorplanWarnings, normalizeFloorplan, roomBounds } from './floorplan.js';
 import { PAPER } from './tape.js';
 import { houseLayout } from './house-geometry.js';
-import { avatarLayout, avatarSpace } from './avatar.js';
+import { avatarLayout, avatarSpace, avatarRect, avatarReach } from './avatar.js';
 
 const INK = '#2a2824';
 export class HouseScene extends PlanScene {
@@ -122,6 +122,17 @@ export class HouseScene extends PlanScene {
       list = spaces(this.state),
       plan = normalizeFloorplan(this.state.floorplan, list);
     const bounds = list.map((r) => roomBounds(r, plan.positions[r.roomId]));
+    // 방 밖에 선 아바타도 화면에 담는다.
+    const stand = avatarSpace(this.state, list),
+      standAt = stand && plan.positions[stand.roomId],
+      body = standAt && avatarRect(avatarLayout({ ...this.state, ...stand }));
+    if (body)
+      bounds.push({
+        left: standAt.x + body.left,
+        right: standAt.x + body.right,
+        top: standAt.z + body.top,
+        bottom: standAt.z + body.bottom,
+      });
     // 공간을 붙일 벽을 고르는 동안에는 붙을 자리까지 화면에 담는다. 종류를 바꿔 봐도 축척이 흔들리지 않는다.
     const reserve = this.reserve,
       at = reserve && plan.positions[this.state.roomId];
@@ -335,10 +346,22 @@ export class HouseScene extends PlanScene {
     const a = avatarLayout({ ...this.state, ...home }),
       p = this.state.floorplan.positions[home.roomId];
     if (!a || !p) return null;
-    const rect = this.canvas.getBoundingClientRect();
+    // 몸이 차지한 범위의 위쪽 가운데에 붙인다. 방 앞쪽 바깥에 서 있으면 몸 아래에 둬 벽을 가리지 않는다.
+    const rect = this.canvas.getBoundingClientRect(),
+      b = avatarReach(a),
+      rad = (a.angle * Math.PI) / 180,
+      zs = [
+        [b.minX, b.minZ],
+        [b.maxX, b.minZ],
+        [b.minX, b.maxZ],
+        [b.maxX, b.maxZ],
+      ].map(([x, z]) => -x * Math.sin(rad) + z * Math.cos(rad)),
+      below = a.outside && a.z > home.room.d / 2;
     return {
       x: rect.left + this.ox + (p.x + a.x) * this.scale,
-      y: rect.top + this.oy + (p.z + a.z) * this.scale - a.h * 0.5 * this.scale,
+      y:
+        rect.top + this.oy + (p.z + a.z + (below ? Math.max(...zs) : Math.min(...zs))) * this.scale,
+      below,
       visible: true,
     };
   }

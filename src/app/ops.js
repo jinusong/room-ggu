@@ -20,7 +20,7 @@ import {
   exampleState,
   DEFAULT_SOURCE,
 } from '../data.js';
-import { defaultAvatar, POSES, poseAccepts } from '../avatar.js';
+import { defaultAvatar, POSES, poseAccepts, standAt, standSpot } from '../avatar.js';
 import {
   normalizeFloorplan,
   roomBounds,
@@ -426,8 +426,35 @@ export function deleteSpace(state, id = state.roomId) {
   return name;
 }
 
+// 이 방 가운데를 원점으로 본 다른 공간들의 범위. 아바타를 방 밖에 세울 때 옆 공간과 겹치지 않는 자리를 고른다.
+function neighbourRects(state) {
+  const at = state.floorplan?.positions?.[state.roomId];
+  if (!at) return [];
+  return spaces(state)
+    .filter((r) => r.roomId !== state.roomId && state.floorplan.positions[r.roomId])
+    .map((r) => {
+      const p = state.floorplan.positions[r.roomId],
+        x = p.x - at.x,
+        z = p.z - at.z;
+      return {
+        left: x - r.room.w / 2,
+        right: x + r.room.w / 2,
+        top: z - r.room.d / 2,
+        bottom: z + r.room.d / 2,
+      };
+    });
+}
 export function setAvatar(state, patch = {}, selectedId = null) {
-  const next = { ...defaultAvatar(), ...state.avatar, ...patch, roomId: state.roomId };
+  const was = state.avatar,
+    next = { ...defaultAvatar(), ...was, ...patch, roomId: state.roomId };
+  // 새로 세우거나 다른 공간에서 데려올 때는 이 방 바깥의 기본 자리에 세운다. 그 뒤로는 끌어 둔 자리를 지킨다.
+  const fresh = !was?.enabled || (was.roomId && was.roomId !== state.roomId);
+  if (next.enabled && fresh && patch.x === undefined && patch.z === undefined) {
+    const spot = standSpot(state.room, next.height, neighbourRects(state));
+    next.x = Math.round(spot.x * 100) / 100;
+    next.z = Math.round(spot.z * 100) / 100;
+    next.angle = 0;
+  }
   if (!Number.isFinite(next.height) || next.height < 80 || next.height > 230)
     throw Error('키는 80~230cm로 입력해주세요.');
   if (!Object.hasOwn(POSES, next.pose)) throw Error('아바타 자세를 골라 주세요.');

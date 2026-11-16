@@ -117,7 +117,9 @@ function Avatar() {
         <span class="foot-note">
           {layout
             ? layout.pose === 'standing'
-              ? '방 안의 아바타를 끌어 옮기거나 눌러서 자세를 바꿔요'
+              ? layout.outside
+                ? '아바타는 방 옆에 서 있어요. 끌어서 방 안으로 옮기거나 눌러서 자세를 바꿔요'
+                : '아바타를 끌어 방 안팎으로 옮기거나 눌러서 자세를 바꿔요'
               : '가구를 옮기거나 돌리면 아바타도 함께 움직여요'
             : '아바타는 켜지 않아도 배치에는 영향이 없어요'}
         </span>
@@ -1102,7 +1104,12 @@ function AIPanel() {
   const ai = app.ai;
   const loading = ai.text === 'loading';
   const textState = {
-    off: ai.why === 'user' || ai.why === 'url' ? '꺼 둠' : '켜지 않음',
+    off:
+      ai.why === 'user' || ai.why === 'url'
+        ? '꺼 둠'
+        : ai.why === 'ask' || ai.why === 'later'
+          ? '아직 받지 않음'
+          : '켜지 않음',
     loading: ai.label || '준비 중',
     ready: `${store.modelName(ai.model)} 실행 중`,
     error: '준비 실패',
@@ -1131,7 +1138,11 @@ function AIPanel() {
           </button>
         ) : ai.text === 'unsupported' ? null : (
           <button class="btn small primary" onClick={() => store.setModelOn(true)}>
-            {ai.text === 'error' ? '다시 시도' : '켜기'}
+            {ai.text === 'error'
+              ? '다시 시도'
+              : ai.why === 'ask' || ai.why === 'later'
+                ? '모델 받기'
+                : '켜기'}
           </button>
         )}
       </div>

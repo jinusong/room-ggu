@@ -58,6 +58,16 @@ export function avatarModel(state) {
     bone(foot, j[side + 'Toe'], h * 0.03, h * 0.022);
     ball(j[side + 'Toe'], h * 0.022);
   }
+  // 방 밖에서는 모형 옆에 세워 둔 축척 인형처럼 방바닥과 같은 높이의 받침 위에 선다.
+  if (a.outside) {
+    const base = new T.Mesh(
+      new T.CylinderGeometry(h * 0.2, h * 0.2, 0.08, 40),
+      new T.MeshStandardMaterial({ color: '#f4f1ea', roughness: 0.95 }),
+    );
+    base.position.y = -0.04;
+    base.castShadow = base.receiveShadow = true;
+    group.add(base);
+  }
   group.position.set(a.x, 0, a.z);
   group.rotation.y = (a.angle * Math.PI) / 180;
   group.userData.avatar = true;

@@ -32,6 +32,8 @@
     'Malgun Gothic', system-ui, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --inset-left: 0px;
+  /* 알림 축의 위쪽 자리. 넓은 화면에서는 대화 머리(68px) 아래, 좁은 화면에서는 방 위 도구 줄 아래다. */
+  --notice-top: 62px;
   --inset-bottom: 0px;
 }
 * {
@@ -341,12 +343,15 @@ button[aria-disabled='true'] {
   box-shadow: var(--shadow-float);
   overflow: hidden;
 }
+.app.is-desktop {
+  --notice-top: 76px;
+}
 .sheet.is-desktop {
   top: 0;
   left: 0;
   bottom: 0;
-  /* 끌어 맞춘 폭을 쓰되, 창이 줄어도 방 쪽에 도구 줄이 들어갈 폭은 남긴다. */
-  width: min(var(--chat-w, clamp(380px, 40vw, 600px)), calc(100vw - 520px));
+  /* 기본은 화면의 절반이다. 끌어 맞춘 폭을 쓰되, 창이 줄어도 방 쪽에 도구 줄이 들어갈 폭은 남긴다. */
+  width: min(var(--chat-w, 50vw), calc(100vw - 520px));
   min-width: 360px;
   border-width: 0 1px 0 0;
   box-shadow:
@@ -363,14 +368,14 @@ button[aria-disabled='true'] {
   border-radius: var(--r-sheet);
   box-shadow: var(--shadow-float);
 }
-/* 대화와 방 사이를 끌어 대화 폭을 바꾼다. */
+/* 대화와 방 사이를 끌어 대화 폭을 바꾼다. 경계 가운데의 손잡이가 끌 수 있는 자리임을 늘 보여 준다. */
 .sheet-resize {
   position: absolute;
   z-index: 2;
   top: 0;
-  right: -4px;
+  right: -7px;
   bottom: 0;
-  width: 9px;
+  width: 13px;
   cursor: col-resize;
   touch-action: none;
 }
@@ -379,7 +384,7 @@ button[aria-disabled='true'] {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 3px;
+  left: 5px;
   width: 2px;
   background: var(--ink-3);
   opacity: 0;
@@ -389,16 +394,42 @@ button[aria-disabled='true'] {
 .is-resizing .sheet-resize::after {
   opacity: 0.5;
 }
+.sheet-resize::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 3px;
+  width: 6px;
+  height: 44px;
+  margin-top: -22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--sheet);
+  box-shadow: 0 1px 3px rgba(31, 29, 25, 0.12);
+  transition:
+    border-color 0.15s var(--ease),
+    background-color 0.15s var(--ease);
+}
+.sheet-resize:hover::before,
+.is-resizing .sheet-resize::before {
+  border-color: var(--ink);
+  background: var(--ink);
+}
 /* 키보드로 잡았을 때는 먹색 굵은 선으로 또렷하게 보인다. */
 .sheet-resize:focus-visible {
   outline: 0;
 }
 .sheet-resize:focus-visible::after {
-  left: 2px;
+  left: 4px;
   width: 4px;
   border-radius: 2px;
   background: var(--ink);
   opacity: 1;
+}
+.sheet-resize:focus-visible::before {
+  border-color: var(--ink);
+  background: var(--ink);
 }
 .is-resizing,
 .is-resizing * {
@@ -1860,6 +1891,16 @@ button.row:hover,
   gap: 6px;
   min-width: 0;
 }
+/* 자리가 모자라면 설명을 줄이고, 켜고 끄는 단추는 끝까지 보이게 둔다. */
+.status-line .status-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.status-line .status-dot,
+.status-line .link {
+  flex: none;
+}
 .status-line .link {
   /* 작은 글자 버튼도 누를 자리는 24px를 지킨다. */
   min-height: 24px;
@@ -2472,18 +2513,25 @@ button.avatar-tag {
   font-size: 12px;
   color: var(--ink-3);
 }
+/* 잠깐 뜨는 알림과 모델 아일랜드는 화면 위 가운데 한 축에 둔다. */
 .toast {
   position: fixed;
   z-index: 50;
-  top: 62px;
-  left: calc((100% + var(--inset-left)) / 2);
+  top: var(--notice-top);
+  left: 50%;
+  /* 왼쪽 50%에서 시작하면 남은 절반 폭에서 줄이 바뀌므로 글 길이만큼 폭을 잡는다. */
+  width: max-content;
   max-width: min(440px, calc(100% - 32px));
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   padding: 10px 16px;
   border-radius: 12px;
   background: var(--ink);
   color: var(--sheet);
   font-size: 14px;
-  box-shadow: var(--shadow-float);
+  box-shadow:
+    0 0 0 1.5px var(--sheet),
+    var(--shadow-float);
   opacity: 0;
   pointer-events: none;
   transform: translate(-50%, -8px);
@@ -2753,6 +2801,10 @@ button.avatar-tag {
 .app.is-mobile .status-extra {
   display: none;
 }
+/* 대화를 화면 가득 펼치면 방 위 자리가 없으므로 알림과 아일랜드를 대화 머리 아래에 둔다. */
+.app.is-mobile:has(.sheet[data-snap='full']) {
+  --notice-top: 132px;
+}
 .app:has(.sheet.is-collapsed) .stage-hint {
   visibility: hidden;
 }
@@ -2924,19 +2976,21 @@ button.avatar-tag {
 }
 
 /* ---------- 모델 아일랜드 ---------- */
-/* 방 위 도구 줄 바로 아래 가운데에 뜨는 먹색 캡슐. 접힌 한 줄과 아래로 펼쳐지는 안내가 한 덩어리다.
-   도구 줄과 같은 줄에 두면 화면 폭에 따라 길잡이를 가리므로 항상 한 줄 아래에 둔다. */
+/* 화면 위 가운데에 뜨는 먹색 캡슐. 접힌 한 줄과 아래로 펼쳐지는 안내가 한 덩어리다.
+   대화 머리와 방 위 도구 줄의 단추를 가리지 않게 그 줄 바로 아래에 둔다. */
 .island {
   position: fixed;
   z-index: 55;
-  top: 62px;
-  left: calc((100% + var(--inset-left)) / 2);
+  top: var(--notice-top);
+  left: 50%;
   width: max-content;
   max-width: calc(100% - 24px);
   border-radius: 22px;
   background: var(--ink);
   color: var(--sheet);
+  /* 먹색 말풍선 위에 떠도 한 덩어리로 보이지 않게 종이색 테를 두른다. */
   box-shadow:
+    0 0 0 1.5px var(--sheet),
     0 1px 2px rgba(31, 29, 25, 0.2),
     0 12px 32px rgba(31, 29, 25, 0.24);
   transform: translateX(-50%);
@@ -3112,6 +3166,90 @@ button.avatar-tag {
 .island-btn:focus-visible {
   outline-color: var(--tape);
 }
+/* 모델을 받을지 묻는 팝업. 아일랜드와 같은 자리에 뜨고, 뒤 화면은 옅게 가린다. */
+.island-scrim {
+  position: fixed;
+  z-index: 54;
+  inset: 0;
+  background: rgba(31, 29, 25, 0.38);
+  animation: fade 0.2s var(--ease) both;
+}
+.island.is-ask {
+  width: min(380px, calc(100% - 24px));
+}
+.ask-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 16px 4px 12px;
+}
+.ask-head .island-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--tape);
+  color: var(--tape-ink);
+}
+.ask-head h2 {
+  margin: 0;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.35;
+}
+.is-ask .island-desc {
+  margin-top: 8px;
+}
+.ask-facts {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px dashed rgba(251, 250, 247, 0.42);
+  border-radius: 10px;
+}
+.ask-facts div {
+  display: grid;
+  gap: 2px;
+}
+.ask-facts dt {
+  font-size: 11px;
+  color: rgba(251, 250, 247, 0.64);
+}
+.ask-facts dd {
+  margin: 0;
+  font-weight: 500;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.ask-facts dd.is-size {
+  color: var(--tape);
+}
+.island.is-ask:focus {
+  outline: 0;
+}
+.island-desc,
+.island-stalled,
+.ask-note,
+.ask-head h2 {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.ask-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(251, 250, 247, 0.72);
+}
+.is-ask footer .island-btn {
+  height: 44px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+.is-ask footer .island-btn.is-primary {
+  flex: 1;
+}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -3123,7 +3261,7 @@ button.avatar-tag {
 }
 /* 아일랜드가 떠 있으면 잠깐 뜨는 알림은 그 아래에 둔다. */
 .has-island .toast {
-  top: 116px;
+  top: calc(var(--notice-top) + 54px);
 }
 .model-choices {
   display: grid;

@@ -11,7 +11,11 @@ const OFF_TEXT = {
   url: '모델 꺼 둠',
   'save-data': '데이터 절약 모드라 모델을 켜지 않음',
   memory: '메모리가 작아 모델을 켜지 않음',
+  ask: '모델을 아직 받지 않음',
+  later: '모델을 아직 받지 않음',
 };
+// 받은 적이 없어 꺼져 있는 상태. 켜는 단추가 내려받기를 시작한다는 것을 이름으로 알린다.
+const notFetched = (ai) => ai.text === 'off' && (ai.why === 'ask' || ai.why === 'later');
 // 지금 누가 답하는지. 상담 상대 이름 바로 아래에 둔다.
 function Status() {
   const ai = app.ai;
@@ -65,13 +69,22 @@ function Status() {
   return (
     <span class="status-line">
       <span class={`status-dot is-${ai.text}`} />
-      {text} · 규칙으로 답해요
+      <span class="status-text">
+        {text}
+        <span class="status-extra"> · 규칙으로 답해요</span>
+      </span>
       <button
         type="button"
         class="link"
         onClick={() => (ai.text === 'unsupported' ? store.openTool('ai') : store.setModelOn(true))}
       >
-        {ai.text === 'unsupported' ? '자세히' : ai.text === 'error' ? '다시 시도' : '켜기'}
+        {ai.text === 'unsupported'
+          ? '자세히'
+          : ai.text === 'error'
+            ? '다시 시도'
+            : notFetched(ai)
+              ? '모델 받기'
+              : '켜기'}
       </button>
     </span>
   );
@@ -79,10 +92,10 @@ function Status() {
 
 // 대화 열의 폭. 사용자가 끌어 맞춘 값은 이 브라우저에만 기억한다.
 const WIDTH_KEY = 'room-ggu-chat-width';
-// 방 쪽에 위 도구 줄이 들어갈 폭(520px)은 남긴다.
+// 기본 폭은 화면의 절반이다(CSS). 끌어서는 화면의 70%까지 넓히되, 방 쪽에 위 도구 줄이 들어갈 폭(520px)은 남긴다.
 const widthLimits = () => [
   360,
-  Math.max(380, Math.min(760, Math.round(innerWidth * 0.6), innerWidth - 520)),
+  Math.max(380, Math.min(Math.round(innerWidth * 0.7), innerWidth - 520)),
 ];
 function applyWidth(px) {
   if (px) document.documentElement.style.setProperty('--chat-w', `${px}px`);

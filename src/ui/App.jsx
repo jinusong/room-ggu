@@ -139,7 +139,7 @@ export function App() {
   return (
     <div
       class={`app ${mobile ? 'is-mobile' : 'is-desktop'} ${dragging ? 'is-dropping' : ''} ${
-        app.ai.download ? 'has-island' : ''
+        app.ai.download || app.view.modelAsk ? 'has-island' : ''
       }`}
       onDragOver={(e) => {
         if ([...(e.dataTransfer?.items || [])].some((i) => i.kind === 'file')) {

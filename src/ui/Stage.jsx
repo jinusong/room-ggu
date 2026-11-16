@@ -894,7 +894,12 @@ export function Stage({ mobile, sheetRef }) {
     const tag = layer.querySelector('[data-avatar-tag]'),
       p = tag && sc.avatarAnchor?.();
     if (tag && (!p || !p.visible)) tag.style.visibility = 'hidden';
-    else if (tag) put(tag, p.x - r.left - tag.offsetWidth / 2, p.y - r.top - tag.offsetHeight - 6);
+    else if (tag)
+      put(
+        tag,
+        p.x - r.left - tag.offsetWidth / 2,
+        p.below ? p.y - r.top + 6 : p.y - r.top - tag.offsetHeight - 6,
+      );
   };
   const place = () => {
     placeBar();

@@ -38,6 +38,41 @@ const DOWNLOAD_MB = {
   'gemma-4-E2B-it-q4f32_1-MLC': 2840,
 };
 export const downloadSize = (id) => (Object.hasOwn(DOWNLOAD_MB, id) ? DOWNLOAD_MB[id] : 0);
+// 이 모델의 가중치 가운데 아직 받지 않은 양을 본다. 로더가 쓰는 캐시(webllm/model)에서 조각 목록을 읽어
+// 빠진 조각의 크기를 더한다. 받다 만 모델을 다 받은 것으로 착각하지 않으려는 것이다.
+// cached: 모두 보관됨. missingMB: 남은 양(MB). 조각 목록조차 없으면 얼마나 남았는지 알 수 없어 null이다.
+export async function modelMissing(id) {
+  try {
+    const cache = await caches.open('webllm/model'),
+      mine = (await cache.keys()).filter((r) => r.url.includes(`/${id}/`)),
+      // 조각 목록의 파일 이름은 모델을 만든 시기에 따라 둘 중 하나다.
+      index = mine.find((r) => /\/(tensor|ndarray)-cache\.json$/.test(r.url));
+    if (!index) return { cached: false, missingMB: null };
+    const records = (await (await cache.match(index)).json()).records || [],
+      have = new Set(mine.map((r) => r.url.split('/').pop())),
+      missing = records.filter((r) => !have.has(r.dataPath));
+    if (!records.length) return { cached: false, missingMB: null };
+    const bytes = missing.reduce((n, r) => n + (Number.isFinite(r.nbytes) ? r.nbytes : NaN), 0);
+    return {
+      cached: missing.length === 0,
+      missingMB: Number.isFinite(bytes) ? Math.ceil(bytes / 1048576) : null,
+    };
+  } catch {
+    return { cached: false, missingMB: null };
+  }
+}
+export const modelCached = async (id) => (await modelMissing(id)).cached;
+// 휴대 기기인지. 휴대 기기에서는 큰 모델 파일을 묻지 않고 받지 않는다.
+export function handheld(nav = globalThis.navigator) {
+  if (!nav) return false;
+  if (nav.userAgentData?.mobile) return true;
+  const ua = nav.userAgent || '';
+  return (
+    /Android|iPhone|iPad|iPod|Mobile/i.test(ua) ||
+    (/Macintosh/.test(ua) && nav.maxTouchPoints > 1) ||
+    nav.connection?.type === 'cellular'
+  );
+}
 export const sizeText = (mb) =>
   mb >= 1000 ? `${(mb / 1000).toFixed(1)}GB` : `${Math.round(mb)}MB`;
 

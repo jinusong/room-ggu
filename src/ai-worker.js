@@ -5,7 +5,7 @@
 import { TYPES, ROOM_TYPES, WALL_COLORS, FLOOR_COLORS, FURNITURE_COLORS } from './catalog.js';
 import { MODEL_ACTIONS, MODEL_UI } from './ui-schema.js';
 import { PHOTO_MODEL, PHOTO_LABELS } from './app/photo.js';
-import { textModel, DOWNLOAD_START } from './app/models.js';
+import { textModel, modelCached, DOWNLOAD_START } from './app/models.js';
 
 let engine = null,
   textId = null,
@@ -29,17 +29,6 @@ async function unloadClassifier() {
   self.postMessage({ event: 'unloaded', task: 'vision' });
 }
 
-// 이 모델의 가중치 조각이 브라우저 캐시에 있는지 본다. 라이브러리의 hasModelInCache는 저장소 형식에 따라
-// 받아 둔 모델도 없다고 답해서, 로더가 쓰는 캐시(webllm/model)를 직접 확인한다.
-async function hasWeights(id) {
-  try {
-    const keys = await (await caches.open('webllm/model')).keys();
-    return keys.filter((r) => r.url.includes(`/${id}/`) && r.url.endsWith('.bin')).length >= 3;
-  } catch {
-    return false;
-  }
-}
-
 async function loadText(choice) {
   if (engine && (!choice || textModel(choice) === textModel(textChoice))) return textId;
   if (engine) await unloadText();
@@ -55,7 +44,8 @@ async function loadText(choice) {
     throw Error('이 버전에서 지원하는 모델을 찾지 못했어요.');
   // 보관해 둔 모델이 없으면 내려받기를 시작한다고 먼저 알린다. 로더는 설정·토크나이저를 받은 뒤에야
   // 첫 진행 상황을 보내므로, 그 사이에도 화면이 내려받는 중임을 보여줄 수 있게 한다.
-  if (!(await hasWeights(preferred)))
+  // 라이브러리의 hasModelInCache는 저장소 형식에 따라 받아 둔 모델도 없다고 답해서 캐시를 직접 확인한다.
+  if (!(await modelCached(preferred)))
     emit('text', { progress: 0, text: DOWNLOAD_START, model: preferred });
   engine = new MLCEngine({
     initProgressCallback: (r) =>

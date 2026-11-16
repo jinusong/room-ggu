@@ -41,6 +41,94 @@ function Ring({ value }) {
   );
 }
 
+// 휴대 기기에서 모델을 받기 전에 묻는 팝업. 아일랜드와 같은 자리, 같은 재질로 뜨고, 받겠다고 누르면
+// 그 자리에서 받는 중 안내로 이어진다. 누르기 전에는 아무것도 받지 않는다.
+function ModelAsk({ ask }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const before = document.activeElement;
+    // 초점은 팝업 자체에 둔다. 단추에 두면 Enter 한 번에 큰 파일을 받기 시작할 수 있다.
+    ref.current?.focus({ preventScroll: true });
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        store.declineModel();
+      }
+      // 팝업이 떠 있는 동안 초점은 두 단추 사이에서만 돈다.
+      if (e.key === 'Tab') {
+        const list = [...ref.current.querySelectorAll('button')],
+          i = list.indexOf(document.activeElement),
+          next = i < 0 ? (e.shiftKey ? list.length - 1 : 0) : i + (e.shiftKey ? -1 : 1);
+        e.preventDefault();
+        list[(next + list.length) % list.length].focus();
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      if (before && before !== document.body && before.isConnected)
+        before.focus?.({ preventScroll: true });
+    };
+  }, []);
+  const size = `약 ${sizeText(ask.mb)}`;
+  return (
+    <div
+      class="island-scrim"
+      onPointerDown={(e) => e.target === e.currentTarget && store.declineModel()}
+    >
+      <div
+        ref={ref}
+        id="model-ask"
+        class="island is-ask is-open"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ask-title"
+        aria-describedby="ask-desc"
+        tabIndex={-1}
+      >
+        <div class="ask-head">
+          <span class="island-icon">
+            <Icon name="download" size={16} />
+          </span>
+          <h2 id="ask-title">상담 모델을 먼저 받아야 해요</h2>
+        </div>
+        <div class="island-panel">
+          <p id="ask-desc" class="island-desc">
+            {ask.partial
+              ? '받다 만 모델이 있어요. 남은 만큼만 이어서 받으면 돼요. 대화는 서버로 보내지 않고 이 기기에서 해석해요.'
+              : '룸꾸는 대화를 서버로 보내지 않고 이 기기에서 해석해요. 그래서 처음 한 번 모델을 받아 둬야 해요.'}
+          </p>
+          <dl class="ask-facts">
+            <div>
+              <dt>모델</dt>
+              <dd>{ask.name}</dd>
+            </div>
+            <div>
+              <dt>{ask.partial ? '남은 크기' : '크기'}</dt>
+              <dd class="is-size">{size}</dd>
+            </div>
+            <div>
+              <dt>보관</dt>
+              <dd>이 브라우저</dd>
+            </div>
+          </dl>
+          <p class="ask-note">
+            Wi-Fi에서 받기를 권해요. 받지 않아도 “소파 놓아줘” 같은 정해진 표현은 알아들어요.
+          </p>
+          <footer>
+            <button class="island-btn" id="ask-later" onClick={() => store.declineModel()}>
+              나중에
+            </button>
+            <button class="island-btn is-primary" id="ask-go" onClick={() => store.acceptModel()}>
+              {ask.partial ? '이어서 받기' : '모델 받기'} · {size}
+            </button>
+          </footer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ModelIsland() {
   const d = app.ai.download,
     open = !!d && app.view.downloadOpen;
@@ -93,6 +181,13 @@ export function ModelIsland() {
       {d ? TITLES[d.task][d.phase] : ''}
     </span>
   );
+  if (!d && app.view.modelAsk)
+    return (
+      <>
+        {live}
+        <ModelAsk ask={app.view.modelAsk} />
+      </>
+    );
   if (!d) return live;
   const title = TITLES[d.task][d.phase],
     percent = Math.round((d.progress || 0) * 100),

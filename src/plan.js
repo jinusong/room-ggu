@@ -1,6 +1,6 @@
 import { TYPES, footprint, spaces } from './data.js';
 import { tapeCanvas, drawTags, PAPER } from './tape.js';
-import { avatarLayout, avatarHit, avatarReach, LIMBS } from './avatar.js';
+import { avatarLayout, avatarHit, avatarReach, avatarApron, LIMBS } from './avatar.js';
 import { roomOpenings, doorSwing } from './floorplan.js';
 import { bathroomFixtures } from './house-geometry.js';
 
@@ -23,6 +23,16 @@ export function drawAvatar(c, a, ox, oy, s) {
     };
   c.save();
   c.translate(ox + a.x * s, oy + a.z * s);
+  // 방 밖에서는 받침 위에 선다. 3D의 받침과 같은 크기다.
+  if (a.outside) {
+    c.beginPath();
+    c.arc(0, 0, h * 0.2 * s, 0, Math.PI * 2);
+    c.fillStyle = '#f7f5ef';
+    c.fill();
+    c.lineWidth = 1;
+    c.strokeStyle = 'rgba(42,40,36,0.28)';
+    c.stroke();
+  }
   c.rotate((-a.angle * Math.PI) / 180);
   c.lineCap = 'round';
   c.strokeStyle = '#667669';
@@ -194,6 +204,8 @@ export class PlanScene {
           py: e.clientY,
           fixed: !!hit.fixed,
           started: false,
+          // 아바타를 끄는 동안에는 도면 축척을 그대로 둔다. 놓은 뒤에 아바타가 선 자리까지 다시 맞춘다.
+          apron: hit.id === 'avatar' ? this.apron() : null,
         };
         this.canvas.setPointerCapture(e.pointerId);
       }
@@ -249,6 +261,7 @@ export class PlanScene {
         const { started, id, door } = this.drag;
         this.drag = null;
         this.canvas.style.cursor = '';
+        if (started && id === 'avatar') this.draw();
         if (started) this.cb.commit();
         else if (door) this.cb.pickDoor?.([this.state.roomId, door.roomId]);
         else if (id === 'avatar') this.cb.pickAvatar?.();
@@ -259,6 +272,10 @@ export class PlanScene {
     this.canvas.addEventListener('pointerup', this.up);
     this.canvas.addEventListener('pointercancel', this.up);
     this.draw();
+  }
+  // 방 밖에 선 아바타까지 담으려고 방 둘레에 더 잡는 자리(m).
+  apron() {
+    return avatarApron(avatarLayout(this.state), this.state.room);
   }
   point(e) {
     const r = this.canvas.getBoundingClientRect();
@@ -353,9 +370,12 @@ export class PlanScene {
       [b.minX, b.maxZ],
       [b.maxX, b.maxZ],
     ].map(([x, z]) => -x * Math.sin(rad) + z * Math.cos(rad));
+    // 방 앞쪽 바깥에 서 있으면 이름표를 몸 아래에 둬 벽과 치수선을 가리지 않는다.
+    const below = a.outside && a.z > this.state.room.d / 2;
     return {
       x: r.left + this.ox + a.x * this.scale,
-      y: r.top + this.oy + (a.z + Math.min(...zs)) * this.scale,
+      y: r.top + this.oy + (a.z + (below ? Math.max(...zs) : Math.min(...zs))) * this.scale,
+      below,
       visible: true,
     };
   }
@@ -391,10 +411,14 @@ export class PlanScene {
     const room = this.state.room,
       pad = W < 600 ? 44 : 72;
     const aw = Math.max(80, W - left - right - pad * 2),
-      ah = Math.max(80, H - top - bottom - pad * 2);
-    this.scale = Math.max(8, Math.min(aw / room.w, ah / room.d));
-    this.ox = left + (W - left - right) / 2;
-    this.oy = top + (H - top - bottom) / 2;
+      ah = Math.max(80, H - top - bottom - pad * 2),
+      apron = this.drag?.apron || this.apron();
+    this.scale = Math.max(
+      8,
+      Math.min(aw / (room.w + apron.left + apron.right), ah / (room.d + apron.top + apron.bottom)),
+    );
+    this.ox = left + (W - left - right) / 2 + ((apron.left - apron.right) / 2) * this.scale;
+    this.oy = top + (H - top - bottom) / 2 + ((apron.top - apron.bottom) / 2) * this.scale;
     const s = this.scale,
       rw = room.w * s,
       rh = room.d * s,

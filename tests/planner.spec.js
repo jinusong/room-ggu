@@ -326,6 +326,8 @@ test('대화와 방 사이를 끌거나 방향키로 대화 폭을 바꾸고 다
   const sheet = page.locator('.sheet'),
     handle = page.getByRole('separator', { name: '대화 폭 조절' });
   const before = (await sheet.boundingBox()).width;
+  // 기본은 화면의 절반이다.
+  expect(before).toBeCloseTo(720, 0);
   const box = await handle.boundingBox();
   await page.mouse.move(box.x + box.width / 2, 400);
   await page.mouse.down();
@@ -351,7 +353,8 @@ test('대화와 방 사이를 끌거나 방향키로 대화 폭을 바꾸고 다
   for (let i = 0; i < 40; i++) await page.keyboard.press('ArrowLeft');
   expect((await sheet.boundingBox()).width).toBe(360);
   for (let i = 0; i < 60; i++) await page.keyboard.press('ArrowRight');
-  expect((await sheet.boundingBox()).width).toBeLessThanOrEqual(1440 * 0.6);
+  // 넓혀도 방 쪽 도구 줄이 들어갈 520px은 남는다.
+  expect((await sheet.boundingBox()).width).toBe(1440 - 520);
   await handle.dblclick();
   expect((await sheet.boundingBox()).width).toBeCloseTo(before, 0);
 });

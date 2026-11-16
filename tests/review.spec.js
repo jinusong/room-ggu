@@ -61,9 +61,12 @@ test('방 위의 사람 버튼으로 아바타를 세우고 키 출처를 구별
   // 키를 말하지 않았으면 170cm 기본값이고 점선으로 표시한다.
   await expect(page.locator('.avatar-bar .tape')).toHaveClass(/is-draft/);
   await expect(page.locator('.avatar-bar .tape')).toHaveText('키 170cm');
+  // 방 밖 앞쪽 왼 모서리 옆에, 방바닥과 같은 높이의 받침(두께 8cm) 위에 선다.
   let body = await avatar3d(page);
   expect(body.high).toBeCloseTo(1.7, 2);
-  expect(body.low).toBeGreaterThan(-0.02);
+  expect(body.low).toBeCloseTo(-0.08, 2);
+  expect(body.x).toBeLessThan(-before.room.w / 2);
+  expect(body.z).toBeGreaterThan(before.room.d / 2);
   const field = page.getByLabel('아바타 키', { exact: true });
   await field.fill('182');
   await field.blur();
@@ -393,23 +396,26 @@ test('모델을 받거나 준비하는 동안 위쪽 아일랜드로 알리고, 
   await expect(toggle).toContainText('상담 모델 받는 중');
   await expect(toggle).toContainText('43%');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  // 화면을 막는 다이얼로그가 아니다. 방 위 도구 줄 바로 아래 가운데에 뜬다.
+  // 화면을 막는 다이얼로그가 아니다. 화면 가운데, 대화 머리와 방 위 도구 줄 바로 아래에 뜬다.
   await expect(page.getByRole('dialog')).toHaveCount(0);
   // 나타나는 움직임이 끝난 뒤의 자리를 잰다.
   await page.waitForTimeout(450);
   const box = await island.boundingBox(),
-    stage = await page.evaluate(() => {
-      const left = parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue('--inset-left'),
-      );
-      return {
-        center: (innerWidth + left) / 2,
-        tools: document.querySelector('.stage-top').getBoundingClientRect().bottom,
-      };
-    });
-  expect(box.y).toBeGreaterThanOrEqual(stage.tools);
+    top = await page.evaluate(() => ({
+      center: innerWidth / 2,
+      tools: document.querySelector('.stage-top').getBoundingClientRect().bottom,
+      head: document.querySelector('.sheet-head').getBoundingClientRect().bottom,
+    }));
+  expect(box.y).toBeGreaterThanOrEqual(Math.max(top.tools, top.head));
   expect(box.y).toBeLessThan(120);
-  expect(Math.abs(box.x + box.width / 2 - stage.center)).toBeLessThan(2);
+  expect(Math.abs(box.x + box.width / 2 - top.center)).toBeLessThan(2);
+  // 대화 폭을 바꿔도 아일랜드는 화면 가운데에 그대로 있다.
+  const handle = page.getByRole('separator', { name: '대화 폭 조절' });
+  await handle.focus();
+  for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowLeft');
+  const moved = await island.boundingBox();
+  expect(Math.abs(moved.x + moved.width / 2 - top.center)).toBeLessThan(2);
+  await handle.dblclick();
   // 받는 동안에도 상담과 방 위 도구는 그대로 쓸 수 있다.
   await say(page, '거실 가로 5m 세로 4m');
   expect((await stored(page)).room).toMatchObject({ w: 5, d: 4 });
