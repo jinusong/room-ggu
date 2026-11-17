@@ -12,7 +12,7 @@
 
 | 벽·바닥 비교 | 가구 고르기 | 모바일 |
 | --- | --- | --- |
-| ![벽과 바닥 도구가 지금과 바꾸기 전 모서리를 비교한다](docs/screenshots/generated-ui.png) | ![욕실 설비를 포함한 23종 가구 썸네일](docs/screenshots/catalog.png) | ![모바일 하단 대화 시트와 선택한 소파의 도구 막대](docs/screenshots/mobile.png) |
+| ![벽과 바닥 도구가 지금과 바꾸기 전 모서리를 비교한다](docs/screenshots/generated-ui.png) | ![주방·반려동물·식물을 포함한 93종 가구 썸네일](docs/screenshots/catalog.png) | ![모바일 하단 대화 시트와 선택한 소파의 도구 막대](docs/screenshots/mobile.png) |
 
 | 벽의 +로 공간 붙이기 | 문 옮기기·폭 바꾸기 | 모델 준비 알림 |
 | --- | --- | --- |
@@ -28,7 +28,7 @@
 
 내추럴·미니멀·북유럽·재팬디·모던·빈티지·인더스트리얼·코지 8개 테마를 제공합니다. “침실 3개 욕실 2개”, “가족들이 책 읽기 좋은 집”처럼 구성을 더하고, 적용 후에는 “안방 침대 가로 180cm로”, “거실 벽은 세이지로”처럼 방 이름을 붙여 고칩니다. 같은 종류의 가구가 여럿이면 고칠 대상을 먼저 고릅니다.
 
-지원 범위는 40~660m², 최대 12개 공간과 현재 가구 카탈로그 23종입니다. 방 크기는 전체 면적을 나눈 배치 초안이며 시공 도면이 아닙니다. 자리가 없어 놓지 못한 가구는 초안 카드에 따로 표시합니다. 모델을 꺼 둔 경우에는 기본 구성임을 표시합니다.
+지원 범위는 40~660m², 최대 12개 공간과 현재 가구 카탈로그 93종입니다. 방 크기는 전체 면적을 나눈 배치 초안이며 시공 도면이 아닙니다. 자리가 없어 놓지 못한 가구는 초안 카드에 따로 표시합니다. 모델을 꺼 둔 경우에는 기본 구성임을 표시합니다.
 
 ## 사용하기
 
@@ -100,7 +100,7 @@ v5.9부터 **A2UI 1.0 공식 코어**와 룸꾸 전용 카탈로그로 도구를
 
 | 경로 | 역할 |
 | --- | --- |
-| `src/catalog.js`, `src/data.js` | 가구·공간 카탈로그(욕실 설비 3종 포함 23종), 저장 형식 v5 검증과 v1~v4 이전, 경계·충돌 |
+| `src/catalog.js`, `src/data.js` | 가구·공간 카탈로그(욕실·주방·반려동물·식물·아이·운동 포함 93종), 저장 형식 v5 검증과 v1~v4 이전, 경계·충돌 |
 | `src/avatar.js`, `src/seating.js`, `src/avatar-three.js` | 키·자세·가구 참조, 앉는 면·눕는 면, 같은 축척의 아바타 모형 |
 | `src/app/design.js` | 집 전체 상담 계약, 공간 구성·가구 구성·테마 검증 |
 | `src/app/models.js`, `src/ui/ModelIsland.jsx` | 상담 모델 후보와 크기, 받는 중·준비 중을 알리는 방 위 캡슐 |
@@ -114,7 +114,7 @@ v5.9부터 **A2UI 1.0 공식 코어**와 룸꾸 전용 카탈로그로 도구를
 | `src/app/store.js` | 대화·초안·선택·실행 취소·저장·모델 상태 |
 | `src/a2ui-catalog.js`, `src/a2ui.js`, `src/ui/A2uiSurface.jsx` | A2UI 1.0 카탈로그, 공식 코어의 메시지·바인딩·이벤트, Preact 렌더러 연결 |
 | `src/ui/` | Preact 화면: 상담 대화 열(`Sheet`·`Thread`·`Composer`), 방 위 도구(`Stage`), 생성형 컴포넌트 |
-| `src/scene.js`, `src/plan.js`, `src/furniture.js` | 3D 모형, 2D 평면도, 파라메트릭 가구 |
+| `src/scene.js`, `src/plan.js`, `src/furniture.js`, `src/furniture-more.js` | 3D 모형, 2D 평면도, 파라메트릭 가구(주방·반려동물·식물·아이·운동 가구는 `furniture-more.js`) |
 | `src/ai.js`, `src/ai-worker.js` | 브라우저 Worker의 WebLLM(상담)·Transformers.js(사진) |
 | `eval/photo/` | 실제 사진 118장 판별 평가(사진 목록·실행·채점·결과) |
 
