@@ -322,6 +322,10 @@ test('겹친 채 저장된 공간은 "겹친다"는 말이나 배치 확인의 �
   await page.locator('#undo').click();
   expect(await overlaps(page)).toBe(1);
   await expect(page.locator('.surface').last()).toContainText('다른 공간과 겹쳐요');
+  await expect(page.locator('.surface').last()).toHaveAttribute(
+    'data-a2ui-component',
+    'RoomGguImpact',
+  );
   await page.locator('[data-separate]').last().click();
   await frames(page);
   expect(await overlaps(page)).toBe(0);

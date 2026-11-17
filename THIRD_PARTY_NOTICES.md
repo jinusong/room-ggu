@@ -16,6 +16,8 @@
 
 ## Runtime libraries and models
 
+A2UI Core `@a2ui/web_core@0.15.0` (Apache-2.0, Google LLC, [upstream](https://github.com/a2ui-project/a2ui/tree/main/typescript/core/web_core))의 공식 MessageProcessor·NodeResolver·Catalog를 사용합니다. 원본을 수정하지 않았으며 라이선스 사본은 `public/licenses/a2ui-LICENSE.txt`로 함께 배포합니다. 룸꾸의 커스텀 카탈로그와 Preact 연결 코드는 이 저장소에 있습니다.
+
 Three.js (MIT), Preact (MIT), Lucide (ISC), Vite (MIT), esbuild (MIT), WebLLM (Apache-2.0), Transformers.js (Apache-2.0)를 사용합니다. 글꼴은 [Pretendard](https://github.com/orioncactus/pretendard)(SIL OFL 1.1, jsDelivr에서 불러옴)와 [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono)(SIL OFL 1.1, @fontsource로 번들)입니다. 각 패키지의 저작권과 라이선스는 해당 upstream 및 npm 배포물에 있습니다.
 
 Gemma 3 모델은 Google Gemma 이용 조건을 따릅니다. [Gemma terms](https://ai.google.dev/gemma/terms). 사용자가 고를 때만 쓰는 Gemma 4 E2B는 모델 카드에 Apache-2.0으로 표시되어 있고, WebLLM용 변환본 [`mlc-ai/gemma-4-E2B-it-q4f16_1-MLC`](https://huggingface.co/mlc-ai/gemma-4-E2B-it-q4f16_1-MLC)을 씁니다. Qwen3 모델은 모델 카드의 라이선스(Apache-2.0)를 따릅니다. 사진 판별의 SigLIP(`google/siglip-base-patch16-224`, Apache-2.0)은 Transformers.js용 ONNX 변환본 [`Xenova/siglip-base-patch16-224`](https://huggingface.co/Xenova/siglip-base-patch16-224)을 씁니다. 모델 가중치는 이 저장소에 포함하지 않으며 사용자 브라우저가 공개 저장소에서 내려받습니다.

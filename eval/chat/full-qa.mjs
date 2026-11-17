@@ -9,6 +9,7 @@ import { TYPES } from '../../src/catalog.js';
 import { THEMES } from '../../src/app/design.js';
 import { validateState, spaces, layoutWarnings } from '../../src/data.js';
 import { floorplanWarnings } from '../../src/floorplan.js';
+import { TOOL_COMPONENTS } from '../../src/a2ui-catalog.js';
 const model = process.env.MODEL || 'large',
   base = process.argv[2] || 'http://127.0.0.1:4180/';
 const out = path.resolve(
@@ -115,6 +116,31 @@ async function say(text, { engine = true, check } = {}) {
         '실제 모델 추론이어야 함',
       );
     assert.notEqual(data.turn.tone, 'error', data.turn.text);
+    const tools = (data.turn.surfaces || []).map((s) => ({
+      surfaceId: `tool-${s.id}`,
+      component: TOOL_COMPONENTS[s.kind],
+    }));
+    // 모델의 계획이 최종 카드까지 공식 A2UI 경로로 이어졌는지도 확인한다.
+    await page.waitForFunction(
+      ({ turnId, tools }) => {
+        const turn = [...document.querySelectorAll('[data-turn]')].find(
+          (n) => n.dataset.turn === turnId,
+        );
+        if (!turn || turn.querySelector('[aria-label="도구 오류"]')) return false;
+        const cards = [...turn.querySelectorAll('[data-a2ui-surface]')];
+        return tools.every((tool) =>
+          cards.some(
+            (card) =>
+              card.dataset.a2uiSurface === tool.surfaceId &&
+              card.dataset.a2uiComponent === tool.component &&
+              card.dataset.a2uiVersion === '1.0',
+          ),
+        );
+      },
+      { turnId: data.turn.id, tools },
+      { timeout: 5000 },
+    );
+    record.a2ui = tools;
     if (check) await check(data, record);
     record.passed = true;
   } catch (e) {

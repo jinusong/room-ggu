@@ -92,7 +92,9 @@
 
 Google Cloud의 분류로 보면 미리 만든 구성요소 중에서 고르는 정적 방식에 가깝습니다. 앱이 렌더링하는 컴포넌트는 `src/ui-schema.js`의 `SURFACE_KINDS` 17가지입니다. 모델은 다음에 보여줄 도구(방 3가지·가구 3가지)와 동작(가구 고르기·공간 목록·저장 등 열기)을 허용 목록의 문자열로 고르고, 앱이 검증해 `src/ui/surfaces.jsx`의 자체 컴포넌트에 실제 상태를 연결합니다. 키 비교와 집 전체 도면은 직접 여는 앱 도구입니다. 모델이 만든 HTML·CSS·JavaScript는 실행하지 않습니다.
 
-문장에 “벽”, “색”, “가로 120cm”처럼 도구를 정하는 단어가 분명한데 모델이 다른 도구를 고르면 앱이 그 단어에 맞는 도구로 바꾸고 바로잡은 내용에 남깁니다. A2UI 프로토콜을 구현하거나 호환을 주장하지 않습니다. 참고 문서는 [디자인 방향](docs/design-direction.md)에 있습니다.
+문장에 “벽”, “색”, “가로 120cm”처럼 도구를 정하는 단어가 분명한데 모델이 다른 도구를 고르면 앱이 그 단어에 맞는 도구로 바꾸고 바로잡은 내용에 남깁니다.
+
+v5.9부터 **A2UI 1.0 공식 코어**와 룸꾸 전용 카탈로그로 도구를 연결합니다. 모델의 간결한 명령은 유지하고, 검증한 도구 명세를 앱이 A2UI 메시지로 바꿉니다. 공식 MessageProcessor·NodeResolver가 도구와 바인딩을 해석하고 기존 Preact 카드가 렌더링합니다. 접힌 카드 다시 열기는 A2UI 이벤트로 전달합니다. 치수 입력·드래그·배치 검증은 기존 앱 연산이 맡습니다. [공개 카탈로그](https://jinusong.github.io/room-ggu/a2ui/catalog.json) · [연결 구조와 범위](docs/a2ui.md).
 
 ## 구조
 
@@ -110,6 +112,7 @@ Google Cloud의 분류로 보면 미리 만든 구성요소 중에서 고르는 
 | `src/app/ops.js` | 검증된 상태 연산, 빈자리 찾기, 변경 내역 |
 | `src/app/model-turn.js`, `src/app/photo.js` | 모델 답 문장 거르기, 사진 점수 → 후보 |
 | `src/app/store.js` | 대화·초안·선택·실행 취소·저장·모델 상태 |
+| `src/a2ui-catalog.js`, `src/a2ui.js`, `src/ui/A2uiSurface.jsx` | A2UI 1.0 카탈로그, 공식 코어의 메시지·바인딩·이벤트, Preact 렌더러 연결 |
 | `src/ui/` | Preact 화면: 상담 대화 열(`Sheet`·`Thread`·`Composer`), 방 위 도구(`Stage`), 생성형 컴포넌트 |
 | `src/scene.js`, `src/plan.js`, `src/furniture.js` | 3D 모형, 2D 평면도, 파라메트릭 가구 |
 | `src/ai.js`, `src/ai-worker.js` | 브라우저 Worker의 WebLLM(상담)·Transformers.js(사진) |

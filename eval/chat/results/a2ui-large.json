@@ -1,0 +1,96 @@
+{
+  "at": "2026-11-17T03:08:59.092Z",
+  "model": "large",
+  "base": "http://127.0.0.1:4187/",
+  "build": "a2ui-5.9.0",
+  "ms": 35248,
+  "results": [
+    {
+      "text": "100평 집 전체를 재팬디로 꾸며줘",
+      "ms": 6598,
+      "engine": "gemma",
+      "reply": "재팬디 테마로 집 전체 초안을 준비했어요. 공간과 가구를 아래에서 확인한 뒤 적용해 주세요. 적용하면 현재 배치를 바꾸며, 한 번에 되돌릴 수 있어요.",
+      "raw": "{\n  \"theme\": \"japandi\",\n  \"room1\": \"standard\",\n  \"room2\": \"standard\",\n  \"room3\": \"standard\",\n  \"room4\": \"standard\",\n  \"room5\": \"standard\",\n  \"room6\": \"reading\",\n  \"room7\": \"standard\",\n  \"room8\": \"standard\",\n  \"room9\": \"standard\",\n  \"room10\": \"standard\",\n  \"room11\": \"standard\",\n  \"room12\": \"standard\"\n}",
+      "model": "gemma-4-E2B-it-q4f16_1-MLC",
+      "passed": true,
+      "a2ui": [
+        {
+          "surfaceId": "tool-tmwk44wks2",
+          "component": "RoomGguDesign"
+        }
+      ]
+    },
+    {
+      "text": "초안 적용해줘",
+      "ms": 145,
+      "engine": "app",
+      "reply": "초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.",
+      "raw": "{\n  \"theme\": \"japandi\",\n  \"room1\": \"standard\",\n  \"room2\": \"standard\",\n  \"room3\": \"standard\",\n  \"room4\": \"standard\",\n  \"room5\": \"standard\",\n  \"room6\": \"reading\",\n  \"room7\": \"standard\",\n  \"room8\": \"standard\",\n  \"room9\": \"standard\",\n  \"room10\": \"standard\",\n  \"room11\": \"standard\",\n  \"room12\": \"standard\"\n}",
+      "model": "gemma-4-E2B-it-q4f16_1-MLC",
+      "passed": true,
+      "a2ui": [
+        {
+          "surfaceId": "tool-tmwk44wnq7",
+          "component": "RoomGguFloorplan"
+        }
+      ]
+    },
+    {
+      "text": "안방 침대 가로 180cm로 바꿔줘",
+      "ms": 8012,
+      "engine": "gemma",
+      "reply": "침대 크기는 180 × 200 × 55cm예요. 아래 도구에서 더 조절할 수 있어요.",
+      "fixes": [
+        "문장에 없는 동작(회전)은 실행하지 않음"
+      ],
+      "raw": "{\"intent\":\"action\",\"action\":\"rotate\",\"furniture\":\"bed\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"unknown\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"침대를 180cm로 변경했어요. 다른 가구의 크기 조정도 필요하신가요?\"}",
+      "model": "gemma-4-E2B-it-q4f16_1-MLC",
+      "passed": true,
+      "a2ui": [
+        {
+          "surfaceId": "tool-tmwk452vza",
+          "component": "RoomGguFurnitureDims"
+        },
+        {
+          "surfaceId": "tool-tmwk452vzb",
+          "component": "RoomGguImpact"
+        }
+      ]
+    },
+    {
+      "text": "높이는 60cm로 바꿔줘",
+      "ms": 7369,
+      "engine": "gemma",
+      "reply": "침대 크기는 180 × 200 × 60cm예요. 아래 도구에서 더 조절할 수 있어요.",
+      "fixes": [
+        "문장에 없는 동작(회전)은 실행하지 않음"
+      ],
+      "raw": "{\"intent\":\"action\",\"action\":\"rotate\",\"furniture\":\"bed\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"tall\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"침대를 높게 조절했어요. 이제 색상이나 다른 부분에 대해 조정해 볼까요?\"}",
+      "model": "gemma-4-E2B-it-q4f16_1-MLC",
+      "passed": true,
+      "a2ui": [
+        {
+          "surfaceId": "tool-tmwk458kte",
+          "component": "RoomGguFurnitureDims"
+        }
+      ]
+    },
+    {
+      "text": "네이비로 바꿔줘",
+      "ms": 7702,
+      "engine": "gemma",
+      "reply": "침대 색을 네이비로 바꿨어요.",
+      "fixes": [],
+      "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"bed\",\"room_type\":\"bedroom\",\"space\":\"침실 2\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"unknown\",\"color\":\"네이비\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_color\",\"reply\":\"침대를 네이비 색으로 변경했어요. 다른 가구의 색도 맞춰볼까요?\"}",
+      "model": "gemma-4-E2B-it-q4f16_1-MLC",
+      "passed": true,
+      "a2ui": [
+        {
+          "surfaceId": "tool-tmwk45eiph",
+          "component": "RoomGguFurnitureColor"
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

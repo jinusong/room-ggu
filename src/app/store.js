@@ -1063,6 +1063,8 @@ async function respondToDesign(request, turn) {
 
 function fixRoomTargets(turn) {
   for (const s of turn.surfaces || []) {
+    // 상태 연산이 나중에 덧붙인 도구에도 재열기·A2UI 수명 관리용 ID를 준다.
+    s.id ||= turnId();
     if (s.target?.type === 'room') s.target = { type: 'room', roomId: app.state.roomId };
     if (s.target?.type === 'draft' && !s.target.id && app.draft)
       s.target = { type: 'draft', id: app.draft.id };

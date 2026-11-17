@@ -1492,23 +1492,23 @@ export function surfaceSummary(spec) {
   }
 }
 
-export function Surface({ spec, live, onOpen }) {
+export function NativeTool({ spec, live, onOpen, summary, protocol }) {
   const meta = SURFACE_KINDS[spec.kind];
   if (!meta) return null;
   const roomElsewhere =
     meta.scope === 'room' && spec.target?.roomId && spec.target.roomId !== app.state.roomId;
   if (!live)
     return (
-      <button class="surface-chip" data-surface-chip={spec.kind} onClick={onOpen}>
+      <button class="surface-chip" data-surface-chip={spec.kind} onClick={onOpen} {...protocol}>
         <Icon name={meta.icon} size={16} />
         <span>{meta.title}</span>
-        <small>{roomElsewhere ? '다른 공간' : surfaceSummary(spec)}</small>
+        <small>{roomElsewhere ? '다른 공간' : summary}</small>
         <Icon name="chevron-down" size={16} />
       </button>
     );
   const Body = BODIES[spec.kind];
   return (
-    <section class="surface" data-surface={spec.kind} aria-label={meta.title}>
+    <section class="surface" data-surface={spec.kind} aria-label={meta.title} {...protocol}>
       {roomElsewhere ? (
         <OtherSpace roomId={spec.target.roomId} />
       ) : (

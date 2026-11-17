@@ -4,7 +4,7 @@ import { app } from '../app/store.js';
 import { isExampleLike } from '../app/ops.js';
 import { STARTERS, EXAMPLE_PROMPTS } from '../app/planner.js';
 import { Icon } from './icons.js';
-import { Surface } from './surfaces.jsx';
+import { A2uiSurface } from './A2uiSurface.jsx';
 import { BrandMark } from './widgets.jsx';
 
 const STARTER_ICONS = {
@@ -181,7 +181,7 @@ function Turn({ turn, live, latest, canUndo }) {
         )}
         {turn.status === 'thinking' && <Thinking />}
         {turn.surfaces?.map((s) => (
-          <Surface
+          <A2uiSurface
             key={s.id}
             spec={s}
             live={live.has(s.id)}
