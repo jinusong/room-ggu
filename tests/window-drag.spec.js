@@ -115,6 +115,8 @@ test('모바일 터치로 창문을 끌고, 포인터 취소는 원래 배치로
 });
 
 test('네 벽의 창문을 2D·3D에서 잡아 이동하고 옆벽은 위아래 키로 조절한다', async ({ page }) => {
+  // 소프트웨어 렌더링인 CI에서도 8회 드래그와 보기 전환을 끝낼 시간을 둔다.
+  test.setTimeout(90_000);
   await setup(page);
   for (const view of ['2d', '3d'])
     for (const wall of ['back', 'left', 'right', 'front']) {
