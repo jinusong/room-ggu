@@ -364,6 +364,8 @@ export function FitBadge({ fit }) {
   const map = {
     fits: ['check', '들어가요'],
     overlap: ['triangle-alert', '겹쳐요'],
+    door: ['triangle-alert', '문 앞을 막아요'],
+    window: ['triangle-alert', '창 앞을 가려요'],
     oversize: ['circle-alert', '방보다 커요'],
   };
   const [icon, text] = map[fit] || map.fits;

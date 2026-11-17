@@ -1,0 +1,79 @@
+{
+  "at": "2026-11-17T08:05:06.937Z",
+  "base": "http://127.0.0.1:4173/",
+  "model": "qwen",
+  "results": [
+    {
+      "text": "사무용 의자 하나 놓고 싶어",
+      "expected": "office_chair",
+      "engine": "qwen",
+      "fixes": [
+        "가구 이야기로 처리"
+      ],
+      "draft": "office_chair",
+      "reply": "사무용 의자 초안은 65 × 65 × 110cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "pass": true
+    },
+    {
+      "text": "아일랜드 식탁 하나 놓아줘",
+      "expected": "island",
+      "engine": "qwen",
+      "fixes": [
+        "가구 이야기로 처리"
+      ],
+      "draft": "island",
+      "reply": "아일랜드 식탁 초안은 140 × 80 × 90cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "pass": true
+    },
+    {
+      "text": "건조기 하나 놓아줘",
+      "expected": "dryer",
+      "engine": "qwen",
+      "fixes": [],
+      "draft": "dryer",
+      "reply": "건조기 초안은 65 × 70 × 85cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "pass": true
+    },
+    {
+      "text": "화장대 하나 놓아줘",
+      "expected": "vanity",
+      "engine": "qwen",
+      "fixes": [
+        "문장에 없는 동작(삭제)은 실행하지 않음",
+        "가구 종류는 문장에 적힌 화장대"
+      ],
+      "draft": "vanity",
+      "reply": "화장대 초안은 90 × 45 × 140cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "pass": true
+    },
+    {
+      "text": "행거 하나 놓아줘",
+      "expected": "hanger",
+      "engine": "qwen",
+      "fixes": [
+        "문장에 없는 동작(자리 정리)은 실행하지 않음",
+        "가구 종류는 문장에 적힌 행거"
+      ],
+      "draft": "hanger",
+      "reply": "행거 초안은 100 × 45 × 170cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "pass": true
+    },
+    {
+      "text": "디지털 피아노 하나 놓아줘",
+      "expected": "piano",
+      "engine": "qwen",
+      "fixes": [
+        "가구 이야기로 처리"
+      ],
+      "draft": "piano",
+      "reply": "디지털 피아노 초안은 140 × 45 × 85cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "ai": {
+    "text": "ready",
+    "model": "Qwen3-0.6B-q4f16_1-MLC",
+    "error": ""
+  }
+}

@@ -1107,7 +1107,11 @@ export function Stage({ mobile, sheetRef }) {
           <span>
             {warn.oversized.size
               ? `방을 넘는 가구 ${warn.oversized.size}개`
-              : `겹친 가구 ${warn.conflicts.size}개`}
+              : warn.blockedDoors.size
+                ? `문 앞을 막는 가구 ${warn.blockedDoors.size}개`
+                : warn.blockedWindows.size
+                  ? `창 앞을 가리는 가구 ${warn.blockedWindows.size}개`
+                  : `겹친 가구 ${warn.conflicts.size}개`}
           </span>
           <button class="link" onClick={() => store.relocate()}>
             빈자리로 옮기기

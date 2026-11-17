@@ -175,7 +175,7 @@ test('문장에 명령이 분명하면 모델 선택 대신 명령을 따르고,
 
 test('형식이 틀린 모델 답은 예외로 넘기고, 허용 목록 밖 값은 버린다', () => {
   assert.throws(() => readModel('모르겠어요'));
-  const v = readModel(model({ furniture: 'piano', ui: 'html', color: '보라' }));
+  const v = readModel(model({ furniture: 'trampoline', ui: 'html', color: '보라' }));
   assert.equal(v.furniture, null);
   assert.equal(v.ui, null);
   assert.equal(v.color, null);

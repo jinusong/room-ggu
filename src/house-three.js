@@ -1,3 +1,4 @@
+import { windowModel } from './window-three.js';
 import * as T from 'three';
 import { houseLayout } from './house-geometry.js';
 import { furniture } from './furniture.js';
@@ -73,13 +74,18 @@ export function houseStructure(state, { plankTexture } = {}) {
       w.h,
       w.axis === 'x' ? len : 0.08,
       w.axis === 'x' ? w.at : (w.start + w.end) / 2,
-      w.h / 2,
+      (w.bottom || 0) + w.h / 2,
       w.axis === 'x' ? (w.start + w.end) / 2 : w.at,
       [mat, mat, cap, mat, mat, mat],
     );
     m.userData.roomId = w.roomId;
     m.userData.wall = true;
     m.userData.shared = w.shared;
+  }
+  for (const o of layout.windows || []) {
+    const model = windowModel(o);
+    model.userData.roomId = o.roomId;
+    root.add(model);
   }
   for (const o of layout.openings) {
     const g = new T.Group();

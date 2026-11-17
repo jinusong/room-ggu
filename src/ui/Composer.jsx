@@ -16,6 +16,7 @@ const TOOL_GROUPS = [
   [
     ['room-size', '방 크기', 'ruler'],
     ['room-type', '공간 유형', 'layout-grid'],
+    ['windows', '창문 설정', 'grid-2x2'],
     ['finishes', '벽과 바닥', 'paint-roller'],
     ['spaces', '내 공간', 'layers'],
   ],

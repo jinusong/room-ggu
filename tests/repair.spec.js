@@ -140,7 +140,7 @@ test('화장실 옆에 거실을 붙이고, 한 문장의 방·가구 요청과 
 
   // 3) 겹친 공간이 없으면 없다고 답한다.
   r = await say(page, '거실로 바꿨는데 겹치잖아...');
-  expect(r.text).toBe('겹친 공간도, 겹치거나 벽을 넘은 가구도 없어요.');
+  expect(r.text).toBe('겹침·벽 넘침이나 문·창 앞을 가리는 가구가 없어요.');
 
   // 4) 방을 통째로 돌린다. 가구가 함께 돌고 화장실과 겹치지 않는다.
   const before = (await stored(page)).room;
@@ -330,6 +330,6 @@ test('겹친 채 저장된 공간은 "겹친다"는 말이나 배치 확인의 �
   await frames(page);
   expect(await overlaps(page)).toBe(0);
   await expect(page.locator('.surface').last()).toContainText(
-    '겹친 공간도, 겹치거나 벽을 넘은 가구도 없어요',
+    '겹침·벽 넘침이나 문·창 앞을 가리는 가구가 없어요',
   );
 });

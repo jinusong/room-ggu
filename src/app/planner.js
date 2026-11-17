@@ -144,6 +144,8 @@ function planMeta(t, ctx, item) {
   if (/^(?:방금\s*(?:거|것|건)?\s*)?(?:되돌려|되돌리기|실행\s*취소|취소해)/.test(t))
     return metaPlan('undo', '방금 바꾼 내용을 되돌렸어요.');
   if (/^다시\s*실행/.test(t)) return metaPlan('redo', '되돌린 내용을 다시 적용했어요.');
+  if (/창문|창호/.test(t))
+    return surfacePlan('windows', '벽을 고른 뒤 창 크기와 위치를 입력해 주세요.');
   if (/예시\s*(?:방|공간)/.test(t)) return metaPlan('example', '');
   if (/(?:저장|내보내|불러오|이미지로|png|json|배치\s*파일)/i.test(t) && !numbers)
     return surfacePlan(
@@ -635,7 +637,7 @@ export function objectsOf(t) {
     unlisted = [];
   for (const j of picked) {
     const raw = words[j].replace(/,$/, '');
-    const w = raw.replace(PARTICLE, '') || raw;
+    const w = !unlistedInfo(raw) && detectType(raw) ? raw : raw.replace(PARTICLE, '') || raw;
     const odd = unlistedInfo(w);
     const type = !odd && detectType(w);
     if (odd) unlisted.push(odd);
@@ -715,7 +717,7 @@ function loneName(t) {
     .filter((w) => w && !SKIP_WORD.test(w));
   if (!words.length || words.length > 2 || (words.length === 2 && !MODIFIER(words[0]))) return null;
   const raw = words.at(-1);
-  const w = raw.replace(PARTICLE, '') || raw;
+  const w = !unlistedInfo(raw) && detectType(raw) ? raw : raw.replace(PARTICLE, '') || raw;
   const odd = unlistedInfo(w);
   if (odd) return { ...odd, sure: true };
   if (

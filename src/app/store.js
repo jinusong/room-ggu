@@ -513,7 +513,8 @@ function runAction(action, arg, turn) {
         );
       else if (r.remaining)
         lines.push('옮길 빈자리가 없어요. 가구 크기를 줄이거나 방을 넓혀 주세요.');
-      else if (!sp.overlapped.length) lines.push('겹친 공간도, 겹치거나 벽을 넘은 가구도 없어요.');
+      else if (!sp.overlapped.length)
+        lines.push('겹침·벽 넘침이나 문·창 앞을 가리는 가구가 없어요.');
       turn.text = lines.join(' ');
       if (sp.moved.length)
         turn.receipt.push({ label: '집 배치', to: `${sp.moved.length}개 공간 이동` });
@@ -789,6 +790,17 @@ async function respondToText(text, turn, history, extra = []) {
       {
         reply: error || '초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.',
         surfaces: [{ kind: 'floorplan', target: { type: 'room' } }],
+      },
+      { engine: 'app' },
+    );
+    return;
+  }
+  if (/창문|창호/.test(text)) {
+    finishTurn(
+      turn,
+      {
+        reply: '창문은 아래 도구에서 벽과 치수·위치를 정해 주세요.',
+        surfaces: [{ kind: 'windows', target: roomTarget() }],
       },
       { engine: 'app' },
     );
@@ -1114,6 +1126,8 @@ const TOOL_TEXT = {
   floorplan: '방과 화장실을 2D·3D로 함께 보세요. 공간 위치는 2D에서 끌어 맞출 수 있어요.',
   'room-size': '방 크기를 정해 볼까요? 숫자를 바로 고치거나 “가로 4m 세로 3m”처럼 말해도 돼요.',
   'room-type': '어떤 공간인가요? 유형을 바꾸면 직접 정한 치수는 그대로 두고 나머지만 바꿔요.',
+  windows:
+    '벽을 고르고 창 크기와 위치를 cm로 입력해 주세요. 집 전체와 배치 파일에도 함께 반영해요.',
   finishes: '벽과 바닥을 골라 보세요. 바꾸기 전과 후를 나란히 보여드려요.',
   catalog: '놓고 싶은 가구를 골라 주세요. 고르면 크기 초안이 방 안에 먼저 나타나요.',
   spaces: '공간마다 크기와 가구를 따로 저장해요. 최대 12개까지 만들 수 있어요.',
@@ -1448,29 +1462,49 @@ function commit({ silent = false } = {}) {
   if (!silent) emit();
 }
 
-export function setRoomDim(key, value, { live = false } = {}) {
-  if (!live) snapshot();
-  ops.setRoom(app.state, ops.roomWithDims(app.state.room, { [key]: value }));
-  commit();
+// 실패한 방 크기 변경은 배치와 실행 취소 기록을 건드리지 않는다.
+function editRoom(make, { live = false } = {}) {
+  try {
+    const next = structuredClone(app.state);
+    ops.setRoom(next, make(next.room));
+    if (!live) snapshot();
+    Object.assign(app.state, next);
+    commit();
+  } catch (e) {
+    toast(e.message);
+    return e.message;
+  }
+}
+export function setRoomDim(key, value, opts = {}) {
+  return editRoom((room) => ops.roomWithDims(room, { [key]: value }), opts);
 }
 export function setRoomPreset(index) {
-  snapshot();
-  ops.setRoom(app.state, ops.roomWithPreset(app.state.room, index));
-  commit();
+  return editRoom((room) => ops.roomWithPreset(room, index));
 }
 export function setRoomType(type) {
-  snapshot();
-  ops.setRoom(app.state, ops.roomWithType(app.state.room, type));
-  commit();
+  return editRoom((room) => ops.roomWithType(room, type));
 }
 export function setFinish(key, color) {
-  const before = app.state.room[key];
-  if (before === color) return;
-  snapshot();
-  rememberFinish(app.state.room);
-  ops.setRoom(app.state, ops.roomWithFinish(app.state.room, key, color));
-  commit();
+  if (app.state.room[key] === color) return;
+  const before = app.state.room;
+  const error = editRoom((room) => ops.roomWithFinish(room, key, color));
+  if (!error) rememberFinish(before);
 }
+function editWindow(change) {
+  try {
+    const next = structuredClone(app.state);
+    change(next);
+    snapshot();
+    Object.assign(app.state, next);
+    commit();
+  } catch (e) {
+    toast(e.message);
+    return e.message;
+  }
+}
+export const addWindow = (wall) => editWindow((s) => ops.addWindow(s, wall));
+export const setWindow = (id, patch) => editWindow((s) => ops.setWindow(s, id, patch));
+export const removeWindow = (id) => editWindow((s) => ops.removeWindow(s, id));
 function rememberFinish(room) {
   app.view.lastFinish = {
     roomId: app.state.roomId,

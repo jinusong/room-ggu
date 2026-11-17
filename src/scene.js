@@ -1,3 +1,5 @@
+import { windowOpenings, wallPieces } from './windows.js';
+import { windowModel } from './window-three.js';
 import * as T from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -469,25 +471,7 @@ export class RoomScene {
     });
     // 다른 공간과 맞닿은 벽에는 집 전체와 같은 자리에 연결 문을 비워 둔다(위치는 초안).
     const doors = roomOpenings(spaces(this.state), this.state.floorplan, this.state.roomId);
-    const split = (from, to, wall) => {
-      const gaps = doors
-        .filter((o) => o.wall === wall)
-        .map((o) => {
-          const c = o.vertical ? o.z : o.x;
-          return [Math.max(from, c - o.width / 2), Math.min(to, c + o.width / 2)];
-        })
-        .filter((g) => g[1] - g[0] > 0.05)
-        .sort((a, b) => a[0] - b[0]);
-      const parts = [];
-      let at = from;
-      for (const [g0, g1] of gaps) {
-        if (g0 > at + 0.001) parts.push([at, g0, false]);
-        if (g1 > at + 0.001) parts.push([Math.max(at, g0), g1, true]);
-        at = Math.max(at, g1);
-      }
-      if (to > at + 0.001) parts.push([at, to, false]);
-      return parts;
-    };
+    const windows = windowOpenings(this.state.room);
     const piece = (alongX, start, end, across, y0, y1, thick, mats, shadow = true) => {
       const len = end - start,
         m = new T.Mesh(
@@ -509,28 +493,29 @@ export class RoomScene {
       [false, -d / 2, d / 2, -w / 2 - WALL_T / 2, 'left', true],
       [false, -d / 2, d / 2 + WALL_T, w / 2 + WALL_T / 2, 'right', false],
       [true, -w / 2 - WALL_T, w / 2 + WALL_T, d / 2 + WALL_T / 2, 'front', false],
-    ])
-      for (const [start, end, door] of split(from, to, wall)) {
-        if (!door) {
-          piece(alongX, start, end, across, -0.08, high ? h : 0.08, WALL_T, high ? tall : low);
-          if (high && end - start > 0.02)
-            piece(
-              alongX,
-              Math.max(start, alongX ? -w / 2 : -d / 2),
-              end,
-              across + WALL_T / 2 + 0.006,
-              0,
-              0.07,
-              0.012,
-              base,
-              false,
-            );
-          continue;
-        }
-        // 문턱은 바닥 높이로 남기고, 높은 벽은 문 위쪽만 막는다.
-        piece(alongX, start, end, across, -0.08, 0, WALL_T, low);
-        if (high && h > DOOR_H + 0.05) piece(alongX, start, end, across, DOOR_H, h, WALL_T, tall);
-      }
+    ]) {
+      const cuts = [
+        ...doors
+          .filter((o) => o.wall === wall)
+          .map((o) => ({
+            start: (o.vertical ? o.z : o.x) - o.width / 2,
+            end: (o.vertical ? o.z : o.x) + o.width / 2,
+            bottom: 0,
+            top: DOOR_H,
+          })),
+        ...windows
+          .filter((o) => o.wall === wall)
+          .map((o) => ({
+            start: (o.vertical ? o.z : o.x) - o.width / 2,
+            end: (o.vertical ? o.z : o.x) + o.width / 2,
+            bottom: o.sill,
+            top: o.sill + o.height,
+          })),
+      ];
+      for (const p of wallPieces(from, to, high ? h : 0.08, cuts, -0.08))
+        piece(alongX, p.start, p.end, across, p.bottom, p.top, WALL_T, high ? tall : low);
+    }
+    for (const o of windows) this.room.add(windowModel(o));
     for (const o of doors) {
       const { hinge, along, leaf } = doorSwing(o),
         points = [new T.Vector3(hinge[0] + leaf[0] * o.width, 0.004, hinge[1] + leaf[1] * o.width)];

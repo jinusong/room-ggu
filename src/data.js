@@ -1,3 +1,4 @@
+import { validateWindows, windowOpenings } from './windows.js';
 import { TYPES, ROOM_TYPES, makeRoom } from './catalog.js';
 import { defaultAvatar, validateAvatar } from './avatar.js';
 import { normalizeFloorplan, roomOpenings } from './floorplan.js';
@@ -104,6 +105,7 @@ function validateSpace(v, roomIds) {
   }
   for (const k of ['wallColor', 'floorColor'])
     if (/^#[0-9a-f]{6}$/i.test(v.room[k])) room[k] = v.room[k];
+  room.windows = validateWindows(v.room.windows, room);
   return {
     roomId: id,
     name: typeof v.name === 'string' ? v.name.slice(0, 100) : '불러온 방',
@@ -218,14 +220,29 @@ export function doorZones(s) {
     z: o.z + (!o.vertical ? (o.z > 0 ? -0.45 : 0.45) : 0),
   }));
 }
+// 창 앞 20cm에 놓인 가구 중 창 아래 높이를 넘는 것만 가림으로 표시한다.
+export function windowZones(s, item) {
+  return windowOpenings(s.room)
+    .filter((w) => !item || item.dims[1] / 100 > w.sill + 0.01)
+    .map((w) => ({
+      id: `window-${w.id}`,
+      type: 'cabinet',
+      angle: 0,
+      dims: w.vertical ? [20, 100, w.width * 100] : [w.width * 100, 100, 20],
+      x: w.x + (w.vertical ? (w.x > 0 ? -0.1 : 0.1) : 0),
+      z: w.z + (!w.vertical ? (w.z > 0 ? -0.1 : 0.1) : 0),
+    }));
+}
 export function layoutWarnings(s) {
   const conflicts = new Set(),
     oversized = new Set(),
     blockedDoors = new Set(),
+    blockedWindows = new Set(),
     doors = doorZones(s);
   for (let i = 0; i < s.items.length; i++) {
     const a = s.items[i],
       f = footprint(a);
+    if (windowZones(s, a).some((w) => overlaps(a, w))) blockedWindows.add(a.id);
     if (doors.some((d) => overlaps(a, d))) blockedDoors.add(a.id);
     if (
       Math.abs(a.x) + f.w / 2 > s.room.w / 2 + 0.001 ||
@@ -243,6 +260,7 @@ export function layoutWarnings(s) {
     conflicts,
     oversized,
     blockedDoors,
-    all: new Set([...conflicts, ...oversized, ...blockedDoors]),
+    blockedWindows,
+    all: new Set([...conflicts, ...oversized, ...blockedDoors, ...blockedWindows]),
   };
 }

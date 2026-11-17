@@ -27,8 +27,25 @@ function woodGrain() {
   grain.userData.shared = true;
   return grain;
 }
-const FABRIC = new Set(['sofa', 'armchair', 'bed', 'rug', 'bench', 'chair']);
-const APPLIANCE = new Set(['fridge', 'washer']);
+const FABRIC = new Set([
+  'sofa',
+  'armchair',
+  'bed',
+  'rug',
+  'bench',
+  'chair',
+  'stool',
+  'ottoman',
+  'office_chair',
+]);
+const APPLIANCE = new Set([
+  'fridge',
+  'washer',
+  'dryer',
+  'dishwasher',
+  'standing_ac',
+  'air_purifier',
+]);
 // 화장실 설비. 도기처럼 매끈하게 그린다.
 const CERAMIC = new Set(['toilet', 'basin', 'shower']);
 
@@ -166,6 +183,7 @@ export function furniture(item, { ghost = false } = {}) {
       box(0, h * 0.86, d * 0.2, w * 0.99, h * 0.07, d * 0.55);
       box(0, h / 2, -d / 2 + 0.025, w, h, 0.05, wood);
       break;
+    case 'office_chair':
     case 'chair':
       legs(h * 0.5, 0.03, dark);
       box(0, h * 0.52, 0, w, h * 0.06, d);
@@ -269,6 +287,7 @@ export function furniture(item, { ghost = false } = {}) {
       box(-w * 0.38, h * 0.62, d / 2 + 0.03, 0.02, h * 0.18, 0.02, dark, false);
       box(-w * 0.38, h * 0.3, d / 2 + 0.03, 0.02, h * 0.14, 0.02, dark, false);
       break;
+    case 'dryer':
     case 'washer': {
       box(0, h / 2, 0, w, h, d, linen);
       box(0, h * 0.9, d / 2 + 0.006, w * 0.96, h * 0.13, 0.012, main);
@@ -281,6 +300,124 @@ export function furniture(item, { ghost = false } = {}) {
       g.add(window);
       break;
     }
+    case 'stool':
+      legs(h * 0.88, 0.035, wood);
+      box(0, h * 0.94, 0, w, h * 0.12, d);
+      break;
+    case 'ottoman':
+      box(0, h * 0.42, 0, w * 0.96, h * 0.84, d * 0.96);
+      box(0, h * 0.9, 0, w, h * 0.2, d);
+      break;
+    case 'vanity': {
+      const top = h * 0.52;
+      box(0, top, 0, w, 0.05, d, wood);
+      legs(top - 0.02, 0.04);
+      box(0, h * 0.79, -d * 0.4, w * 0.65, h * 0.42, 0.035, dark);
+      box(
+        0,
+        h * 0.79,
+        -d * 0.4 + 0.02,
+        w * 0.58,
+        h * 0.36,
+        0.01,
+        finish('#b6ced2', 0.1, { metalness: 0.55 }),
+        false,
+      );
+      break;
+    }
+    case 'hanger':
+      for (const x of [-w * 0.46, w * 0.46]) {
+        box(x, h / 2, 0, 0.035, h, 0.035, dark, false);
+        box(x, 0.025, 0, 0.06, 0.05, d, dark, false);
+      }
+      box(0, h - 0.02, 0, w, 0.035, 0.035, dark, false);
+      for (const x of [-w * 0.25, 0, w * 0.25])
+        box(x, h * 0.61, 0, w * 0.19, h * 0.55, 0.035, main, false);
+      break;
+    case 'mirror':
+      box(0, h / 2, -d * 0.25, w, h, 0.045, wood);
+      box(
+        0,
+        h / 2,
+        -d * 0.25 + 0.03,
+        w * 0.88,
+        h * 0.94,
+        0.015,
+        finish('#b6ced2', 0.1, { metalness: 0.6 }),
+        false,
+      );
+      box(0, 0.025, 0, w * 0.8, 0.05, d, dark, false);
+      break;
+    case 'kitchen_counter':
+    case 'island':
+      box(0, h * 0.46, 0, w * 0.94, h * 0.92, d * 0.94);
+      box(0, h - 0.025, 0, w, 0.05, d, linen);
+      for (const x of [-w * 0.25, w * 0.25])
+        box(x, h * 0.7, d / 2, w * 0.14, 0.02, 0.025, dark, false);
+      if (item.type === 'kitchen_counter') {
+        box(w * 0.2, h + 0.003, 0, w * 0.34, 0.012, d * 0.65, dark, false);
+        box(-w * 0.25, h + 0.003, 0, w * 0.3, 0.012, d * 0.5, finish('#aabbbd', 0.25), false);
+      }
+      break;
+    case 'dishwasher':
+      box(0, h / 2, 0, w, h, d, linen);
+      box(0, h * 0.88, d / 2 + 0.008, w * 0.94, h * 0.15, 0.016, dark, false);
+      box(0, h * 0.74, d / 2 + 0.025, w * 0.65, 0.025, 0.035, main, false);
+      break;
+    case 'standing_ac':
+    case 'air_purifier':
+      box(0, h / 2, 0, w, h, d, linen);
+      for (let i = 0; i < 6; i++)
+        box(0, h * (0.6 + i * 0.05), d / 2 + 0.005, w * 0.72, 0.012, 0.012, dark, false);
+      box(0, h * 0.94, d / 2 + 0.008, w * 0.2, 0.025, 0.01, main, false);
+      break;
+    case 'fan': {
+      cylinder(w * 0.4, w * 0.44, 0.05, 0.025, main);
+      box(0, h * 0.34, 0, 0.035, h * 0.65, 0.035, dark, false);
+      const head = new T.Mesh(new T.CylinderGeometry(w * 0.48, w * 0.48, d * 0.24, 32), linen);
+      head.rotation.x = Math.PI / 2;
+      head.position.set(0, h - w * 0.48, 0);
+      g.add(head);
+      for (let i = 0; i < 3; i++) {
+        const blade = box(0, h - w * 0.48, d * 0.14, w * 0.72, 0.035, 0.015, dark, false);
+        blade.rotation.z = (i * Math.PI) / 3;
+      }
+      break;
+    }
+    case 'piano':
+      box(0, h * 0.68, 0, w, h * 0.25, d);
+      box(0, h * 0.83, d * 0.12, w * 0.95, 0.025, d * 0.65, linen, false);
+      for (let i = 0; i < 18; i++)
+        box(-w * 0.43 + i * w * 0.05, h * 0.85, d * 0.02, w * 0.018, 0.025, d * 0.3, dark, false);
+      for (const x of [-w * 0.43, w * 0.43])
+        box(x, h * 0.3, 0, 0.06, h * 0.6, d * 0.85, wood, false);
+      box(0, h * 0.92, -d * 0.38, w * 0.6, h * 0.16, 0.025, dark, false);
+      break;
+    case 'treadmill':
+      box(0, 0.06, 0, w, 0.12, d, dark);
+      box(0, 0.125, 0, w * 0.8, 0.012, d * 0.84, main, false);
+      if (h > 0.3) {
+        for (const x of [-w * 0.42, w * 0.42])
+          box(x, h * 0.48, -d * 0.32, 0.045, h * 0.95, 0.045, dark, false);
+        box(0, h * 0.95, -d * 0.32, w, 0.08, d * 0.15, main, false);
+      }
+      break;
+    case 'cat_tower':
+      box(0, 0.025, 0, w, 0.05, d, wood);
+      for (const [x, z] of [
+        [-w * 0.25, -d * 0.2],
+        [w * 0.25, d * 0.2],
+      ])
+        cylinder(0.045, 0.045, h * 0.94, h * 0.47, linen, x, z);
+      for (let i = 1; i <= 3; i++)
+        box((i % 2 ? 1 : -1) * w * 0.12, (h * i) / 3 - 0.025, 0, w * 0.7, 0.05, d * 0.8, main);
+      break;
+    case 'drying_rack':
+      for (const x of [-w * 0.45, w * 0.45])
+        for (const z of [-d * 0.42, d * 0.42]) box(x, h / 2, z, 0.025, h, 0.025, dark, false);
+      for (let i = 0; i < 7; i++)
+        box(0, h - 0.015, -d * 0.44 + (i * d * 0.88) / 6, w, 0.025, 0.025, main, false);
+      break;
     case 'shelf':
       for (const x of [-1, 1]) box(x * (w / 2 - 0.015), h / 2, 0, 0.03, h, d, wood);
       box(0, h / 2, -d / 2 + 0.008, w, h, 0.016, main, false);

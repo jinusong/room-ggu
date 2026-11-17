@@ -1,3 +1,4 @@
+import { windowOpenings } from './windows.js';
 import { TYPES, footprint, spaces } from './data.js';
 import { tapeCanvas, drawTags, PAPER } from './tape.js';
 import { avatarLayout, avatarHit, avatarReach, avatarApron, LIMBS } from './avatar.js';
@@ -62,6 +63,26 @@ export function doorHit(o, p, scale, pixels = 14) {
 }
 
 // 연결 문: 벽을 비우고 문짝과 열리는 호를 그린다. 자동으로 놓인 문은 점선, 직접 옮기거나 폭을 정한 문은 실선이다.
+export function drawWindow(c, o, ox, oy, scale, thickness) {
+  c.save();
+  c.translate(ox + o.x * scale, oy + o.z * scale);
+  if (o.vertical) c.rotate(Math.PI / 2);
+  const width = o.width * scale,
+    depth = Math.max(5, thickness);
+  c.fillStyle = PAPER;
+  c.fillRect(-width / 2, -depth / 2 - 1, width, depth + 2);
+  c.strokeStyle = '#536e75';
+  c.lineWidth = 1.5;
+  c.strokeRect(-width / 2, -depth / 2, width, depth);
+  c.beginPath();
+  c.moveTo(-width / 2, 0);
+  c.lineTo(width / 2, 0);
+  c.moveTo(0, -depth / 2);
+  c.lineTo(0, depth / 2);
+  c.stroke();
+  c.restore();
+}
+
 export function drawDoor(c, o, ox, oy, s, wall, selected = false) {
   const { hinge, along, leaf } = doorSwing(o),
     w = o.width * s,
@@ -453,6 +474,7 @@ export class PlanScene {
     const doors = roomOpenings(spaces(this.state), this.state.floorplan, this.state.roomId);
     for (const o of doors)
       drawDoor(c, o, this.ox, this.oy, s, wt * 2 + 2, !!this.doorSelected?.includes(o.roomId));
+    for (const o of windowOpenings(room)) drawWindow(c, o, this.ox, this.oy, s, wt * 2);
     const items = [...this.state.items].sort((a, b) => (b.type === 'rug') - (a.type === 'rug'));
     for (const a of items)
       this.item(c, a, { warn: this.warnings.has(a.id), selected: a.id === this.selected });
@@ -507,6 +529,7 @@ export class PlanScene {
         c.moveTo(fw * 0.38, -fd * 0.28);
         c.lineTo(fw * 0.38, fd / 2 - 3);
         break;
+      case 'office_chair':
       case 'chair':
         c.moveTo(-fw / 2 + 2, -fd * 0.34);
         c.lineTo(fw / 2 - 2, -fd * 0.34);
@@ -516,11 +539,14 @@ export class PlanScene {
         c.rect(-fw * 0.44, -fd * 0.44, fw * 0.88, fd * 0.88);
         break;
       case 'desk':
+      case 'island':
+      case 'kitchen_counter':
       case 'dining':
       case 'coffee':
       case 'bench':
         c.rect(-fw / 2 + 4, -fd / 2 + 4, fw - 8, fd - 8);
         break;
+      case 'dryer':
       case 'washer':
         c.arc(0, 0, Math.min(fw, fd) * 0.3, 0, Math.PI * 2);
         break;

@@ -1,3 +1,4 @@
+import { windowOpenings, wallPieces } from './windows.js';
 import { spaces } from './data.js';
 import {
   normalizeFloorplan,
@@ -81,9 +82,33 @@ export function houseLayout(state) {
       walls.push({ axis, at, start, end, h, roomId: owners[0].roomId, shared: owners.length > 1 });
     }
   }
+  const windows = rooms.flatMap((r) =>
+    windowOpenings(r.room, r.position).map((o) => ({ ...o, roomId: r.roomId })),
+  );
+  const windowWalls = walls.flatMap((w) => {
+    const cuts = windows
+      .filter(
+        (o) =>
+          (o.vertical ? 'x' : 'z') === w.axis && Math.abs((o.vertical ? o.x : o.z) - w.at) < 0.02,
+      )
+      .map((o) => ({
+        start: (o.vertical ? o.z : o.x) - o.width / 2,
+        end: (o.vertical ? o.z : o.x) + o.width / 2,
+        bottom: o.sill,
+        top: o.sill + o.height,
+      }));
+    return wallPieces(w.start, w.end, w.h, cuts).map((p) => ({
+      ...w,
+      start: p.start,
+      end: p.end,
+      h: p.top - p.bottom,
+      bottom: p.bottom,
+    }));
+  });
   return {
     rooms,
-    walls,
+    windows,
+    walls: windowWalls,
     openings,
     w: maxX - minX,
     d: maxZ - minZ,

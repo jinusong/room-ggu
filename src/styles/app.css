@@ -1376,7 +1376,9 @@ button[aria-disabled='true'] {
 .fit-fits {
   color: var(--ok);
 }
-.fit-overlap {
+.fit-overlap,
+.fit-window,
+.fit-door {
   color: var(--amber);
 }
 .fit-oversize {
@@ -3407,4 +3409,90 @@ button.avatar-tag {
 .ask-model-choice select:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 3px;
+}
+
+/* 창문은 대화 속에서 치수와 위치를 정한다. */
+.window-editor {
+  border-top: 1px solid var(--line, #dedbd3);
+  padding: 16px 0;
+  display: grid;
+  gap: 10px;
+}
+.window-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.window-head .icon-btn {
+  margin-left: auto;
+}
+.window-wall,
+.window-add label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.window-wall select,
+.window-add select {
+  font: inherit;
+  color: inherit;
+  padding: 10px;
+  border: 1px solid #b8b4ab;
+  border-radius: 8px;
+  background: #fbfaf7;
+  min-height: 44px;
+  max-width: 100%;
+}
+.window-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.window-fields label {
+  font-size: 12px;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.window-fields label > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.window-fields input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  padding: 10px;
+  color: #1f1d19;
+  border: 1px solid #b8b4ab;
+  border-radius: 8px;
+  background: #fff;
+}
+.window-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  padding-top: 12px;
+}
+.window-add label {
+  flex: 1;
+  min-width: 150px;
+}
+.window-error {
+  color: #b03d29;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.window-error:empty {
+  display: none;
+}
+.window-editor .btn {
+  min-height: 44px;
+  justify-self: start;
 }

@@ -56,6 +56,7 @@ export const SURFACE_KINDS = {
   floorplan: { scope: 'app', title: '집 전체', icon: 'house' },
   'room-size': { scope: 'room', model: 'dimensions', title: '방 크기', icon: 'ruler' },
   'room-type': { scope: 'room', model: 'types', title: '공간 유형', icon: 'layout-grid' },
+  windows: { scope: 'room', title: '창문 설정', icon: 'grid-2x2' },
   finishes: { scope: 'room', model: 'finishes', title: '벽과 바닥', icon: 'paint-roller' },
   'furniture-size': { scope: 'furniture', model: 'sizes', title: '규격 비교', icon: 'columns-3' },
   'furniture-dims': {

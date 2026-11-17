@@ -1,5 +1,7 @@
+import { catalogMatches } from '../estimator.js';
+import { WINDOW_WALLS, MAX_WINDOWS } from '../windows.js';
 // 대화 안에 나타나는 생성형 UI 컴포넌트. 모델은 이름만 고르고, 값과 동작은 모두 앱 상태에 연결된다.
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'preact/hooks';
 import {
   TYPES,
   ROOM_TYPES,
@@ -459,6 +461,149 @@ function RoomType() {
   );
 }
 
+function WindowEditor({ window: w, index }) {
+  const [values, setValues] = useState(w);
+  const [error, setError] = useState('');
+  useLayoutEffect(() => {
+    setValues(w);
+    setError('');
+  }, [w]);
+  const update = (key, value) => {
+    setValues({ ...values, [key]: value });
+    setError('');
+  };
+  return (
+    <form
+      class="window-editor"
+      data-window={w.id}
+      onSubmit={(e) => {
+        e.preventDefault();
+        const patch = Object.fromEntries(
+          ['offset', 'width', 'height', 'sill'].map((k) => [k, Number(values[k])]),
+        );
+        patch.wall = values.wall;
+        setError(store.setWindow(w.id, patch) || '');
+      }}
+    >
+      <div class="window-head">
+        <strong>창문 {index + 1}</strong>
+        <Tape source="사용자 설정">직접 설정</Tape>
+        <button
+          class="icon-btn"
+          type="button"
+          aria-label={`창문 ${index + 1} 삭제`}
+          onClick={() => store.removeWindow(w.id)}
+        >
+          <Icon name="trash-2" size={16} />
+        </button>
+      </div>
+      <label class="window-wall">
+        벽 방향
+        <select
+          aria-label={`창문 ${index + 1} 벽 방향`}
+          value={values.wall}
+          onChange={(e) => update('wall', e.currentTarget.value)}
+        >
+          {Object.entries(WINDOW_WALLS).map(([key, label]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div class="window-fields">
+        {[
+          ['width', '폭', 30],
+          ['height', '높이', 30],
+          ['offset', '벽 끝에서', 5],
+          ['sill', '바닥에서', 10],
+        ].map(([key, label, min]) => (
+          <label key={key}>
+            {label}
+            <span>
+              <input
+                aria-label={`창문 ${index + 1} ${label}`}
+                type="number"
+                min={min}
+                max={1500}
+                step="1"
+                required
+                value={
+                  values[key] === '' ? '' : Math.round(Number(values[key]) * 100 * 1000) / 1000
+                }
+                onInput={(e) =>
+                  update(
+                    key,
+                    e.currentTarget.value === '' ? '' : Number(e.currentTarget.value) / 100,
+                  )
+                }
+              />
+              <small>cm</small>
+            </span>
+          </label>
+        ))}
+      </div>
+      <p class="surface-hint">벽 끝은 정면 벽의 왼쪽 끝, 옆벽의 위쪽 끝이에요.</p>
+      <div class="window-error" role="alert">
+        {error}
+      </div>
+      <button class="btn" type="submit">
+        창문 변경 적용
+      </button>
+    </form>
+  );
+}
+function Windows() {
+  const windows = app.state.room.windows || [];
+  const [wall, setWall] = useState('back');
+  const [error, setError] = useState('');
+  return (
+    <>
+      <Head icon="grid-2x2" title="창문 설정" meta={`${windows.length} / ${MAX_WINDOWS}`} />
+      {!windows.length && (
+        <p class="surface-empty">설정한 창문이 없어요. 벽을 고르고 첫 창문을 추가해 보세요.</p>
+      )}
+      {windows.map((w, i) => (
+        <WindowEditor key={w.id} window={w} index={i} />
+      ))}
+      <div class="window-add">
+        <label>
+          추가할 벽
+          <select
+            aria-label="새 창문 벽 방향"
+            value={wall}
+            onChange={(e) => {
+              setWall(e.currentTarget.value);
+              setError('');
+            }}
+          >
+            {Object.entries(WINDOW_WALLS).map(([k, l]) => (
+              <option key={k} value={k}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          class="btn primary"
+          disabled={windows.length >= MAX_WINDOWS}
+          onClick={() => setError(store.addWindow(wall) || '')}
+        >
+          <Icon name="plus" size={16} />
+          창문 추가
+        </button>
+      </div>
+      <div class="window-error" role="alert">
+        {error}
+      </div>
+      <p class="surface-hint">
+        2D·3D와 배치 파일에 저장해요. 앞쪽·오른쪽 벽은 낮춰 보여도 창은 실제 높이에 남아요. 자동
+        문은 창문을 피해 옮겨질 수 있어요. 햇빛·채광은 계산하지 않아요.
+      </p>
+    </>
+  );
+}
+
 function Finishes() {
   const r = app.state.room;
   const [hover, setHover] = useState(null);
@@ -525,6 +670,12 @@ function Finishes() {
       </div>
       {row('wallColor', '벽', WALL_COLORS, wallName)}
       {row('floorColor', '바닥', FLOOR_COLORS, floorName)}
+      <footer class="surface-foot">
+        <span class="foot-note">창문도 벽에 맞춰 설정해요</span>
+        <button class="btn" onClick={() => store.openTool('windows')}>
+          창문 설정
+        </button>
+      </footer>
     </>
   );
 }
@@ -778,7 +929,7 @@ function Catalog() {
   const [cat, setCat] = useState('all');
   const thumbs = useThumbnails();
   const list = Object.entries(TYPES).filter(
-    ([, t]) => (cat === 'all' || t.category === cat) && t.name.includes(q.trim()),
+    ([k, t]) => (cat === 'all' || t.category === cat) && catalogMatches(k, q),
   );
   const total = Object.values(TYPES).reduce((n, t) => n + t.presets.length, 0);
   return (
@@ -792,7 +943,7 @@ function Catalog() {
         <Icon name="search" size={16} />
         <input
           aria-label="가구 검색"
-          placeholder="소파, 식탁, 책장"
+          placeholder="가구 이름·별칭·규격으로 검색"
           value={q}
           onInput={(e) => setQ(e.currentTarget.value)}
         />
@@ -809,6 +960,9 @@ function Catalog() {
           </button>
         ))}
       </div>
+      <p class="surface-hint" role="status">
+        {list.length}종 표시 · 바닥에 놓는 가구와 가전이에요
+      </p>
       {list.length ? (
         <div class="catalog-grid">
           {list.map(([k, t]) => (
@@ -826,7 +980,18 @@ function Catalog() {
           ))}
         </div>
       ) : (
-        <p class="surface-empty">찾는 가구가 없어요. 다른 이름으로 찾아보세요.</p>
+        <div class="surface-empty">
+          <p>“{q || CATEGORIES[cat]}”에 맞는 가구가 없어요.</p>
+          <button
+            class="btn"
+            onClick={() => {
+              setQ('');
+              setCat('all');
+            }}
+          >
+            검색·분류 초기화
+          </button>
+        </div>
       )}
     </>
   );
@@ -886,7 +1051,9 @@ function Impact() {
                       ? '방보다 크거나 벽을 넘어요'
                       : warn.blockedDoors.has(a.id)
                         ? '문 앞 통로를 막고 있어요'
-                        : '다른 가구와 겹쳐요'}
+                        : warn.blockedWindows.has(a.id)
+                          ? '창 앞 20cm를 가리고 있어요'
+                          : '다른 가구와 겹쳐요'}
                   </small>
                 </span>
                 <Icon name="chevron-right" size={16} />
@@ -898,7 +1065,7 @@ function Impact() {
         !rooms.length && (
           <p class="surface-ok">
             <Icon name="check" size={16} />
-            겹친 공간도, 겹치거나 벽을 넘은 가구도 없어요.
+            겹침·벽 넘침이나 문·창 앞을 가리는 가구가 없어요.
           </p>
         )
       )}
@@ -1441,6 +1608,7 @@ const BODIES = {
   floorplan: Floorplan,
   'room-size': RoomSize,
   'room-type': RoomType,
+  windows: Windows,
   finishes: Finishes,
   'furniture-size': FurnitureSize,
   'furniture-dims': FurnitureDims,
@@ -1485,6 +1653,8 @@ export function surfaceSummary(spec) {
     }
     case 'spaces':
       return `${spaces(s).length}개`;
+    case 'windows':
+      return `${s.room.windows?.length || 0}개`;
     case 'items':
       return `${s.items.length}개`;
     default:

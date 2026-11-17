@@ -1,7 +1,25 @@
 import { UI_SURFACES } from './ui-schema.js';
 import { TYPES, makeItem, DEFAULT_SOURCE } from './data.js';
 import { josa } from './app/text.js';
-const aliases = {
+export const aliases = {
+  office_chair: /사무용\s*의자|사무\s*의자|컴퓨터\s*의자|오피스\s*체어|office\s*chair/i,
+  stool: /스툴|바\s*의자|stool/i,
+  ottoman: /오토만|풋스툴|발받침|ottoman/i,
+  vanity: /화장대|vanity/i,
+  hanger: /행거|옷걸이|옷\s*걸이|clothes\s*rack/i,
+  mirror: /(?:전신\s*)?거울|mirror/i,
+  kitchen_counter: /주방\s*조리대|조리대|싱크대|kitchen\s*counter/i,
+  island: /아일랜드(?:\s*(?:식탁|테이블))?|island/i,
+  dishwasher: /식기\s*세척기|식세기|dishwasher/i,
+  dryer: /(?<!빨래\s)건조기|dryer/i,
+  air_purifier: /공기\s*청정기|air\s*purifier/i,
+  fan: /선풍기|서큘레이터|\bfan\b/i,
+  standing_ac: /(?:스탠드\s*)?에어컨|air\s*conditioner/i,
+  piano: /(?:디지털\s*)?피아노|piano/i,
+  treadmill: /러닝\s*머신|런닝\s*머신|워킹패드|트레드밀|treadmill/i,
+  cat_tower: /캣\s*타워|cat\s*tower/i,
+  drying_rack: /빨래\s*건조대|건조대|drying\s*rack/i,
+
   armchair: /라운지체어|암체어|1인용\s*안락|armchair/i,
   coffee: /소파\s*테이블|커피\s*테이블|coffee\s*table/i,
   side: /협탁|사이드\s*테이블|nightstand|side\s*table/i,
@@ -65,7 +83,7 @@ export function furnitureMentions(t) {
   return found.sort((a, b) => a.index - b.index);
 }
 // 목록에 없다고 알려진 물건. 목록에 없는 물건은 이 표에 없어도 없다고 답한다(planner.js의 unlistedPlan).
-// 이 표는 이름을 바로잡고 성질을 더할 때만 쓴다: "안마의자"·"스탠드 에어컨"을 의자·조명으로 읽지 않고,
+// 이 표는 이름을 바로잡고 성질을 더할 때만 쓴다: "안마의자"를 의자로 읽지 않고,
 // on은 보통 다른 가구 위에 두는 물건, alt는 대신 권할 목록의 가구다.
 const UNLISTED = [
   ['컴퓨터', /컴퓨터|데스크\s*톱|데스크\s*탑|본체|\bpc\b/i, { on: true, alt: ['desk'] }],
@@ -77,24 +95,12 @@ const UNLISTED = [
   ['스피커', /스피커|speaker/i, { on: true, alt: ['shelf'] }],
   ['전자레인지', /전자\s*레인지|microwave/i, { on: true, alt: ['cabinet'] }],
   ['안마의자', /안마\s*의자|마사지\s*체어/, { alt: ['armchair'] }],
-  ['에어컨', /(?:스탠드\s*)?에어컨/, { alt: [] }],
-  ['공기청정기', /공기\s*청정기/, { alt: [] }],
-  ['선풍기', /선풍기|서큘레이터/, { alt: [] }],
   ['가습기', /가습기/, { alt: [] }],
-  ['건조기', /건조기|dryer/i, { alt: ['washer'] }],
-  ['빨래 건조대', /빨래\s*건조대|건조대/, { alt: [] }],
-  ['식기세척기', /식기\s*세척기|식세기/, { alt: ['cabinet'] }],
   ['정수기', /정수기/, { alt: [] }],
-  ['피아노', /피아노|piano/i, { alt: [] }],
   ['자전거', /자전거|bicycle/i, { alt: [] }],
-  ['러닝머신', /러닝\s*머신|트레드밀|treadmill/i, { alt: [] }],
-  ['화장대', /화장대/, { alt: ['dresser'] }],
-  ['행거', /행거|옷걸이/, { alt: ['wardrobe'] }],
-  ['거울', /거울|mirror/i, { alt: [] }],
   ['커튼', /커튼|블라인드/, { alt: [] }],
   ['액자', /액자|포스터/, { alt: [] }],
   ['어항', /어항|수족관/, { alt: ['cabinet'] }],
-  ['캣타워', /캣\s*타워/, { alt: [] }],
 ];
 // 목적어 하나가 목록에 없는 물건으로 알려진 이름인지 본다. 아니면 null.
 // 이름이 낱말 끝까지 닿을 때만 본다: "컴퓨터책상"은 책상, "안마의자"는 안마의자다.
@@ -366,4 +372,16 @@ export function applyModelResult(raw, previous, options = {}) {
     reply: v.reply.slice(0, 700),
     ui: UI_SURFACES.furniture.includes(v.ui) ? v.ui : null,
   };
+}
+
+// 카탈로그와 상담이 같은 별칭을 쓴다. 공백·영문 대소문자도 맞춰 검색한다.
+export function catalogMatches(type, query) {
+  const q = String(query).trim();
+  if (!q) return true;
+  const normalize = (s) => s.normalize('NFKC').toLowerCase().replace(/\s/g, '');
+  return (
+    normalize(TYPES[type].name).includes(normalize(q)) ||
+    aliases[type]?.test(q) ||
+    TYPES[type].presets.some((p) => normalize(p.label).includes(normalize(q)))
+  );
 }
