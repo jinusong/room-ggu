@@ -637,7 +637,7 @@ export function objectsOf(t) {
     const raw = words[j].replace(/,$/, '');
     const w = raw.replace(PARTICLE, '') || raw;
     const odd = unlistedInfo(w);
-    const type = !odd && detectType(w);
+    const type = !odd && (detectType(w) || spannedType(words[j - 1], w));
     if (odd) unlisted.push(odd);
     else if (type) known.push(type);
     else if (!NOT_THING.test(w) && !mentionsRoom(w) && /[가-힣a-z]/i.test(w))
@@ -651,6 +651,15 @@ export function objectsOf(t) {
     if (type && (PLACE_TAIL.test(words[j]) || PLACE_WORD.test(words[j + 1] || ''))) place = type;
   }
   return { known, unlisted, place };
+}
+
+// “화분 받침”, “강아지 방석”처럼 띄어 쓴 두 낱말에 걸친 가구 이름. 앞 낱말에서 끝나는 이름(“책상에 컴퓨터”)은 아니다.
+function spannedType(before, w) {
+  if (!before || AND_TAIL.test(before)) return null;
+  const head = before.replace(PARTICLE, '') || before;
+  return furnitureMentions(`${head} ${w}`).find(
+    (m) => m.index < head.length && m.end > head.length + 1,
+  )?.type;
 }
 
 // 목록에 없는 물건만 말했으면 가구를 만들거나 바꾸지 않고 없다고 답한다.

@@ -30,6 +30,27 @@ test('주방·반려동물·식물·운동 가구를 포함한 93종 가구의 2
       disposeGroup(mesh);
     }
 });
+test('모든 가구의 이름은 그 가구로 읽히고, 긴 이름은 짧은 이름의 가구로 읽히지 않는다', () => {
+  for (const [type, t] of Object.entries(TYPES)) assert.equal(detectType(t.name), type, t.name);
+  for (const [text, type] of [
+    ['김치냉장고', 'kimchi_fridge'],
+    ['냉장고', 'fridge'],
+    ['바 스툴', 'bar_stool'],
+    ['의자', 'chair'],
+    ['아기침대', 'crib'],
+    ['강아지 침대', 'pet_bed'],
+    ['고양이 화장실', 'litter_box'],
+    ['스탠드 에어컨', 'aircon'],
+    ['스탠드', 'lamp'],
+    ['몬스테라', 'leafy_plant'],
+    ['화분 받침', 'plant_stand'],
+    ['서랍장', 'dresser'],
+    ['책상 서랍', 'drawer_unit'],
+    ['실내 자전거', 'exercise_bike'],
+    ['자전거', 'bicycle'],
+  ])
+    assert.equal(detectType(text), type, text);
+});
 test('공간 전환·저장·복원 시 방별 치수와 가구를 보존한다', () => {
   const s = freshState(),
     first = s.roomId;

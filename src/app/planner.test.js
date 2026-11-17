@@ -180,13 +180,20 @@ test('목록에 없는 물건은 새 가구를 만들거나 고른 가구를 바
   // 고른 가구를 지우거나 놓지 않는다.
   assert.equal(planTurn('모니터 빼줘', { state: s, target: onDesk }).action, undefined);
   assert.equal(planTurn('이거 빼줘', { state: s, target: onDesk }).action, 'delete');
-  // 목록의 이름을 품은 말을 그 가구로 읽지 않는다.
-  assert.deepEqual(planTurn('안마의자 하나 놓고 싶어', { state: s, target: room }).unlisted, [
-    '안마의자',
+  // 목록에 없는 물건은 비슷한 이름의 가구로 읽지 않는다.
+  assert.deepEqual(planTurn('전자레인지 하나 놓고 싶어', { state: s, target: room }).unlisted, [
+    '전자레인지',
   ]);
-  assert.deepEqual(planTurn('스탠드 에어컨 놓아줘', { state: s, target: room }).unlisted, [
-    '에어컨',
-  ]);
+  assert.deepEqual(planTurn('상부장 달아줘', { state: s, target: room }).unlisted, ['상부장']);
+  // 목록의 이름을 품은 긴 이름은 긴 이름의 가구다.
+  assert.equal(
+    planTurn('안마의자 하나 놓고 싶어', { state: s, target: room }).changes.draft.type,
+    'massage_chair',
+  );
+  assert.equal(
+    planTurn('스탠드 에어컨 놓아줘', { state: s, target: room }).changes.draft.type,
+    'aircon',
+  );
 });
 test('목록의 가구는 그대로 처리하고 함께 말한 목록에 없는 물건만 뺐다고 알린다', () => {
   const s = freshState();
@@ -205,12 +212,31 @@ test('목록의 가구는 그대로 처리하고 함께 말한 목록에 없는 
     undefined,
   );
 });
+test('새 가구는 띄어 쓴 이름이나 공간 이름이 들어간 이름으로 말해도 그 가구 초안을 만든다', () => {
+  const s = freshState();
+  for (const [text, type] of [
+    ['고양이 화장실 놓아줘', 'litter_box'],
+    ['강아지 방석 하나 놓아줘', 'pet_bed'],
+    ['화분 받침 놓아줘', 'plant_stand'],
+    ['책상 서랍 추가해줘', 'drawer_unit'],
+    ['싱크대 넣어줘', 'sink'],
+    ['요가매트 깔아줘', 'yoga_mat'],
+  ])
+    assert.equal(planTurn(text, { state: s, target: room }).changes?.draft?.type, type, text);
+  assert.equal(
+    planTurn('화장실 하나 추가해줘', { state: s, target: room }).changes.addSpace,
+    'bathroom',
+  );
+  assert.deepEqual(planTurn('책상에 컴퓨터 추가해줘', { state: s, target: room }).unlisted, [
+    '컴퓨터',
+  ]);
+});
 test('이름 하나만 말해도 목록에 없는 물건이면 없다고 답하고 뜻이 있는 낱말은 그대로 처리한다', () => {
   const s = exampleState();
   const desk = s.items.find((a) => a.type === 'desk');
   const bed = s.items.find((a) => a.type === 'bed');
   const onDesk = { type: 'item', id: desk.id };
-  for (const t of ['트램펄린', '큰 트램펄린', '안마의자'])
+  for (const t of ['트램펄린', '큰 트램펄린', '정수기'])
     assert.ok(planTurn(t, { state: s, target: onDesk }).unlisted, t);
   assert.equal(planTurn('트램펄린', { state: s, target: onDesk }).changes, undefined);
   // 규격·색·방 이름·인사·서술어는 목록 밖 물건으로 보지 않는다.
