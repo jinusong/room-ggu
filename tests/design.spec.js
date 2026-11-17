@@ -174,7 +174,8 @@ test('모델 선택은 첫 화면에서 열고 네 후보의 크기와 실행 �
   expect((await state(page)).items).toEqual(itemsBefore);
   expect(await page.evaluate(() => localStorage.getItem('room-ggu-model-choice'))).toBe('qwen');
   await page.reload();
-  await ready(page);
+  // 모델 설정 복원은 앱 초기화 직후 확인한다. 이 검사에는 3D 준비를 기다릴 필요가 없다.
+  await page.waitForFunction(() => !!window.__roomggu?.app);
   expect(await page.evaluate(() => window.__roomggu.app.ai.choice)).toBe('qwen');
 });
 
