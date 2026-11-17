@@ -1,5 +1,6 @@
 import * as T from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { moreFurniture } from './furniture-more.js';
 
 // 치수 [가로, 전체 높이, 깊이] cm를 그대로 반영하는 파라메트릭 형상.
 // 모형처럼 읽히도록 상자마다 얇은 외곽선을 붙이고, 재질은 천·나무·도장·금속으로 나눈다.
@@ -27,8 +28,37 @@ function woodGrain() {
   grain.userData.shared = true;
   return grain;
 }
-const FABRIC = new Set(['sofa', 'armchair', 'bed', 'rug', 'bench', 'chair']);
-const APPLIANCE = new Set(['fridge', 'washer']);
+const FABRIC = new Set([
+  'sofa',
+  'armchair',
+  'bed',
+  'rug',
+  'bench',
+  'chair',
+  'beanbag',
+  'ottoman',
+  'massage_chair',
+  'office_chair',
+  'pet_bed',
+  'bumper_bed',
+  'play_mat',
+  'yoga_mat',
+]);
+const APPLIANCE = new Set([
+  'fridge',
+  'washer',
+  'dryer',
+  'styler',
+  'aircon',
+  'air_purifier',
+  'dehumidifier',
+  'humidifier',
+  'fan',
+  'robot_station',
+  'kimchi_fridge',
+  'dishwasher',
+  'wine_cellar',
+]);
 // 화장실 설비. 도기처럼 매끈하게 그린다.
 const CERAMIC = new Set(['toilet', 'basin', 'shower']);
 
@@ -51,7 +81,7 @@ export function furniture(item, { ghost = false } = {}) {
       ? 0.92
       : APPLIANCE.has(item.type)
         ? 0.35
-        : CERAMIC.has(item.type)
+        : CERAMIC.has(item.type) || item.type === 'bathtub'
           ? 0.28
           : 0.62,
   );
@@ -71,11 +101,11 @@ export function furniture(item, { ghost = false } = {}) {
     mesh.castShadow = !ghost;
     mesh.receiveShadow = !ghost;
     g.add(mesh);
+    // 외곽선은 상자의 자식이라 상자를 기울여도 함께 기운다.
     if (outline && a > 0.03 && b > 0.008 && c > 0.03) {
       const lines = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(a, b, c)), edge);
-      lines.position.copy(mesh.position);
       lines.userData.outline = true;
-      g.add(lines);
+      mesh.add(lines);
     }
     return mesh;
   }
@@ -186,6 +216,7 @@ export function furniture(item, { ghost = false } = {}) {
       break;
     }
     case 'wardrobe':
+    case 'bath_cabinet':
     case 'cabinet':
     case 'side':
     case 'tvstand':
@@ -224,6 +255,8 @@ export function furniture(item, { ghost = false } = {}) {
       legs(h - 0.06, 0.04, wood);
       break;
     case 'rug':
+    case 'play_mat':
+    case 'yoga_mat':
       box(0, h / 2, 0, w, h, d, main, false);
       box(
         0,
@@ -286,6 +319,24 @@ export function furniture(item, { ghost = false } = {}) {
       box(0, h / 2, -d / 2 + 0.008, w, h, 0.016, main, false);
       for (let i = 0; i < 5; i++) box(0, 0.015 + ((h - 0.03) * i) / 4, 0, w - 0.06, 0.03, d, wood);
       break;
+    default:
+      moreFurniture(item.type, {
+        g,
+        item,
+        w,
+        h,
+        d,
+        ghost,
+        finish,
+        main,
+        wood,
+        dark,
+        linen,
+        box,
+        legs,
+        cylinder,
+        ellipsoid,
+      });
   }
   if (ghost)
     g.traverse((o) => {

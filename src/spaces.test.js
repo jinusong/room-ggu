@@ -13,11 +13,11 @@ import {
 } from './data.js';
 import { furniture, disposeGroup } from './furniture.js';
 import { detectType, applyModelResult } from './estimator.js';
-test('욕실 설비 3종을 포함한 23종 가구의 72개 초안이 유효하며 실제 3D 형상이 있다', () => {
-  assert.equal(Object.keys(TYPES).length, 23);
+test('주방·반려동물·식물·운동 가구를 포함한 93종 가구의 282개 초안이 유효하며 실제 3D 형상이 있다', () => {
+  assert.equal(Object.keys(TYPES).length, 93);
   assert.equal(
     Object.values(TYPES).reduce((n, t) => n + t.presets.length, 0),
-    72,
+    282,
   );
   for (const [type, t] of Object.entries(TYPES))
     for (const preset of t.presets) {

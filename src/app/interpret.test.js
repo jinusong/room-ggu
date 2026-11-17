@@ -175,7 +175,7 @@ test('문장에 명령이 분명하면 모델 선택 대신 명령을 따르고,
 
 test('형식이 틀린 모델 답은 예외로 넘기고, 허용 목록 밖 값은 버린다', () => {
   assert.throws(() => readModel('모르겠어요'));
-  const v = readModel(model({ furniture: 'piano', ui: 'html', color: '보라' }));
+  const v = readModel(model({ furniture: 'rocket', ui: 'html', color: '보라' }));
   assert.equal(v.furniture, null);
   assert.equal(v.ui, null);
   assert.equal(v.color, null);
@@ -186,7 +186,7 @@ test('사진 점수는 확률로 바꿔 상위 3개만 남긴다', () => {
     { type: 'sofa', score: 0.2 },
     { type: 'armchair', score: 0.01 },
     { type: 'bed', score: 0.0001 },
-    { type: 'piano', score: 0.9 },
+    { type: 'rocket', score: 0.9 },
     { type: 'rug', score: 0.00001 },
   ]);
   assert.equal(c.length, 3);

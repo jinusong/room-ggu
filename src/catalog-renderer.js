@@ -30,6 +30,11 @@ export function furniturePreviews() {
         decor: '#a3b084',
         appliance: '#bbc2bd',
         bath: '#efede7',
+        kitchen: '#e5ddcc',
+        plant: '#bc8065',
+        pet: '#b8a48b',
+        kids: '#c3b48f',
+        fitness: '#8495a5',
       }[definition.category];
       const mesh = furniture(item);
       scene.add(mesh);
