@@ -313,6 +313,41 @@ export class PlanScene {
     };
   }
   // 고른 문의 막대 자리: 문 가운데.
+  windowPoint(e, wall) {
+    const p = this.point(e);
+    return {
+      u: ['left', 'right'].includes(wall)
+        ? p.z + this.state.room.d / 2
+        : p.x + this.state.room.w / 2,
+      v: null,
+    };
+  }
+  windowFrames() {
+    if (!this.scale || this.state.scope === 'house') return [];
+    const r = this.canvas.getBoundingClientRect();
+    return windowOpenings(this.state.room).map((w) => {
+      const cx = r.left + this.ox + w.x * this.scale,
+        cy = r.top + this.oy + w.z * this.scale,
+        half = (w.width * this.scale) / 2;
+      return {
+        id: w.id,
+        points: w.vertical
+          ? [
+              { x: cx + 10, y: cy - half },
+              { x: cx + 10, y: cy + half },
+              { x: cx - 10, y: cy + half },
+              { x: cx - 10, y: cy - half },
+            ]
+          : [
+              { x: cx - half, y: cy + 10 },
+              { x: cx + half, y: cy + 10 },
+              { x: cx + half, y: cy - 10 },
+              { x: cx - half, y: cy - 10 },
+            ],
+        visible: true,
+      };
+    });
+  }
   doorAnchor(ids) {
     if (!ids || !this.scale || !ids.includes(this.state.roomId)) return null;
     const o = roomOpenings(spaces(this.state), this.state.floorplan, this.state.roomId).find((o) =>

@@ -1,0 +1,311 @@
+{
+  "at": "2026-11-17T11:31:11.523Z",
+  "results": [
+    {
+      "model": "large",
+      "at": "2026-11-17T11:24:57.109Z",
+      "cases": [
+        {
+          "category": "가구",
+          "text": "책상 가로 140cm 깊이 70cm 하나 놓아줘",
+          "ms": 7451,
+          "engine": "gemma",
+          "fixes": [
+            "새 가구나 치수 요청은 초안을 먼저 준비"
+          ],
+          "raw": "{\"intent\":\"action\",\"action\":\"place\",\"furniture\":\"desk\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"unknown\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"책상을 놓았어요. 다음으로 무엇을 하시겠어요?\"}",
+          "passed": true
+        },
+        {
+          "category": "새 가구",
+          "text": "화장대 하나 놓아줘",
+          "ms": 6600,
+          "engine": "gemma",
+          "fixes": [
+            "새 가구나 치수 요청은 초안을 먼저 준비"
+          ],
+          "raw": "{\"intent\":\"furniture\",\"action\":\"place\",\"furniture\":\"vanity\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"unknown\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"화장대를 어디에 놓을까요?\"}",
+          "passed": true
+        },
+        {
+          "category": "방",
+          "text": "거실 가로 5m 세로 4m로 바꿔줘",
+          "ms": 7049,
+          "engine": "gemma",
+          "fixes": [
+            "공간 이동은 문장에 그 공간의 이름이나 유형이 있을 때만 실행"
+          ],
+          "raw": "{\"intent\":\"room\",\"action\":\"switch_space\",\"furniture\":\"none\",\"room_type\":\"living\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"unknown\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"거실 크기로 변경했어요. 이제 어떤 가구를 배치해 볼까요?\"}",
+          "passed": true
+        },
+        {
+          "category": "복수 요청",
+          "text": "소파랑 식탁이랑 책상 놓고 싶어",
+          "ms": 6939,
+          "engine": "gemma",
+          "fixes": [
+            "가구 여럿을 나눠 처리"
+          ],
+          "raw": "{\"intent\":\"action\",\"action\":\"place\",\"furniture\":\"sofa\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"unknown\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"소파를 먼저 놓을까요, 아니면 식탁을 먼저 놓을까요?\"}",
+          "passed": true
+        },
+        {
+          "category": "분위기",
+          "text": "벽은 따뜻한 느낌으로 하고 바닥은 짙은 원목으로",
+          "ms": 7456,
+          "engine": "gemma",
+          "fixes": [],
+          "raw": "{\"intent\":\"room\",\"action\":\"none\",\"furniture\":\"none\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"unknown\",\"color\":\"none\",\"wall\":\"세이지\",\"floor\":\"월넛\",\"ui\":\"finishes\",\"reply\":\"벽은 세이지, 바닥은 짙은 월넛으로 맞췄어요. 가구 색도 맞춰 볼까요?\"}",
+          "passed": false,
+          "criteria": "샌드 벽·월넛 바닥 반영",
+          "error": "분위기 기준 색(샌드·월넛)과 다른 결과"
+        },
+        {
+          "category": "집 전체",
+          "text": "100평 집 전체를 재팬디로 꾸며줘",
+          "ms": 5698,
+          "engine": "gemma",
+          "fixes": [],
+          "raw": "{\n  \"theme\": \"japandi\",\n  \"room1\": \"standard\",\n  \"room2\": \"standard\",\n  \"room3\": \"standard\",\n  \"room4\": \"standard\",\n  \"room5\": \"standard\",\n  \"room6\": \"standard\",\n  \"room7\": \"standard\",\n  \"room8\": \"standard\",\n  \"room9\": \"standard\",\n  \"room10\": \"standard\",\n  \"room11\": \"standard\",\n  \"room12\": \"standard\"\n}",
+          "passed": true
+        }
+      ],
+      "errors": [],
+      "ai": {
+        "status": "ready",
+        "id": "gemma-4-E2B-it-q4f16_1-MLC",
+        "error": ""
+      }
+    },
+    {
+      "model": "light",
+      "at": "2026-11-17T11:25:42.205Z",
+      "cases": [
+        {
+          "category": "가구",
+          "text": "책상 가로 140cm 깊이 70cm 하나 놓아줘",
+          "ms": 2860,
+          "engine": "gemma",
+          "fixes": [
+            "도구는 요청 단어에 맞춰 치수 직접 입력"
+          ],
+          "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"desk\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"책상 가로 140cm 깊이 70cm의 책상을 놓았어요. 공간은 어느 정도인가요?\"}",
+          "passed": true
+        },
+        {
+          "category": "새 가구",
+          "text": "화장대 하나 놓아줘",
+          "ms": 2128,
+          "engine": "gemma",
+          "fixes": [
+            "가구 종류는 문장에 적힌 화장대"
+          ],
+          "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"dresser\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"화장대 하나 놓아주었어요. 화장대 치수는 어떻게 되나요?\"}",
+          "passed": true
+        },
+        {
+          "category": "방",
+          "text": "거실 가로 5m 세로 4m로 바꿔줘",
+          "ms": 2115,
+          "engine": "gemma",
+          "fixes": [
+            "도구는 요청 단어에 맞춰 방 크기"
+          ],
+          "raw": "{\"intent\":\"room\",\"action\":\"none\",\"furniture\":\"sofa\",\"room_type\":\"living\",\"space\":\"none\",\"seats\":2,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"finishes\",\"reply\":\"거실 가로 5m, 세로 4m으로 바꿔 드릴까요?\"}",
+          "passed": true
+        },
+        {
+          "category": "복수 요청",
+          "text": "소파랑 식탁이랑 책상 놓고 싶어",
+          "ms": 2009,
+          "engine": "gemma",
+          "fixes": [
+            "가구 여럿을 나눠 처리"
+          ],
+          "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"sofa\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":2,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"furniture_sizes\",\"reply\":\"소파랑 식탁을 놓을 공간이 있나요?\"}",
+          "passed": true
+        },
+        {
+          "category": "분위기",
+          "text": "벽은 따뜻한 느낌으로 하고 바닥은 짙은 원목으로",
+          "ms": 2351,
+          "engine": "gemma",
+          "fixes": [],
+          "raw": "{\"intent\":\"room\",\"action\":\"none\",\"furniture\":\"none\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":null,\"size\":\"unknown\",\"depth\":\"unknown\",\"height\":\"low\",\"color\":\"none\",\"wall\":\"샌드\",\"floor\":\"월넛\",\"ui\":\"finishes\",\"reply\":\"벽은 따뜻한 샌드, 바닥은 짙은 월넛으로 맞췄어요. 가구 색도 맞춰 볼까요?\"}",
+          "passed": true,
+          "criteria": "샌드 벽·월넛 바닥 반영"
+        },
+        {
+          "category": "집 전체",
+          "text": "100평 집 전체를 재팬디로 꾸며줘",
+          "ms": 1632,
+          "engine": "gemma",
+          "fixes": [],
+          "raw": "{\"theme\":\"minimal\",\"room1\":\"reading\",\"room2\":\"reading\",\"room3\":\"reading\",\"room4\":\"reading\",\"room5\":\"reading\",\"room6\":\"reading\",\"room7\":\"reading\",\"room8\":\"reading\",\"room9\":\"reading\",\"room10\":\"reading\",\"room11\":\"reading\",\"room12\":\"reading\"}",
+          "passed": true
+        }
+      ],
+      "errors": [],
+      "ai": {
+        "status": "ready",
+        "id": "gemma3-1b-it-q4f16_1-MLC",
+        "error": ""
+      }
+    },
+    {
+      "model": "qwen",
+      "at": "2026-11-17T11:25:57.628Z",
+      "cases": [
+        {
+          "category": "가구",
+          "text": "책상 가로 140cm 깊이 70cm 하나 놓아줘",
+          "ms": 2126,
+          "engine": "qwen",
+          "fixes": [
+            "가구 이야기로 처리"
+          ],
+          "raw": "{\n\n\n\"intent\": \"room\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n\n}",
+          "passed": true
+        },
+        {
+          "category": "새 가구",
+          "text": "화장대 하나 놓아줘",
+          "ms": 1715,
+          "engine": "qwen",
+          "fixes": [
+            "가구 이야기로 처리"
+          ],
+          "raw": "{\n\n\n\"intent\": \"room\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"finishes\",\n\"reply\": \"\"\n\n}",
+          "passed": true
+        },
+        {
+          "category": "방",
+          "text": "거실 가로 5m 세로 4m로 바꿔줘",
+          "ms": 1684,
+          "engine": "qwen",
+          "fixes": [],
+          "raw": "{\n\n\n\"intent\": \"room\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n}",
+          "passed": true
+        },
+        {
+          "category": "복수 요청",
+          "text": "소파랑 식탁이랑 책상 놓고 싶어",
+          "ms": 1635,
+          "engine": "qwen",
+          "fixes": [
+            "가구 여럿을 나눠 처리"
+          ],
+          "raw": "{\n\n\n\"intent\": \"room\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"none\",\n\"reply\": \"\"\n\n}",
+          "passed": true
+        },
+        {
+          "category": "분위기",
+          "text": "벽은 따뜻한 느낌으로 하고 바닥은 짙은 원목으로",
+          "ms": 1741,
+          "engine": "qwen",
+          "fixes": [],
+          "raw": "{\n\n\n\"intent\": \"room\",\n\"action\": \"none\",\n\"furniture\": \"none\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": null,\n\"size\": \"unknown\",\n\"depth\": \"unknown\",\n\"height\": \"unknown\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"finishes\",\n\"reply\": \"\"\n\n}",
+          "passed": false,
+          "error": "분위기 기준 색(샌드·월넛)과 다른 결과",
+          "criteria": "샌드 벽·월넛 바닥 반영"
+        },
+        {
+          "category": "집 전체",
+          "text": "100평 집 전체를 재팬디로 꾸며줘",
+          "ms": 1317,
+          "engine": "qwen",
+          "fixes": [],
+          "raw": "{\n\n\n  \"theme\": \"japandi\",\n  \"room1\": \"reading\",\n  \"room2\": \"standard\",\n  \"room3\": \"standard\",\n  \"room4\": \"standard\",\n  \"room5\": \"standard\",\n  \"room6\": \"standard\",\n  \"room7\": \"standard\",\n  \"room8\": \"standard\",\n  \"room9\": \"standard\",\n  \"room10\": \"standard\",\n  \"room11\": \"standard\",\n  \"room12\": \"standard\"\n}",
+          "passed": true
+        }
+      ],
+      "errors": [],
+      "ai": {
+        "status": "ready",
+        "id": "Qwen3-0.6B-q4f16_1-MLC",
+        "error": ""
+      }
+    },
+    {
+      "model": "balanced",
+      "at": "2026-11-17T11:30:42.287Z",
+      "cases": [
+        {
+          "category": "가구",
+          "text": "책상 가로 140cm 깊이 70cm 하나 놓아줘",
+          "ms": 4016,
+          "engine": "qwen",
+          "fixes": [
+            "새 가구나 치수 요청은 초안을 먼저 준비"
+          ],
+          "raw": "{\n\n\n  \"intent\": \"action\",\n  \"action\": \"place\",\n  \"furniture\": \"desk\",\n  \"room_type\": \"none\",\n  \"space\": \"none\",\n  \"seats\": null,\n  \"size\": \"standard\",\n  \"depth\": \"deep\",\n  \"height\": \"tall\",\n  \"color\": \"none\",\n  \"wall\": \"none\",\n  \"floor\": \"none\",\n  \"ui\": \"furniture_dims\",\n  \"reply\": \"책상의 가로 140cm, 깊이 70cm로 잡았어요. 높이도 중요한가요?\"\n}",
+          "passed": true
+        },
+        {
+          "category": "새 가구",
+          "text": "화장대 하나 놓아줘",
+          "ms": 3008,
+          "engine": "qwen",
+          "fixes": [
+            "새 가구나 치수 요청은 초안을 먼저 준비"
+          ],
+          "raw": "{\n\n\n    \"intent\": \"furniture\",\n    \"action\": \"place\",\n    \"furniture\": \"vanity\",\n    \"room_type\": \"none\",\n    \"space\": \"none\",\n    \"seats\": null,\n    \"size\": \"unknown\",\n    \"depth\": \"unknown\",\n    \"height\": \"low\",\n    \"color\": \"none\",\n    \"wall\": \"none\",\n    \"floor\": \"none\",\n    \"ui\": \"furniture_sizes\",\n    \"reply\": \"화장대를 방에 놓았어요. 앉는 깊이도 중요한가요?\"\n    \n}",
+          "passed": true
+        },
+        {
+          "category": "방",
+          "text": "거실 가로 5m 세로 4m로 바꿔줘",
+          "ms": 3017,
+          "engine": "qwen",
+          "fixes": [
+            "문장에 없는 동작(자리 정리)은 실행하지 않음"
+          ],
+          "raw": "{\n\n\n    \"intent\": \"action\",\n    \"action\": \"relocate\",\n    \"furniture\": \"sofa\",\n    \"room_type\": \"living\",\n    \"space\": \"none\",\n    \"seats\": null,\n    \"size\": \"standard\",\n    \"depth\": \"deep\",\n    \"height\": \"tall\",\n    \"color\": \"none\",\n    \"wall\": \"none\",\n    \"floor\": \"none\",\n    \"ui\": \"none\",\n    \"reply\": \"소파를 빈자리로 옮겼어요.\"\n    \n\n\n\n\n\n\n\n\n}",
+          "passed": true
+        },
+        {
+          "category": "복수 요청",
+          "text": "소파랑 식탁이랑 책상 놓고 싶어",
+          "ms": 3337,
+          "engine": "qwen",
+          "fixes": [
+            "가구 여럿을 나눠 처리"
+          ],
+          "raw": "{\n\n\n\"intent\": \"furniture\",\n\"action\": \"none\",\n\"furniture\": \"sofa\",\n\"room_type\": \"none\",\n\"space\": \"none\",\n\"seats\": 2,\n\"size\": \"standard\",\n\"depth\": \"deep\",\n\"height\": \"tall\",\n\"color\": \"none\",\n\"wall\": \"none\",\n\"floor\": \"none\",\n\"ui\": \"furniture_sizes\",\n\"reply\": \"소파를 2명이 앉는 깊이로 빼앗았어요. 높은 높이로 놓을게요. 앉는 공간이 필요하면 추가해 주세요.\"\n}",
+          "passed": true
+        },
+        {
+          "category": "분위기",
+          "text": "벽은 따뜻한 느낌으로 하고 바닥은 짙은 원목으로",
+          "ms": 3392,
+          "engine": "qwen",
+          "fixes": [],
+          "raw": "{\n\n\n  \"intent\": \"room\",\n  \"action\": \"none\",\n  \"furniture\": \"none\",\n  \"room_type\": \"none\",\n  \"space\": \"none\",\n  \"seats\": null,\n  \"size\": \"standard\",\n  \"depth\": \"unknown\",\n  \"height\": \"unknown\",\n  \"color\": \"none\",\n  \"wall\": \"샌드\",\n  \"floor\": \"월넛\",\n  \"ui\": \"finishes\",\n  \"reply\": \"벽은 따뜻한 샌드, 바닥은 짙은 월넛으로 맞췄어요. 가구 색도 맞춰 볼까요?\"\n  }",
+          "passed": true,
+          "criteria": "샌드 벽·월넛 바닥 반영"
+        },
+        {
+          "category": "집 전체",
+          "text": "100평 집 전체를 재팬디로 꾸며줘",
+          "ms": 1913,
+          "engine": "qwen",
+          "fixes": [],
+          "raw": "{\n\n\n    \"theme\": \"japandi\",\n    \"room1\": \"reading\",\n    \"room2\": \"standard\",\n    \"room3\": \"standard\",\n    \"room4\": \"standard\",\n    \"room5\": \"standard\",\n    \"room6\": \"standard\",\n    \"room7\": \"standard\",\n    \"room8\": \"standard\",\n    \"room9\": \"standard\",\n    \"room10\": \"standard\",\n    \"room11\": \"standard\",\n    \"room12\": \"standard\"\n    \n}",
+          "passed": true
+        }
+      ],
+      "errors": [],
+      "ai": {
+        "status": "ready",
+        "id": "Qwen3-1.7B-q4f16_1-MLC",
+        "error": ""
+      },
+      "preparationNote": "첫 준비는 240000ms 제한 초과. 캐시를 이어 쓴 재시도에서 실제 추론 완료."
+    }
+  ],
+  "environment": {
+    "browser": "Chrome",
+    "compute": "WebGPU shader-f16",
+    "scope": "동일 기기·6문장·모델 준비 후 응답 시간·앱 보정 뒤 상태"
+  }
+}

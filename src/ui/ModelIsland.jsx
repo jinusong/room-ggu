@@ -1,3 +1,10 @@
+import {
+  MODEL_USAGE,
+  modelEvidence,
+  MODEL_EVIDENCE_CONTEXT,
+  modelCoverage,
+  modelCaution,
+} from '../app/model-capabilities.js';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import * as store from '../app/store.js';
 import { app } from '../app/store.js';
@@ -94,43 +101,54 @@ function ModelAsk({ ask }) {
           <h2 id="ask-title">상담 모델을 먼저 받아야 해요</h2>
         </div>
         <div class="island-panel">
-          <p id="ask-desc" class="island-desc">
-            {ask.partial
-              ? '받다 만 모델이 있어요. 남은 만큼만 이어서 받으면 돼요. 대화는 서버로 보내지 않고 이 기기에서 해석해요.'
-              : '룸꾸는 대화를 서버로 보내지 않고 이 기기에서 해석해요. 그래서 처음 한 번 모델을 받아 둬야 해요.'}
-          </p>
-          <label class="ask-model-choice">
-            상담 모델
-            <select
-              id="ask-model-select"
-              aria-label="받을 상담 모델"
-              value={app.ai.choice}
-              onChange={(e) => store.setModelChoice(e.currentTarget.value)}
-            >
-              {Object.values(TEXT_MODELS).map((m) => (
-                <option key={m.key} value={m.key}>
-                  {m.name} · 약 {sizeText(m.downloadMB)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <dl class="ask-facts">
-            <div>
-              <dt>모델</dt>
-              <dd>{ask.name}</dd>
+          <div class="ask-content">
+            <p id="ask-desc" class="island-desc">
+              {ask.partial
+                ? '받다 만 모델이 있어요. 남은 만큼만 이어서 받으면 돼요. 대화는 서버로 보내지 않고 이 기기에서 해석해요.'
+                : '룸꾸는 대화를 서버로 보내지 않고 이 기기에서 해석해요. 그래서 처음 한 번 모델을 받아 둬야 해요.'}
+            </p>
+            <label class="ask-model-choice">
+              상담 모델
+              <select
+                id="ask-model-select"
+                aria-label="받을 상담 모델"
+                value={app.ai.choice}
+                onChange={(e) => store.setModelChoice(e.currentTarget.value)}
+              >
+                {Object.values(TEXT_MODELS).map((m) => (
+                  <option key={m.key} value={m.key}>
+                    {m.name} · 약 {sizeText(m.downloadMB)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div class="ask-capabilities" role="status" aria-live="polite">
+              <strong>이 모델로 하는 일</strong>
+              <p>{MODEL_USAGE[app.ai.choice]}</p>
+              <p>{modelCoverage(app.ai.choice)}</p>
+              <p>{modelEvidence(app.ai.choice)}</p>
+              {modelCaution(app.ai.choice) && <p>{modelCaution(app.ai.choice)}</p>}
+              {TEXT_MODELS[app.ai.choice]?.f32Note && <p>{TEXT_MODELS[app.ai.choice].f32Note}</p>}
+              <small>{MODEL_EVIDENCE_CONTEXT}</small>
             </div>
-            <div>
-              <dt>{ask.partial ? '남은 크기' : '크기'}</dt>
-              <dd class="is-size">{size}</dd>
-            </div>
-            <div>
-              <dt>보관</dt>
-              <dd>이 브라우저</dd>
-            </div>
-          </dl>
-          <p class="ask-note">
-            Wi-Fi에서 받기를 권해요. 받지 않아도 “소파 놓아줘” 같은 정해진 표현은 알아들어요.
-          </p>
+            <dl class="ask-facts">
+              <div>
+                <dt>모델</dt>
+                <dd>{ask.name}</dd>
+              </div>
+              <div>
+                <dt>{ask.partial ? '남은 크기' : '크기'}</dt>
+                <dd class="is-size">{size}</dd>
+              </div>
+              <div>
+                <dt>보관</dt>
+                <dd>이 브라우저</dd>
+              </div>
+            </dl>
+            <p class="ask-note">
+              Wi-Fi에서 받기를 권해요. 받지 않아도 “소파 놓아줘” 같은 정해진 표현은 알아들어요.
+            </p>
+          </div>
           <footer>
             <button class="island-btn" id="ask-later" onClick={() => store.declineModel()}>
               나중에

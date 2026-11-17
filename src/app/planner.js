@@ -637,7 +637,10 @@ export function objectsOf(t) {
     unlisted = [];
   for (const j of picked) {
     const raw = words[j].replace(/,$/, '');
-    const w = !unlistedInfo(raw) && detectType(raw) ? raw : raw.replace(PARTICLE, '') || raw;
+    const w =
+      NOT_THING.test(raw) || (!unlistedInfo(raw) && detectType(raw))
+        ? raw
+        : raw.replace(PARTICLE, '') || raw;
     const odd = unlistedInfo(w);
     const type = !odd && detectType(w);
     if (odd) unlisted.push(odd);
@@ -717,7 +720,10 @@ function loneName(t) {
     .filter((w) => w && !SKIP_WORD.test(w));
   if (!words.length || words.length > 2 || (words.length === 2 && !MODIFIER(words[0]))) return null;
   const raw = words.at(-1);
-  const w = !unlistedInfo(raw) && detectType(raw) ? raw : raw.replace(PARTICLE, '') || raw;
+  const w =
+    NOT_THING.test(raw) || (!unlistedInfo(raw) && detectType(raw))
+      ? raw
+      : raw.replace(PARTICLE, '') || raw;
   const odd = unlistedInfo(w);
   if (odd) return { ...odd, sure: true };
   if (

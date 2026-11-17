@@ -181,6 +181,25 @@ test('형식이 틀린 모델 답은 예외로 넘기고, 허용 목록 밖 값�
   assert.equal(v.color, null);
 });
 
+test('새 가구의 놓기 요청은 모델이 place라고 골라도 초안을 먼저 만들며 치수 축을 물건 이름으로 자르지 않는다', () => {
+  const ctx = { state: freshState(), target: { type: 'room' } };
+  const desk = planFromModel(
+    model({ intent: 'action', action: 'place', furniture: 'desk' }),
+    '책상 가로 140cm 깊이 70cm 하나 놓아줘',
+    ctx,
+  );
+  assert.equal(desk.changes.draft.type, 'desk');
+  assert.equal(desk.changes.draft.dims[0], 140);
+  assert.equal(desk.changes.draft.dims[2], 70);
+  const vanity = planFromModel(
+    model({ intent: 'furniture', action: 'place', furniture: 'vanity' }),
+    '화장대 하나 놓아줘',
+    ctx,
+  );
+  assert.equal(vanity.changes.draft.type, 'vanity');
+  assert.equal(vanity.action, undefined);
+});
+
 test('사진 점수는 확률로 바꿔 상위 3개만 남긴다', () => {
   const c = photoCandidates([
     { type: 'sofa', score: 0.2 },

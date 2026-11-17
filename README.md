@@ -5,6 +5,12 @@
 [사이트 열기](https://jinusong.github.io/room-ggu/) · [v5.10 개선 리뷰](https://room-ggu-review-20261117.divine-angel-0926.chatgpt.site) · [기획](docs/product-plan.md) ([HTML](docs/product-plan.html)) · [디자인 방향](docs/design-direction.md) · [검증 기록](docs/verification.md)
 
 
+## v5.11 창문 직접 조작과 모델별 안내
+
+창문을 눌러 선택한 뒤 유리나 이동 손잡이를 끌면 벽 위에서 옮깁니다. 3D는 모서리로 폭·높이를 바꾸고 2D는 양끝 손잡이로 폭을 바꿉니다. 방향키로 5cm, Shift와 함께 25cm씩 조절하며 Esc로 취소합니다. 한 번의 드래그는 한 번에 실행 취소됩니다.
+
+모델 선택 카드와 휴대 기기 다운로드 안내에 지원 작업, 실제 비교 결과, 앱 보정 건수와 응답 시간을 표시합니다. [모델별 평가와 해석 범위](docs/model-capabilities.md)를 함께 확인하세요.
+
 ## v5.10 가구 확장과 창문
 
 가구 40종·123개 크기 초안을 제공합니다. 화장대·행거·전신거울·조리대·아일랜드·식기세척기·건조기·공기청정기·선풍기·피아노·러닝머신 등을 추가했습니다. 검색은 식세기·싱크대·옷걸이 같은 별칭도 읽습니다.

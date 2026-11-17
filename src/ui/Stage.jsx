@@ -1,3 +1,4 @@
+import { WindowControls } from './WindowControls.jsx';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { TYPES, ROOM_TYPES } from '../catalog.js';
 import { layoutWarnings, spaces } from '../data.js';
@@ -1074,6 +1075,7 @@ export function Stage({ mobile, sheetRef }) {
         <DoorBar />
         <AvatarTag mobile={mobile} />
       </div>
+      <WindowControls />
       <div class="stage-top">
         <div class="stage-lead">
           <ScopeNav />

@@ -1,3 +1,10 @@
+import {
+  MODEL_USAGE,
+  modelEvidence,
+  MODEL_EVIDENCE_CONTEXT,
+  modelCoverage,
+  modelCaution,
+} from '../app/model-capabilities.js';
 import { catalogMatches } from '../estimator.js';
 import { WINDOW_WALLS, MAX_WINDOWS } from '../windows.js';
 // 대화 안에 나타나는 생성형 UI 컴포넌트. 모델은 이름만 고르고, 값과 동작은 모두 앱 상태에 연결된다.
@@ -1451,6 +1458,7 @@ function AIPanel() {
             key={m.key}
             role="radio"
             aria-label={m.name}
+            aria-describedby={`model-cap-${m.key}`}
             aria-checked={ai.choice === m.key}
             tabIndex={ai.choice === m.key ? 0 : -1}
             data-model={m.key}
@@ -1478,6 +1486,12 @@ function AIPanel() {
           >
             <strong>{m.name}</strong>
             <small>{m.note}</small>
+            <span class="model-capability" id={`model-cap-${m.key}`}>
+              {MODEL_USAGE[m.key]}
+            </span>
+            <small class="model-evidence">{modelCoverage(m.key)}</small>
+            <small class="model-evidence">{modelEvidence(m.key)}</small>
+            {modelCaution(m.key) && <small>{modelCaution(m.key)}</small>}
             <span class="mono">내려받기 약 {sizeText(m.downloadMB)}</span>
             <span class="mono">
               GPU 약 {(m.vramMB / 1000).toFixed(1)}~{(m.vramF32MB / 1000).toFixed(1)}GB
@@ -1486,6 +1500,12 @@ function AIPanel() {
           </button>
         ))}
       </div>
+      <p class="surface-hint model-evidence-context">{MODEL_EVIDENCE_CONTEXT}</p>
+      <p class="surface-hint">
+        네 모델 모두 같은 편집 도구를 써요. 집 전체는 모델이 공간별 가구 구성을 고르고 앱이
+        치수·충돌을 검사한 초안이에요. 사진 판별은 별도 SigLIP 모델이 20종만 다루며 실제 cm
+        치수·채광·시공 도면은 계산하지 않아요.
+      </p>
       <p class="surface-hint model-note">
         기본은 Gemma 4 E2B예요. 다운로드를 줄이려면 Qwen3 0.6B, GPU 메모리를 아끼려면 Gemma 3 1B를
         골라 보세요. 모델에 따라 상담 결과와 속도가 달라요. 고르면 새 모델을 한 번 받아요.

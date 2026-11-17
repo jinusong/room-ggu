@@ -212,6 +212,14 @@ export function planFromModel(raw, text, ctx) {
     return done(rule);
   }
 
+  if (
+    v.action === 'place' &&
+    named.length &&
+    (!ctx.draft || !named.includes(ctx.draft.type) || rule.changes?.draft)
+  ) {
+    fixes.push('새 가구나 치수 요청은 초안을 먼저 준비');
+    v.action = 'none';
+  }
   if (v.action !== 'none') {
     const plan = actionPlan(v, t, ctx, item, named, fixes);
     if (plan) return done(plan);

@@ -303,6 +303,7 @@ function restore(json) {
   if (roomBefore !== app.state.roomId) spaceEvent();
 }
 export function undo() {
+  if (finishWindowGesture(true)) return true;
   if (!app.history.length) return false;
   app.future.push(JSON.stringify(app.state));
   restore(app.history.pop());
@@ -311,6 +312,7 @@ export function undo() {
   return true;
 }
 export function redo() {
+  if (finishWindowGesture(true)) return true;
   if (!app.future.length) return false;
   app.history.push(JSON.stringify(app.state));
   restore(app.future.pop());
@@ -1254,6 +1256,7 @@ export function closeAvatarBar() {
   emit();
 }
 export function setScope(scope) {
+  finishWindowGesture(true);
   app.state.scope = scope === 'house' ? 'house' : 'room';
   app.selected = null;
   app.target = { type: 'room' };
@@ -1505,6 +1508,54 @@ function editWindow(change) {
 export const addWindow = (wall) => editWindow((s) => ops.addWindow(s, wall));
 export const setWindow = (id, patch) => editWindow((s) => ops.setWindow(s, id, patch));
 export const removeWindow = (id) => editWindow((s) => ops.removeWindow(s, id));
+// 포인터 한 번의 조작을 실행 취소 한 번으로 묶고, 취소·무효 이동은 기록을 남기지 않는다.
+let windowGesture = null;
+export function beginWindowGesture(id) {
+  finishWindowGesture(true);
+  if (!app.state.room.windows?.some((w) => w.id === id)) return;
+  windowGesture = {
+    id,
+    roomId: app.state.roomId,
+    room: structuredClone(app.state.room),
+    history: [...app.history],
+    future: [...app.future],
+    changed: false,
+  };
+}
+export function dragWindow(patch) {
+  const g = windowGesture;
+  if (!g || g.roomId !== app.state.roomId) return '다른 공간으로 이동했어요.';
+  try {
+    const next = structuredClone(app.state);
+    ops.setWindow(next, g.id, patch);
+    if (JSON.stringify(next.room) === JSON.stringify(app.state.room)) return;
+    if (!g.changed) {
+      snapshot();
+      g.changed = true;
+    }
+    Object.assign(app.state, next);
+    emit();
+  } catch (e) {
+    return e.message;
+  }
+}
+export function finishWindowGesture(cancel = false) {
+  const g = windowGesture;
+  if (!g) return false;
+  windowGesture = null;
+  if (cancel && g.changed) {
+    const r =
+      g.roomId === app.state.roomId
+        ? app.state
+        : app.state.otherRooms.find((r) => r.roomId === g.roomId);
+    if (r) r.room = g.room;
+    app.history = g.history;
+    app.future = g.future;
+  }
+  persist();
+  emit();
+  return true;
+}
 function rememberFinish(room) {
   app.view.lastFinish = {
     roomId: app.state.roomId,
@@ -1596,6 +1647,7 @@ export function removeById(id) {
 
 // ---------- 공간 ----------
 export function switchSpace(id) {
+  finishWindowGesture(true);
   if (id === app.state.roomId) return;
   app.view.addSide = null;
   app.view.ghostRoom = null;
@@ -1729,6 +1781,7 @@ export function loadExampleAction() {
 
 // ---------- 보기 설정 ----------
 export function setView(view) {
+  finishWindowGesture(true);
   if (view === '3d' && app.view.webglError)
     return toast('이 기기에서 3D를 시작하지 못했어요. 2D 평면을 이용해주세요.');
   app.state.view = view;

@@ -821,6 +821,38 @@ export class RoomScene {
     }
     this.dirty = true;
   }
+  windowPoint(e, wall) {
+    this.point(e);
+    const vertical = ['left', 'right'].includes(wall),
+      room = this.state.room;
+    const at = vertical
+      ? wall === 'left'
+        ? -room.w / 2
+        : room.w / 2
+      : wall === 'back'
+        ? -room.d / 2
+        : room.d / 2;
+    const plane = new T.Plane(vertical ? new T.Vector3(1, 0, 0) : new T.Vector3(0, 0, 1), -at),
+      p = new T.Vector3();
+    if (!this.ray.ray.intersectPlane(plane, p)) return null;
+    return { u: vertical ? p.z + room.d / 2 : p.x + room.w / 2, v: p.y };
+  }
+  windowFrames() {
+    if (this.state.scope === 'house') return [];
+    return windowOpenings(this.state.room).map((w) => {
+      const point = (along, y) =>
+        this.project(
+          new T.Vector3(w.x + (w.vertical ? 0 : along), y, w.z + (w.vertical ? along : 0)),
+        );
+      const points = [
+        point(-w.width / 2, w.sill),
+        point(w.width / 2, w.sill),
+        point(w.width / 2, w.sill + w.height),
+        point(-w.width / 2, w.sill + w.height),
+      ];
+      return { id: w.id, points, visible: points.every((p) => p.visible) };
+    });
+  }
   doorAnchors() {
     if (this.state.scope === 'house') return [];
     return roomOpenings(spaces(this.state), this.state.floorplan, this.state.roomId).map((o) => ({

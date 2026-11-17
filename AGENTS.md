@@ -34,6 +34,9 @@ Codex와 Claude Code는 이 파일과 `.agents/skills/room-ggu-pipeline/SKILL.md
 
 - 창문은 방의 `room.windows`에 최대 8개를 저장한다. `src/windows.js`의 검증·좌표와 `ops.addWindow/setWindow/removeWindow`를 사용한다. 벽 방향·폭·높이·벽 끝에서의 거리·바닥 높이를 직접 정하며 2D·3D·집 전체·저장·실행 취소에 반영한다. 벽 경계·창끼리 겹침·연결 문 충돌은 거절하고 기존 상태를 보존한다. 자동 문은 창을 피하되 기존 문을 없애지 않는다. 공간 회전은 창도 함께 돌린다. 창 앞 20cm의 높은 가구는 가림 경고를 하고 빈자리 계산에서 피한다. 채광·일조량은 계산하지 않는다. 창문이 없는 v1~v5 배치는 빈 배열로 읽는다. 새 가구도 사진 자동 판별에는 추가하지 않으며 사진 판별 대상은 기존 20종이다.
 
+- 창문 직접 조작은 `WindowControls.jsx`의 방 위 선택 영역·모서리 손잡이와 `window-drag.js` 계산을 쓴다. 3D는 벽 평면에서 위치·폭·높이를, 2D는 벽을 따른 위치·폭을 바꾼다. 44px 손잡이, 키보드 5cm/Shift 25cm, Esc/포인터 취소를 지원한다. store의 begin/drag/finishWindowGesture가 한 번의 드래그를 실행 취소 한 번으로 묶는다. 무효 이동은 상태를 바꾸지 않으며 보기·공간 전환은 진행 중 조작을 취소한다.
+- 모델 선택의 기능 범위와 검증 표시는 `model-capabilities.js`와 `model-benchmark.json`을 원본으로 쓴다. 실제 평가 원본은 `eval/chat/results/capabilities-v5.11.json`이며 요약은 `scripts/summarize-model-capabilities.mjs`로 만든다. 앱 보정 뒤 결과와 모델 자체 능력을 혼동하지 않고 f16·기기·표본 수·검증일·분위기 색 기준을 밝힌다. 다운로드 동의 전에는 안내를 보여 주기 위해 모델을 실행하거나 받지 않는다.
+
 ## 개발과 검증
 
 - 구현·디자인·기획 작업에는 공용 `room-ggu-pipeline` 스킬을 따른다. 이 스킬이 `answer-me-with-html`(기획 페이지), `open-design`(상태·접근성·모션 규칙), `unslop`(UI 점검), `humanize-korean`(한글 문구), `humanizer`(영문)을 순서대로 잇는다. 디자인 기준은 `docs/design-direction.md`다.
