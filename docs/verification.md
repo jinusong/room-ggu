@@ -14,8 +14,8 @@
 
 - `npm run verify`: 단위 테스트 **256개**·공용 스킬 연결·문법·프로덕션 빌드 통과. 새 사진 단위 테스트는 42개다.
 - `npm run test:e2e`: Chrome 전체 **139개** 통과. 이 중 사진 입력·흐름·반응형은 **50개**다. 전체 기존 97개에서 42개를 추가했다.
-- `BROWSER=firefox PORT=4182 ... test tests/photo-input.spec.js`: **22개** 통과.
-- `BROWSER=webkit PORT=4181 ... test tests/photo-input.spec.js`: **22개** 통과.
+- Firefox: 입력 테스트 **22개**, `photo-flow.spec.js --grep-invert 레이아웃` **23개**, 합계 **45개** 통과.
+- WebKit: 같은 입력 **22개**·판별 흐름 **23개**, 합계 **45개** 통과.
 - `npm run format:check`, `git diff --check` 통과. 기존 `planner.test.js`의 한 assert 문장도 Prettier 형식에 맞췄다.
 - 초기 브라우저 병렬 실행은 같은 trace 폴더를 지워 3개의 Chrome 테스트와 1개의 Firefox 테스트에서 파일 오류가 났다. 결과 폴더를 브라우저별로 분리한 뒤 위 전체 실행을 다시 통과했다. Firefox 합성 ClipboardEvent 생성자가 FileList 옵션을 무시하는 점은 테스트에서 명시적으로 주입했다. OS의 실제 클립보드 권한을 검증한 것은 아니다.
 
@@ -35,6 +35,8 @@
 실제 UI에도 `bed-2.jpg`와 “가로 150cm 깊이 210cm 높이 55cm”를 보내 침대 판별과 `[150,55,210]` 내부 치수, 페이지 오류 0개를 확인했다. 원본 결과는 `eval/photo/results/review-20261117-{gpu,cpu,ui}.json`이다. 앱 흐름에서는 상담 모델을 꺼 규칙으로 설명을 반영했으며 Gemma 실제 추론은 다시 평가하지 않았다.
 
 공개 개선 아티팩트는 `npm run review:build`로 만든다. Answer me with HTML 0.5.11의 원고 검사는 경고 0개였고, 한글 light 윤문은 변경률 0%·자체검증 6/6·결정적 게이트 OK였다. 공개본의 작성용 버튼을 걷어 낸 뒤 1440·390·320px에서 표 필터·도식·가로 넘침·페이지 오류를 확인했다. 로컬 Vite에서는 `/review/index.html`을 검사했으며 GitHub Pages의 `/review/`는 배포 후 별도 확인한다.
+
+첫 GitHub Actions 배포는 `b1d0893`으로 성공했고 공개 `version.json`의 v5.12.0·동일 커밋, 보고서 HTML 일치, 사진 첨부·치수 반영, 모바일 표시를 확인했다. 공개 사이트에서도 실제 SigLIP으로 침대를 판별해 `[150,55,210]`을 반영했고 페이지 오류는 없었다. 서버의 1024px 누름 영역 검사는 첫 실행 실패 후 재시도에 통과했다. 같은 44px 기준을 유지하면서 렌더링 반영을 기다려 검사하도록 보완했다. `photo-flow.spec.js --grep 레이아웃 --repeat-each 20`으로 5개 뷰포트를 각각 20회, 총 100회 반복해 모두 통과했다. 공개 모델 결과는 `eval/photo/results/review-20261117-public.json`에 남겼다.
 
 ### 확인하지 못한 범위
 

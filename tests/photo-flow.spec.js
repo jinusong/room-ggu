@@ -117,10 +117,16 @@ for (const [width, height] of [
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
-    const targets = await page
-      .locator('.photo-kind-grid .chip')
-      .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
-    expect(targets.every((h) => h >= 44)).toBe(true);
+    // 느린 소프트웨어 렌더러에서도 새 도구의 레이아웃이 반영된 뒤 크기를 잰다.
+    await expect
+      .poll(() =>
+        page
+          .locator('.photo-kind-grid .chip')
+          .evaluateAll(
+            (els) => els.length === 40 && els.every((e) => e.getBoundingClientRect().height >= 44),
+          ),
+      )
+      .toBe(true);
     await page.screenshot({ path: `docs/screenshots/photo-review-${width}.png` });
     expect(errors).toEqual([]);
   });
