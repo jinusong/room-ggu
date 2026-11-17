@@ -5,6 +5,7 @@ import { Stage } from './Stage.jsx';
 import { Sheet } from './Sheet.jsx';
 import { ModelIsland } from './ModelIsland.jsx';
 import { Icon } from './icons.js';
+import { isPhotoFile } from '../photo-input.js';
 
 // 대화 열과 방이 나란히 설 폭이 안 되면 대화를 아래 시트로 내린다.
 export const MOBILE = 900;
@@ -158,10 +159,14 @@ export function App() {
       onDrop={(e) => {
         e.preventDefault();
         setDragging(false);
-        const f = [...(e.dataTransfer?.files || [])].find((x) => x.type.startsWith('image/'));
+        const files = [...(e.dataTransfer?.files || [])];
+        const f = files.find(isPhotoFile);
         if (f) store.attachPhoto(f);
-        else if ([...(e.dataTransfer?.files || [])].some((x) => x.name.endsWith('.json')))
-          store.importJSON(e.dataTransfer.files[0]);
+        else {
+          const layout = files.find((x) => x.name.endsWith('.json'));
+          if (layout) store.importJSON(layout);
+          else if (files.length) store.toast('사진이나 배치 JSON 파일을 놓아 주세요.');
+        }
       }}
     >
       <Stage mobile={mobile} sheetRef={sheetRef} />

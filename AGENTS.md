@@ -45,3 +45,5 @@ Codex와 Claude Code는 이 파일과 `.agents/skills/room-ggu-pipeline/SKILL.md
 - AI 경로를 바꾸면 실제 모델(Gemma·SigLIP)로 확인하고, 확인하지 못했으면 그 한계를 `docs/verification.md`에 적는다. 사진 판별을 바꾸면 `eval/photo/`의 test 사진으로 다시 재고, 값은 dev 사진으로만 정한다.
 - 원본 스킬 출처·버전·라이선스는 `.agents/skills/skills-lock.json`과 `THIRD_PARTY_NOTICES.md`에 보존한다.
 - 사용자는 이 작업의 단계별 커밋·푸시와 Pages 배포를 승인했다. 검증한 작업 단위로 현재 브랜치에 커밋·푸시한다. 관련 없는 변경은 포함하지 않으며 force push하지 않는다.
+
+- 사진 파일 전처리는 `src/photo-input.js`를 원본으로 쓴다. 선택·드롭·붙여넣기에 같은 형식 판별을 적용하고 20MB·8천만 화소·최장 변 768px 제한, EXIF 방향 유지, 투명 영역 흰 배경을 지킨다. 비트맵 미지원 시 Image 경로를 쓰며 자원을 해제한다. 파일 읽기 순번으로 마지막 첨부·취소·새 대화를 보호하고 준비 중 전송하지 않는다. 읽기 실패는 기존 사진·입력 글을 보존한다. 사진 판별 중 직접 바꾼 상태는 덮어쓰지 않으며 대기 초안은 새 사진 초안에 섞지 않는다. 사진 후보는 해당 사진 ID에만 적용한다. 사진 도구의 전체 40종 직접 선택은 같은 사진의 설명을 보존하며 자동 판별은 기존 20종을 유지한다. 후보 %는 상대 점수이며 정답 확률로 표시하지 않는다. 공개 개선 보고서는 `public/review/index.html`이고 원고는 `docs/photo-review.md`다.

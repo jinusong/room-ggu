@@ -94,6 +94,242 @@ const snapshot = (page) =>
     busy: window.__roomggu.app.busy?.kind,
   }));
 
+for (const [width, height] of [
+  [1440, 900],
+  [1024, 900],
+  [900, 900],
+  [390, 844],
+  [320, 640],
+])
+  test(`사진 전체 종류와 입력창 레이아웃 ${width}px`, async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.setViewportSize({ width, height });
+    await start(page, { mobile: width < 900 });
+    // start의 모바일 프리셋 이후 검증할 뷰포트를 다시 적용한다.
+    await page.setViewportSize({ width, height });
+    if (width < 900) await page.locator('#ask-later').click();
+    else await page.evaluate(() => window.__roomggu.store.setModelOn(false));
+    await sendPhoto(page, '가로 120cm 깊이 200cm 높이 50cm');
+    await page.getByRole('button', { name: '다른 종류', exact: true }).click();
+    await expect(page.locator('.photo-kind-grid')).toBeVisible();
+    await expect(page.locator('#chat-input')).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    const targets = await page
+      .locator('.photo-kind-grid .chip')
+      .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+    expect(targets.every((h) => h >= 44)).toBe(true);
+    await page.screenshot({ path: `docs/screenshots/photo-review-${width}.png` });
+    expect(errors).toEqual([]);
+  });
+
+test('사진 판별 중 직접 만든 초안과 기다리는 초안을 덮어쓰지 않는다', async ({ page }) => {
+  await start(page);
+  await sendPhoto(page);
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => {
+    // 모델 응답을 기다리는 동안 도면·도구의 직접 편집이 가능하다.
+    const { app } = window.__roomggu;
+    app.draft = {
+      id: 'manual',
+      type: 'desk',
+      name: '직접 만든 책상',
+      dims: [140, 74, 60],
+      sources: ['사용자 설정', '사용자 설정', '사용자 설정'],
+      color: '#333333',
+      x: 0,
+      z: 0,
+      rot: 0,
+    };
+    app.queue = [structuredClone(app.draft)];
+    app.target = { type: 'draft' };
+    window.__finishPhoto();
+  });
+  await expect.poll(async () => (await snapshot(page)).vision).toBe('ready');
+  expect((await snapshot(page)).draft.id).toBe('manual');
+  expect((await snapshot(page)).photo.captionPending).toBe(true);
+  expect(await page.evaluate(() => window.__roomggu.app.queue.length)).toBe(1);
+});
+
+test('사진 판별 중 방 치수를 바꾸면 결과가 배치를 덮어쓰지 않는다', async ({ page }) => {
+  await start(page);
+  await sendPhoto(page);
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => {
+    window.__roomggu.app.state.room.w = 6;
+    window.__finishPhoto();
+  });
+  await expect.poll(async () => (await snapshot(page)).vision).toBe('ready');
+  expect((await snapshot(page)).draft).toBe(null);
+  expect(await page.evaluate(() => window.__roomggu.app.state.room.w)).toBe(6);
+});
+
+test('다른 종류의 전체 목록에서 골라도 사진 설명을 보존한다', async ({ page }) => {
+  await start(page, { mobile: true });
+  await page.locator('#ask-later').click();
+  await sendPhoto(page, '가로 75cm 깊이 65cm 높이 190cm');
+  await page.getByRole('button', { name: '다른 종류', exact: true }).click();
+  await page.getByRole('textbox', { name: '사진의 가구 종류 검색' }).fill('냉장고');
+  await page
+    .locator('.photo-kind-grid')
+    .getByRole('button', { name: '냉장고', exact: true })
+    .click();
+  await expect.poll(async () => (await snapshot(page)).draft?.dims).toEqual([75, 190, 65]);
+  expect((await snapshot(page)).draft.type).toBe('fridge');
+  expect((await snapshot(page)).jobs).toEqual([]);
+});
+
+test('전체 종류 검색의 빈 상태에서 다시 찾을 수 있다', async ({ page }) => {
+  await start(page, { mobile: true });
+  await page.locator('#ask-later').click();
+  await sendPhoto(page, '');
+  await page.getByRole('button', { name: '다른 종류', exact: true }).click();
+  const q = page.getByRole('textbox', { name: '사진의 가구 종류 검색' });
+  await q.fill('존재하지않는가구');
+  await expect(page.getByText('맞는 종류가 없어요. 검색어를 바꿔 주세요.')).toBeVisible();
+  await q.fill('');
+  await expect(page.locator('.photo-kind-grid button')).toHaveCount(40);
+});
+
+test('이전 사진의 후보를 누르면 지금 사진·초안을 바꾸지 않는다', async ({ page }) => {
+  await start(page);
+  await sendPhoto(page, '');
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => window.__finishPhoto());
+  await expect.poll(async () => (await snapshot(page)).draft?.type).toBe('bed');
+  await page.evaluate(() => {
+    window.__oldSuggestion = window.__roomggu.app.thread
+      .flatMap((t) => t.suggestions || [])
+      .find((s) => s.action === 'draft');
+  });
+  await page.locator('#photo-file').setInputFiles({ ...file, name: 'next.png' });
+  await expect(page.locator('.photo-tray img')).toBeVisible();
+  const before = (await snapshot(page)).draft;
+  await page.evaluate(() => window.__roomggu.store.runSuggestion(window.__oldSuggestion));
+  expect((await snapshot(page)).draft).toEqual(before);
+  await expect(page.locator('#toast')).toContainText('이전 사진');
+});
+
+test('재분석해도 직접 정한 치수·색을 유지한다', async ({ page }) => {
+  await start(page);
+  await sendPhoto(page);
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => window.__finishPhoto());
+  await expect.poll(async () => (await snapshot(page)).draft?.dims).toEqual([120, 50, 200]);
+  await page.evaluate(() => {
+    window.__roomggu.store.analyzePhoto();
+  });
+  await expect
+    .poll(async () => (await snapshot(page)).jobs.filter((t) => t === 'classify').length)
+    .toBe(2);
+  await page.evaluate(() => window.__finishPhoto());
+  await expect.poll(async () => (await snapshot(page)).vision).toBe('ready');
+  expect((await snapshot(page)).draft.dims).toEqual([120, 50, 200]);
+  expect((await snapshot(page)).draft.color).toBe('#3f4d63');
+});
+
+test('새 사진의 확신 초안을 만들면 이전 대기 초안은 비운다', async ({ page }) => {
+  await start(page);
+  await page.evaluate(() => {
+    window.__roomggu.app.queue = [{ id: 'old' }];
+  });
+  await sendPhoto(page);
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => window.__finishPhoto());
+  await expect.poll(async () => (await snapshot(page)).draft?.type).toBe('bed');
+  expect(await page.evaluate(() => window.__roomggu.app.queue)).toEqual([]);
+});
+
+for (const [label, scores] of [
+  ['빈 결과', []],
+  ['알 수 없는 종류', [{ type: 'toilet', score: 1 }]],
+  ['단일 점수', [{ type: 'bed', score: 0.99 }]],
+  [
+    '범위 밖',
+    [
+      { type: 'bed', score: 2 },
+      { type: 'sofa', score: -1 },
+    ],
+  ],
+  [
+    '중복 종류',
+    [
+      { type: 'bed', score: 0.99 },
+      { type: 'bed', score: 0.98 },
+    ],
+  ],
+])
+  test(`모델 ${label}는 초안 없이 설명을 보존한다`, async ({ page }) => {
+    await start(page);
+    await sendPhoto(page);
+    await page.waitForFunction(() => window.__photoJob);
+    await page.evaluate((scores) => {
+      const job = window.__photoJob;
+      job.worker.onmessage({ data: { id: job.id, result: { scores, device: 'webgpu' } } });
+    }, scores);
+    await expect.poll(async () => (await snapshot(page)).vision).toBe('ready');
+    expect((await snapshot(page)).draft).toBe(null);
+    expect((await snapshot(page)).photo.captionPending).toBe(true);
+  });
+
+test('사진 원본은 새로고침·배치 내보내기용 저장소에 남지 않는다', async ({ page }) => {
+  await start(page);
+  await sendPhoto(page);
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => window.__finishPhoto());
+  await expect.poll(async () => (await snapshot(page)).vision).toBe('ready');
+  const saved = await page.evaluate(() => ({
+    layout: localStorage.getItem('room-ggu-v2'),
+    thread: localStorage.getItem('room-ggu-thread-v1'),
+  }));
+  expect(saved.layout).not.toContain('data:image');
+  expect(saved.thread).not.toContain('data:image');
+  expect(saved.thread).toContain('hadPhoto');
+  await page.reload();
+  await page.waitForFunction(() => window.__roomggu?.ready());
+  expect((await snapshot(page)).photo).toBe(null);
+  expect((await snapshot(page)).draft.dims).toEqual([120, 50, 200]);
+});
+
+test('사진 판별 중 새 대화를 열면 Worker를 멈추고 늦은 응답을 버린다', async ({ page }) => {
+  await start(page);
+  await sendPhoto(page);
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => {
+    window.__roomggu.store.clearThread();
+    window.__finishPhoto();
+  });
+  expect(
+    await page.evaluate(() => ({
+      busy: window.__roomggu.app.busy,
+      photo: window.__roomggu.app.photo,
+      thread: window.__roomggu.app.thread,
+    })),
+  ).toEqual({ busy: null, photo: null, thread: [] });
+  await page.locator('#chat-input').fill('책상 하나');
+  await expect(page.getByRole('button', { name: '설명 보내기' })).toBeEnabled();
+});
+
+test('새로고침 후 사진 없는 예전 후보를 실행하지 않는다', async ({ page }) => {
+  await start(page);
+  await sendPhoto(page, '');
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => window.__finishPhoto('bed', true));
+  await expect.poll(async () => (await snapshot(page)).vision).toBe('ready');
+  await page.reload();
+  await page.waitForFunction(() => window.__roomggu?.ready());
+  await page.evaluate(() => {
+    const { app, store } = window.__roomggu;
+    store.runSuggestion(
+      app.thread.flatMap((t) => t.suggestions || []).find((s) => s.action === 'draft'),
+    );
+  });
+  expect((await snapshot(page)).draft).toBe(null);
+  await expect(page.locator('#toast')).toContainText('이전 사진');
+});
+
 test('사진+글: Gemma 다운로드가 끝나기 전에 판별하고 같은 초안에 설명을 반영한다', async ({
   page,
 }) => {

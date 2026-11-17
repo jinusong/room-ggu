@@ -184,7 +184,10 @@ test('목록에 없는 물건은 새 가구를 만들거나 고른 가구를 바
   assert.deepEqual(planTurn('안마의자 하나 놓고 싶어', { state: s, target: room }).unlisted, [
     '안마의자',
   ]);
-  assert.equal(planTurn('스탠드 에어컨 놓아줘', { state: s, target: room }).changes.draft.type, 'standing_ac');
+  assert.equal(
+    planTurn('스탠드 에어컨 놓아줘', { state: s, target: room }).changes.draft.type,
+    'standing_ac',
+  );
 });
 test('목록의 가구는 그대로 처리하고 함께 말한 목록에 없는 물건만 뺐다고 알린다', () => {
   const s = freshState();

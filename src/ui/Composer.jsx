@@ -5,6 +5,7 @@ import { app } from '../app/store.js';
 import { josa } from '../app/text.js';
 import { Icon } from './icons.js';
 import { useAutosize, useOutside } from './widgets.jsx';
+import { isPhotoFile } from '../photo-input.js';
 
 // 입력창의 + 메뉴. 가구 → 공간 → 가늠·집 전체 → 파일·설정 순서로 묶는다.
 const TOOL_GROUPS = [
@@ -94,11 +95,11 @@ export function Composer({ onFocusChange, mobile }) {
   };
   const ref = useAutosize(text);
   useOutside(menuRef, () => setMenu(false), menu);
-  const busy = !!app.busy;
+  const busy = !!app.busy || app.photoLoading;
   const pending = app.photo && !app.photo.sent ? app.photo : null;
   const submit = (e) => {
     e?.preventDefault();
-    if (app.busy || (!text.trim() && !pending)) return;
+    if (busy || (!text.trim() && !pending)) return;
     const value = text;
     setText('');
     draftText = '';
@@ -114,6 +115,24 @@ export function Composer({ onFocusChange, mobile }) {
   return (
     <form class="composer" onSubmit={submit} aria-label="상담 입력">
       <TargetChip />
+      {app.photoLoading && (
+        <div class="photo-tray" role="status">
+          <span>사진을 준비하고 있어요</span>
+          <button
+            type="button"
+            class="icon-btn"
+            aria-label="사진 준비 취소"
+            onClick={() => store.removePhoto()}
+          >
+            <Icon name="x" size={16} />
+          </button>
+        </div>
+      )}
+      {app.photoError && (
+        <p class="photo-error" role="alert">
+          {app.photoError}
+        </p>
+      )}
       {pending && (
         <div class="photo-tray">
           <img src={pending.data} alt="첨부할 가구 사진" />
@@ -178,9 +197,7 @@ export function Composer({ onFocusChange, mobile }) {
             if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) submit(e);
           }}
           onPaste={(e) => {
-            const file = [...(e.clipboardData?.files || [])].find((f) =>
-              f.type.startsWith('image/'),
-            );
+            const file = [...(e.clipboardData?.files || [])].find(isPhotoFile);
             if (file) {
               e.preventDefault();
               store.attachPhoto(file);

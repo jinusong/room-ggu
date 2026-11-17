@@ -2,8 +2,14 @@
 
 **룸꾸와 대화하며 방과 가구를 설명하면 필요한 도구가 대화에 나타나고, 실제 치수의 2D·3D 방에 바로 반영되는 인테리어 상담 웹.**
 
-[사이트 열기](https://jinusong.github.io/room-ggu/) · [v5.10 개선 리뷰](https://room-ggu-review-20261117.divine-angel-0926.chatgpt.site) · [기획](docs/product-plan.md) ([HTML](docs/product-plan.html)) · [디자인 방향](docs/design-direction.md) · [검증 기록](docs/verification.md)
+[사이트 열기](https://jinusong.github.io/room-ggu/) · [v5.12 사진 개선·검증](https://jinusong.github.io/room-ggu/review/) · [v5.10 개선 리뷰](https://room-ggu-review-20261117.divine-angel-0926.chatgpt.site) · [기획](docs/product-plan.md) ([HTML](docs/product-plan.html)) · [디자인 방향](docs/design-direction.md) · [검증 기록](docs/verification.md)
 
+
+## v5.12 사진 입력과 판별 복구
+
+사진을 빠르게 교체하거나 준비 중 취소해도 마지막 선택을 유지합니다. 판별 중 직접 고친 배치와 초안은 보호하며, 새 대화를 시작하면 사진 작업도 끝냅니다. 손상·용량 초과 파일은 기존 사진과 입력하던 설명을 남기고 복구 방법을 안내합니다.
+
+투명 사진은 흰 배경으로 변환하고 휴대폰 JPEG의 회전 방향을 유지합니다. 사진의 **다른 종류**에서 40종을 검색해 골라도 함께 보낸 치수·색 설명이 반영됩니다. 후보 점수의 의미와 실제 모델 평가 결과는 [개선·검증 보고서](https://jinusong.github.io/room-ggu/review/)에서 확인하세요.
 
 ## v5.11 창문 직접 조작과 모델별 안내
 

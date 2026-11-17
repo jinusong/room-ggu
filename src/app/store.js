@@ -83,6 +83,8 @@ export const app = {
   selected: null,
   target: { type: 'room' },
   photo: null,
+  photoLoading: false,
+  photoError: '',
   ai: {
     // text: off | loading | ready | error | unsupported. 기본은 켜짐이며 bootModel()이 자동으로 준비한다.
     text: 'off',
@@ -223,6 +225,7 @@ function sanitizeTurn(t) {
         text: cleanText(s?.text, 200) || undefined,
         action: ACTIONS.has(s?.action) ? s.action : undefined,
         arg: typeof s?.arg === 'string' ? s.arg.slice(0, 40) : undefined,
+        photoId: cleanText(s?.photoId, 40) || undefined,
         primary: !!s?.primary,
       }))
       .filter((s) => s.label && (s.text || s.action));
@@ -353,11 +356,15 @@ export function clearThread() {
     interruptAI();
   }
   if (app.busy?.kind === 'model') app.busy = null;
+  if (app.busy?.kind === 'vision') cancelModel();
   app.thread = [];
   app.design = null;
   app.draft = null;
   app.queue = [];
   app.photo = null;
+  photoReadSeq++;
+  app.photoLoading = false;
+  app.photoError = '';
   app.target = app.selected ? { type: 'item', id: app.selected } : { type: 'room' };
   persist();
   emit();
@@ -745,7 +752,7 @@ export async function send(raw) {
     .trim()
     .slice(0, 1500);
   const pendingPhoto = app.photo && !app.photo.sent ? app.photo : null;
-  if ((!text && !pendingPhoto) || app.busy) return;
+  if ((!text && !pendingPhoto) || app.busy || app.photoLoading) return;
   const history = historyForModel();
   push({ role: 'user', text, ...(pendingPhoto ? { photo: pendingPhoto.data } : {}) });
   const turn = push({ role: 'assistant', text: '' });
@@ -1363,6 +1370,10 @@ export function attachBathroom() {
 }
 
 export function runSuggestion(sug) {
+  if (sug.action === 'draft' && (!sug.photoId || sug.photoId !== app.photo?.surfaceId)) {
+    toast('이전 사진의 후보예요. 지금 사진에서 종류를 골라 주세요.');
+    return;
+  }
   if (sug.text) return send(sug.text);
   if (sug.action === 'place') return placeDraft(sug.label);
   if (sug.action === 'place-all') return placeDraft(sug.label, 'place-all');
@@ -1856,6 +1867,7 @@ export function exportPNG() {
 
 // ---------- 사진 ----------
 let photoInput = null;
+let photoReadSeq = 0;
 export function registerPhotoInput(el) {
   photoInput = el;
 }
@@ -1864,16 +1876,28 @@ export function pickPhoto() {
 }
 export async function attachPhoto(file) {
   if (!file) return;
+  const seq = ++photoReadSeq;
+  app.photoLoading = true;
+  app.photoError = '';
+  emit();
   try {
     const data = await imageData(file);
+    if (seq !== photoReadSeq) return;
     if (app.busy?.kind === 'vision') cancelModel();
     app.photo = { data, caption: '', analyzed: false, sent: false, type: null };
-    emit();
   } catch (e) {
-    toast(e.message);
+    if (seq === photoReadSeq) app.photoError = e.message;
+  } finally {
+    if (seq === photoReadSeq) {
+      app.photoLoading = false;
+      emit();
+    }
   }
 }
 export function removePhoto() {
+  photoReadSeq++;
+  app.photoLoading = false;
+  app.photoError = '';
   if (app.photo && !app.photo.sent) app.photo = null;
   emit();
 }
@@ -1894,6 +1918,7 @@ function makePhotoDraft(photo, type) {
   for (let i = 0; i < 3; i++)
     if (!String(next.sources[i]).startsWith('사용자')) next.sources[i] = '사진 유형 · 기본값';
   app.draft = ops.sanitizeItem(next);
+  app.queue = [];
   photo.draftId = app.draft.id;
   app.target = { type: 'draft' };
   app.selected = null;
@@ -1906,8 +1931,10 @@ async function applyPhotoCaption(photo, turn) {
 }
 export async function analyzePhoto() {
   const photo = app.photo;
-  if (!photo || app.busy) return;
+  if (!photo || !photo.sent || app.busy || app.photoLoading) return;
   photo.roomId ||= app.state.roomId;
+  const editStamp = () => JSON.stringify([app.state, app.draft, app.queue, app.target]);
+  const before = editStamp();
   const job = { kind: 'vision', photo };
   app.busy = job;
   setLaneDownload(
@@ -1926,6 +1953,7 @@ export async function analyzePhoto() {
   app.ai.visionLabel = '사진 판별 모델 준비 중';
   app.ai.visionProgress = 0;
   app.ai.visionError = '';
+  photo.error = '';
   visionFiles.clear();
   emit();
   try {
@@ -1940,51 +1968,57 @@ export async function analyzePhoto() {
     const top = candidates[0];
     const sure = !!top && top.p >= PHOTO_CONFIDENT;
     const sameRoom = photo.roomId === app.state.roomId;
+    const unchanged = sameRoom && before === editStamp();
     const pct = (c) => `${Math.round(c.p * 100)}%`;
     photo.type = sure ? top.type : null;
-    if (sure && sameRoom) makePhotoDraft(photo, top.type);
+    if (sure && unchanged) makePhotoDraft(photo, top.type);
     const names = candidates.map((c) => TYPES[c.type].name);
     const turn = push({
       role: 'assistant',
       engine: 'siglip',
       text: !sameRoom
         ? '사진 판별 중 공간이 바뀌어 초안을 만들지 않았어요. 사진을 보낸 공간으로 돌아온 뒤 종류를 골라 주세요.'
-        : sure
-          ? `사진은 ${josa(names[0], '으로/로')} 보여요. 크기는 유형 기본값이며 사진에서 실제 cm를 잰 값은 아니에요.`
-          : top
-            ? `사진만으로는 종류를 확신하기 어려워요. 가까운 후보는 ${josa(names.join(', '), '이에요/예요')}. 맞는 것을 고르면 함께 보낸 설명도 반영해요.`
-            : '사진에서 가구 종류를 읽지 못했어요. 아래에서 종류를 골라 주세요. 함께 보낸 설명은 보관하고 있어요.',
+        : !unchanged
+          ? '사진 판별 중 직접 바꾼 배치를 유지했어요. 사진의 후보를 고르면 새 초안을 만들고 함께 보낸 설명을 반영해요.'
+          : sure
+            ? `사진은 ${josa(names[0], '으로/로')} 보여요. 크기는 유형 기본값이며 사진에서 실제 cm를 잰 값은 아니에요.`
+            : top
+              ? `사진만으로는 종류를 확신하기 어려워요. 가까운 후보는 ${josa(names.join(', '), '이에요/예요')}. 맞는 것을 고르면 함께 보낸 설명도 반영해요.`
+              : '사진에서 가구 종류를 읽지 못했어요. 아래에서 종류를 골라 주세요. 함께 보낸 설명은 보관하고 있어요.',
       photoScores:
         candidates.map((c) => `${TYPES[c.type].name} ${pct(c)}`).join(' · ') || undefined,
       surfaces:
-        sure && sameRoom
+        sure && unchanged
           ? [{ kind: 'furniture-size', target: { type: 'draft', id: app.draft.id } }]
-          : [{ kind: 'catalog', target: roomTarget() }],
+          : [],
       receipt:
-        sure && sameRoom ? [{ label: '사진 판별', to: names[0], tag: `SigLIP ${pct(top)}` }] : [],
+        sure && unchanged ? [{ label: '사진 판별', to: names[0], tag: `SigLIP ${pct(top)}` }] : [],
       suggestions:
-        sure && sameRoom
+        sure && unchanged
           ? [
               { label: '방에 놓기', action: 'place', primary: true },
               ...candidates.slice(1).map((c) => ({
                 label: `${josa(TYPES[c.type].name, '이었/였')}나요?`,
                 action: 'draft',
                 arg: c.type,
+                photoId: photo.surfaceId,
               })),
             ]
           : candidates.map((c, i) => ({
               label: `${josa(TYPES[c.type].name, '으로/로')} 잡기`,
               action: 'draft',
               arg: c.type,
+              photoId: photo.surfaceId,
               primary: i === 0,
             })),
     });
     app.busy = null;
-    if (sure && sameRoom) await applyPhotoCaption(photo, turn);
+    if (sure && unchanged) await applyPhotoCaption(photo, turn);
   } catch (e) {
     if (app.photo !== photo || app.busy !== job) return;
     app.ai.vision = 'error';
     app.ai.visionError = explainLoadError(e.message);
+    photo.error = app.ai.visionError;
     failDownload('vision', app.ai.visionError);
     toast(`사진 판별: ${app.ai.visionError}`);
   } finally {

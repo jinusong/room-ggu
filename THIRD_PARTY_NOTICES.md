@@ -23,3 +23,7 @@ Three.js (MIT), Preact (MIT), Lucide (ISC), Vite (MIT), esbuild (MIT), WebLLM (A
 Gemma 3 모델은 Google Gemma 이용 조건을 따릅니다. [Gemma terms](https://ai.google.dev/gemma/terms). 사용자가 고를 때만 쓰는 Gemma 4 E2B는 모델 카드에 Apache-2.0으로 표시되어 있고, WebLLM용 변환본 [`mlc-ai/gemma-4-E2B-it-q4f16_1-MLC`](https://huggingface.co/mlc-ai/gemma-4-E2B-it-q4f16_1-MLC)을 씁니다. Qwen3 모델은 모델 카드의 라이선스(Apache-2.0)를 따릅니다. 사진 판별의 SigLIP(`google/siglip-base-patch16-224`, Apache-2.0)은 Transformers.js용 ONNX 변환본 [`Xenova/siglip-base-patch16-224`](https://huggingface.co/Xenova/siglip-base-patch16-224)을 씁니다. 모델 가중치는 이 저장소에 포함하지 않으며 사용자 브라우저가 공개 저장소에서 내려받습니다.
 
 사진 평가(`eval/photo/`)는 Openverse·Wikimedia Commons의 CC 라이선스 사진 118장을 씁니다. 사진 파일은 저장소에 넣지 않고, 원본 주소·작성자·라이선스를 `eval/photo/manifest.json`에 남겼습니다. 이전 사진 모델 SmolVLM 256M(Apache-2.0)은 기준선 측정에만 썼습니다. `docs/screenshots/photo.png`·`mobile-photo.png`의 사진은 StockSnap의 CC0 사진(Kristin Hardwick, Ryan Riggins)입니다.
+
+## v5.12 실제 사진 UI 검증
+
+`docs/screenshots/photo-real-*.png`의 앱 검증에 사용한 사진은 nenadstojkovicart의 [침실 사진](https://www.flickr.com/photos/202846129@N03/54584134746)이며 [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/)이다. 앱 표시용으로 축소·재인코딩했다. 사진 원본은 저장소와 배포물에 포함하지 않는다. 평가용 나머지 사진의 작성자·라이선스는 `eval/photo/manifest.json`에 보관한다.

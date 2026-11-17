@@ -8,6 +8,7 @@ const browserName = ['firefox', 'webkit'].includes(process.env.BROWSER)
 const port = Number(process.env.PORT) || 4180;
 export default defineConfig({
   testDir: './tests',
+  outputDir: `test-results/${browserName}`,
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,

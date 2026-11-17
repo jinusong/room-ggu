@@ -29,9 +29,22 @@ export const PHOTO_CONFIDENT = 0.7;
 
 // SigLIP은 이름마다 따로 시그모이드 점수를 낸다. 서로 비교할 수 있게 로짓으로 되돌려 softmax한다.
 export function photoCandidates(raw) {
-  const rows = (Array.isArray(raw) ? raw : []).filter(
-    (r) => r && PHOTO_LABELS.some(([type]) => type === r.type) && Number.isFinite(r.score),
-  );
+  const seen = new Set();
+  const rows = (Array.isArray(raw) ? raw : []).filter((r) => {
+    if (
+      !r ||
+      !PHOTO_LABELS.some(([type]) => type === r.type) ||
+      !Number.isFinite(r.score) ||
+      r.score < 0 ||
+      r.score > 1 ||
+      seen.has(r.type)
+    )
+      return false;
+    seen.add(r.type);
+    return true;
+  });
+  // 한 종류만 남은 잘못된 응답을 100% 확신으로 표시하지 않는다.
+  if (rows.length < 2) return [];
   if (!rows.length) return [];
   const logits = rows.map((r) => {
     const p = Math.min(1 - 1e-9, Math.max(1e-9, r.score));

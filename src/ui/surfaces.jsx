@@ -1230,6 +1230,8 @@ function Items() {
 }
 
 function Photo({ spec }) {
+  const [allKinds, setAllKinds] = useState(false);
+  const [query, setQuery] = useState('');
   const p = app.photo;
   if (!p || p.surfaceId !== spec.id)
     return (
@@ -1245,6 +1247,9 @@ function Photo({ spec }) {
   return (
     <>
       <Head icon="image" title="가구 사진" meta={p.analyzed ? '판별함' : '판별 전'} />
+      <p class="surface-hint">
+        가구 하나가 잘 보이는 사진을 올려 주세요. JPG·PNG·WebP, 최대 20MB예요.
+      </p>
       <div class="photo-surface">
         <img src={p.data} alt="첨부한 가구 사진" />
         <div class="photo-side">
@@ -1277,6 +1282,9 @@ function Photo({ spec }) {
               <p class="surface-hint">
                 SigLIP · {p.device === 'wasm' ? 'CPU' : 'GPU'}에서 실행. 사진만으로는 cm를 잴 수
                 없어 크기는 유형 기본값이에요.
+              </p>
+              <p class="surface-hint">
+                %는 후보 간 상대 점수예요. 정답 확률이나 치수 정확도가 아니에요.
               </p>
             </>
           ) : (
@@ -1319,6 +1327,11 @@ function Photo({ spec }) {
           )}
         </div>
       </div>
+      {p.error && !p.analyzed && (
+        <p class="photo-error" role="alert">
+          {p.error} CPU 호환으로 바꿔 다시 시도하거나 종류를 직접 골라 주세요.
+        </p>
+      )}
       <div class="chips-row is-wrap" aria-label="직접 종류 고르기">
         {['sofa', 'bed', 'desk', 'dining', 'chair', 'wardrobe', 'shelf', 'cabinet'].map((k) => (
           <button key={k} class="chip" onClick={() => store.createDraft(k, { via: 'photo' })}>
@@ -1326,10 +1339,37 @@ function Photo({ spec }) {
             {TYPES[k].name}
           </button>
         ))}
-        <button class="chip" onClick={() => store.openTool('catalog')}>
+        <button class="chip" aria-expanded={allKinds} onClick={() => setAllKinds(!allKinds)}>
           다른 종류
         </button>
       </div>
+      {allKinds && (
+        <div class="photo-kind-picker">
+          <label class="search">
+            <Icon name="search" size={16} />
+            <input
+              aria-label="사진의 가구 종류 검색"
+              placeholder="가구 이름으로 검색"
+              value={query}
+              onInput={(e) => setQuery(e.currentTarget.value)}
+            />
+          </label>
+          <div class="photo-kind-grid" aria-label="사진의 전체 가구 종류">
+            {Object.entries(TYPES)
+              .filter(([k]) => catalogMatches(k, query))
+              .map(([k, t]) => (
+                <button class="chip" key={k} onClick={() => store.createDraft(k, { via: 'photo' })}>
+                  {t.name}
+                </button>
+              ))}
+          </div>
+          {!Object.keys(TYPES).some((k) => catalogMatches(k, query)) && (
+            <p class="surface-hint" role="status">
+              맞는 종류가 없어요. 검색어를 바꿔 주세요.
+            </p>
+          )}
+        </div>
+      )}
     </>
   );
 }
@@ -1604,6 +1644,9 @@ function Help() {
         </li>
       </ol>
       <p class="surface-hint">치수는 배치를 위한 초안이에요. 구매·설치 전에는 실제로 재 주세요.</p>
+      <a class="link" href="./review/" target="_blank" rel="noopener noreferrer">
+        업데이트와 사진 검증 결과
+      </a>
     </>
   );
 }
