@@ -137,13 +137,17 @@ test('선택한 가구는 입력창의 대상이 되고, 다른 가구 이름은
   expect((await stored(page)).items.find((a) => a.id === desk.id).type).toBe('desk');
 });
 
-test('욕실 설비를 포함한 가구 23종을 고르고 규격을 비교해 배치한다', async ({ page }) => {
+test('주방·반려동물·식물을 포함한 가구 93종을 고르고 규격을 비교해 배치한다', async ({ page }) => {
   await page.goto('/?model=off');
   await ready(page);
   await openTool(page, '가구 고르기');
-  await expect(page.locator('.catalog-card')).toHaveCount(23);
-  await expect(page.locator('.catalog-card img')).toHaveCount(23);
+  await expect(page.locator('.catalog-card')).toHaveCount(93);
+  await expect(page.locator('.catalog-card img')).toHaveCount(93);
   await expect(page.locator('.catalog-card[data-type=toilet]')).toContainText('변기');
+  await page.getByRole('button', { name: '반려동물', exact: true }).click();
+  await expect(page.locator('.catalog-card')).toHaveCount(11);
+  await expect(page.locator('.catalog-card[data-type=cat_tower]')).toContainText('캣타워');
+  await page.getByRole('button', { name: '전체', exact: true }).click();
   await page.getByRole('textbox', { name: '가구 검색' }).fill('식탁');
   await expect(page.locator('.catalog-card')).toHaveCount(1);
   await page.locator('.catalog-card').click();
