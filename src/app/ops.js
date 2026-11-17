@@ -7,6 +7,7 @@ import {
   FLOOR_COLORS,
   FURNITURE_COLORS,
   FIXTURE_TYPES,
+  FLAT_TYPES,
   makeRoom,
   retypeRoom,
 } from '../catalog.js';
@@ -505,7 +506,7 @@ export function findFreeSpot(state, item) {
   clampItem(fallback, room);
   const result = (c, free) => ({ x: c.x, z: c.z, angle: c.angle, free });
   if (oversizedAt(item, room)) return result(fallback, false);
-  if (item.type === 'rug') {
+  if (FLAT_TYPES.has(item.type)) {
     const c = { ...item, x: 0, z: 0, angle: item.angle || 0 };
     clampItem(c, room);
     return result(c, true);

@@ -1,5 +1,6 @@
 import { PlanScene, drawAvatar, drawDoor, doorHit } from './plan.js';
 import { spaces } from './data.js';
+import { FLAT_TYPES } from './catalog.js';
 import { floorplanWarnings, normalizeFloorplan, roomBounds } from './floorplan.js';
 import { PAPER } from './tape.js';
 import { houseLayout } from './house-geometry.js';
@@ -207,7 +208,7 @@ export class HouseScene extends PlanScene {
       }
       this.ox = ox + p.x * scale;
       this.oy = oy + p.z * scale;
-      for (const a of [...r.items].sort((a, b) => (b.type === 'rug') - (a.type === 'rug')))
+      for (const a of [...r.items].sort((a, b) => FLAT_TYPES.has(b.type) - FLAT_TYPES.has(a.type)))
         this.item(c, a, { named: names });
       this.ox = ox;
       this.oy = oy;

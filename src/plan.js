@@ -1,4 +1,5 @@
 import { TYPES, footprint, spaces } from './data.js';
+import { FLAT_TYPES } from './catalog.js';
 import { tapeCanvas, drawTags, PAPER } from './tape.js';
 import { avatarLayout, avatarHit, avatarReach, avatarApron, LIMBS } from './avatar.js';
 import { roomOpenings, doorSwing } from './floorplan.js';
@@ -6,7 +7,31 @@ import { roomOpenings, doorSwing } from './floorplan.js';
 // 건축 평면도 방식의 2D 도면. 벽은 먹색 단면, 가구는 위에서 본 기호와 이름으로 그린다.
 const INK = '#2a2824';
 const FONT = '"Pretendard Variable", Pretendard, system-ui, sans-serif';
-const TALL = new Set(['wardrobe', 'shelf', 'fridge', 'shoe_cabinet']);
+const TALL = new Set([
+  'wardrobe',
+  'shelf',
+  'fridge',
+  'shoe_cabinet',
+  'tall_cabinet',
+  'cupboard',
+  'display_cabinet',
+  'bath_cabinet',
+  'styler',
+]);
+// 위에서 보면 둥근 가구.
+const ROUND = new Set([
+  'lamp',
+  'plant',
+  'basin',
+  'leafy_plant',
+  'tree_plant',
+  'succulent',
+  'trailing_plant',
+  'humidifier',
+  'bar_stool',
+  'pet_bed',
+  'bird_cage',
+]);
 
 // 위에서 본 아바타. 관절 좌표(m)를 그대로 그려 가구와 같은 축척을 유지한다.
 export function drawAvatar(c, a, ox, oy, s) {
@@ -135,7 +160,9 @@ export class PlanScene {
       const avatar = avatarLayout(this.state);
       if (avatar && avatarHit(avatar, p.x, p.z) && !(avatar.item && inside(avatar.item)))
         return { id: 'avatar', x: avatar.x, z: avatar.z, fixed: avatar.pose !== 'standing' };
-      for (const a of [...this.state.items].sort((a, b) => (a.type === 'rug') - (b.type === 'rug')))
+      for (const a of [...this.state.items].sort(
+        (a, b) => FLAT_TYPES.has(a.type) - FLAT_TYPES.has(b.type),
+      ))
         if (inside(a)) return a;
       return null;
     };
@@ -453,7 +480,9 @@ export class PlanScene {
     const doors = roomOpenings(spaces(this.state), this.state.floorplan, this.state.roomId);
     for (const o of doors)
       drawDoor(c, o, this.ox, this.oy, s, wt * 2 + 2, !!this.doorSelected?.includes(o.roomId));
-    const items = [...this.state.items].sort((a, b) => (b.type === 'rug') - (a.type === 'rug'));
+    const items = [...this.state.items].sort(
+      (a, b) => FLAT_TYPES.has(b.type) - FLAT_TYPES.has(a.type),
+    );
     for (const a of items)
       this.item(c, a, { warn: this.warnings.has(a.id), selected: a.id === this.selected });
     if (this.ghostItem) this.item(c, this.ghostItem, { ghost: true });
@@ -470,8 +499,7 @@ export class PlanScene {
     c.globalAlpha = ghost ? 0.55 : 1;
     c.fillStyle = a.color;
     c.beginPath();
-    if (a.type === 'lamp' || a.type === 'plant' || a.type === 'basin')
-      c.ellipse(0, 0, fw / 2, fd / 2, 0, 0, Math.PI * 2);
+    if (ROUND.has(a.type)) c.ellipse(0, 0, fw / 2, fd / 2, 0, 0, Math.PI * 2);
     else if (a.type === 'toilet') {
       // 벽 쪽 물탱크와 앞으로 나온 변기.
       c.roundRect(-fw * 0.45, -fd / 2, fw * 0.9, fd * 0.26, 2);
@@ -494,6 +522,9 @@ export class PlanScene {
     c.beginPath();
     switch (a.type) {
       case 'bed':
+      case 'bunk_bed':
+      case 'crib':
+      case 'bumper_bed':
         c.fillStyle = 'rgba(250,248,242,0.92)';
         c.fillRect(-fw * 0.44, -fd * 0.44, fw * 0.88, fd * 0.16);
         c.moveTo(-fw / 2, -fd * 0.08);
@@ -508,10 +539,14 @@ export class PlanScene {
         c.lineTo(fw * 0.38, fd / 2 - 3);
         break;
       case 'chair':
+      case 'office_chair':
+      case 'high_chair':
         c.moveTo(-fw / 2 + 2, -fd * 0.34);
         c.lineTo(fw / 2 - 2, -fd * 0.34);
         break;
       case 'rug':
+      case 'play_mat':
+      case 'yoga_mat':
         c.setLineDash([3, 3]);
         c.rect(-fw * 0.44, -fd * 0.44, fw * 0.88, fd * 0.88);
         break;
@@ -519,9 +554,15 @@ export class PlanScene {
       case 'dining':
       case 'coffee':
       case 'bench':
+      case 'standing_desk':
+      case 'kids_desk':
+      case 'console':
+      case 'bar_table':
+      case 'island':
         c.rect(-fw / 2 + 4, -fd / 2 + 4, fw - 8, fd - 8);
         break;
       case 'washer':
+      case 'dryer':
         c.arc(0, 0, Math.min(fw, fd) * 0.3, 0, Math.PI * 2);
         break;
       case 'basin':
@@ -540,10 +581,38 @@ export class PlanScene {
         c.moveTo(Math.min(fw, fd) * 0.08, 0);
         c.arc(0, 0, Math.min(fw, fd) * 0.08, 0, Math.PI * 2);
         break;
+      case 'bathtub':
+        c.strokeStyle = 'rgba(42,40,36,0.35)';
+        c.roundRect(-fw / 2 + 5, -fd / 2 + 5, fw - 10, fd - 10, Math.min(10, fd / 4));
+        break;
+      case 'sink':
+        c.strokeStyle = 'rgba(42,40,36,0.35)';
+        for (const x of fw > 110 ? [-fw * 0.18, fw * 0.18] : [0])
+          c.rect(x - fw * 0.15, -fd * 0.25, fw * 0.3, fd * 0.6);
+        break;
+      case 'cooktop':
+        c.strokeStyle = 'rgba(42,40,36,0.35)';
+        for (const x of [-fw * 0.22, fw * 0.22]) {
+          c.moveTo(x + fd * 0.12, 0);
+          c.arc(x, 0, fd * 0.12, 0, Math.PI * 2);
+        }
+        break;
       case 'cabinet':
       case 'side':
       case 'tvstand':
       case 'dresser':
+      case 'counter':
+      case 'cupboard':
+      case 'tall_cabinet':
+      case 'microwave_stand':
+      case 'dishwasher':
+      case 'display_cabinet':
+      case 'drawer_unit':
+      case 'file_cabinet':
+      case 'vanity':
+      case 'changing_table':
+      case 'toy_storage':
+      case 'bath_cabinet':
         c.moveTo(-fw / 2 + 2, fd / 2 - 4);
         c.lineTo(fw / 2 - 2, fd / 2 - 4);
         break;
@@ -591,12 +660,12 @@ export class PlanScene {
     const tw = c.measureText(label).width + 8,
       cx = this.ox + a.x * s,
       cy = this.oy + a.z * s;
-    if (bw > tw && bd > 18 && a.type !== 'rug') {
+    if (bw > tw && bd > 18 && !FLAT_TYPES.has(a.type)) {
       c.fillStyle = 'rgba(255,255,255,0.82)';
       c.fillRect(cx - tw / 2, cy - 8, tw, 16);
       c.fillStyle = INK;
       c.fillText(label, cx, cy);
-    } else if (a.type === 'rug' && bw > 60) {
+    } else if (FLAT_TYPES.has(a.type) && bw > 60) {
       c.fillStyle = 'rgba(42,40,36,0.6)';
       c.fillText(label, cx, cy + bd / 2 - 12);
     }

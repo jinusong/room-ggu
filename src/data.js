@@ -1,4 +1,4 @@
-import { TYPES, ROOM_TYPES, makeRoom } from './catalog.js';
+import { TYPES, ROOM_TYPES, FLAT_TYPES, makeRoom } from './catalog.js';
 import { defaultAvatar, validateAvatar } from './avatar.js';
 import { normalizeFloorplan, roomOpenings } from './floorplan.js';
 export { TYPES, ROOM_TYPES, makeRoom } from './catalog.js';
@@ -185,7 +185,7 @@ export function clampItem(item, room) {
   return f.w > room.w + 0.001 || f.d > room.d + 0.001 || item.dims[1] / 100 > room.h;
 }
 export function overlaps(a, b) {
-  if (a.type === 'rug' || b.type === 'rug') return false;
+  if (FLAT_TYPES.has(a.type) || FLAT_TYPES.has(b.type)) return false;
   const aa = (a.angle * Math.PI) / 180,
     bb = (b.angle * Math.PI) / 180;
   const ax = [
