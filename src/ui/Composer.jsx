@@ -4,8 +4,9 @@ import * as store from '../app/store.js';
 import { app } from '../app/store.js';
 import { josa } from '../app/text.js';
 import { Icon } from './icons.js';
-import { useAutosize, useOutside } from './widgets.jsx';
+import { useAutosize, useMenu } from './widgets.jsx';
 import { isPhotoFile } from '../photo-input.js';
+import { isComposingKey } from '../ui-input.js';
 
 // 입력창의 + 메뉴. 가구 → 공간 → 가늠·집 전체 → 파일·설정 순서로 묶는다.
 const TOOL_GROUPS = [
@@ -87,15 +88,15 @@ export function Composer({ onFocusChange, mobile }) {
   const [menuMax, setMenuMax] = useState(420);
   const menuRef = useRef(null);
   // 메뉴는 입력창 위로 열린다. 시트가 낮아도 잘리지 않게 위쪽 여유만큼만 키운다.
-  const toggleMenu = () => {
+  const setMenuOpen = (open) => {
     const box = menuRef.current?.getBoundingClientRect(),
       sheet = menuRef.current?.closest('.sheet')?.getBoundingClientRect();
     if (box && sheet) setMenuMax(Math.max(160, Math.min(440, box.top - sheet.top - 12)));
-    setMenu(!menu);
+    setMenu(open);
   };
+  const menuKeys = useMenu(menuRef, menu, setMenuOpen);
   const ref = useAutosize(text);
-  useOutside(menuRef, () => setMenu(false), menu);
-  const busy = !!app.busy || app.photoLoading;
+  const busy = !!app.busy || app.photoLoading || app.fileLoading;
   const pending = app.photo && !app.photo.sent ? app.photo : null;
   const submit = (e) => {
     e?.preventDefault();
@@ -105,8 +106,8 @@ export function Composer({ onFocusChange, mobile }) {
     draftText = '';
     store.send(value);
   };
-  const runTool = (kind) => {
-    setMenu(false);
+  const runTool = (kind, event) => {
+    menuKeys.close(event.detail === 0);
     if (kind === 'photo') store.pickPhoto();
     else if (kind === 'avatar' && !store.avatarHere()) store.toggleAvatar();
     else store.openTool(kind);
@@ -115,47 +116,61 @@ export function Composer({ onFocusChange, mobile }) {
   return (
     <form class="composer" onSubmit={submit} aria-label="상담 입력">
       <TargetChip />
-      {app.photoLoading && (
-        <div class="photo-tray" role="status">
-          <span>사진을 준비하고 있어요</span>
-          <button
-            type="button"
-            class="icon-btn"
-            aria-label="사진 준비 취소"
-            onClick={() => store.removePhoto()}
-          >
-            <Icon name="x" size={16} />
-          </button>
-        </div>
-      )}
-      {app.photoError && (
-        <p class="photo-error" role="alert">
-          {app.photoError}
-        </p>
-      )}
-      {pending && (
-        <div class="photo-tray">
-          <img src={pending.data} alt="첨부할 가구 사진" />
-          <span>사진을 붙였어요. 설명을 덧붙이거나 그대로 보내세요.</span>
-          <button
-            type="button"
-            class="icon-btn"
-            aria-label="사진 빼기"
-            onClick={() => store.removePhoto()}
-          >
-            <Icon name="x" size={16} />
-          </button>
-        </div>
-      )}
+      <div class="composer-extras">
+        {app.fileLoading && (
+          <div class="photo-tray" role="status">
+            <span>배치 파일을 읽고 있어요</span>
+            <button
+              type="button"
+              class="icon-btn"
+              aria-label="배치 불러오기 취소"
+              onClick={() => store.cancelImport()}
+            >
+              <Icon name="x" size={16} />
+            </button>
+          </div>
+        )}
+        {app.fileError && (
+          <p class="photo-error" role="alert">
+            {app.fileError}
+          </p>
+        )}
+        {app.photoLoading && (
+          <div class="photo-tray" role="status">
+            <span>사진을 준비하고 있어요</span>
+            <button
+              type="button"
+              class="icon-btn"
+              aria-label="사진 준비 취소"
+              onClick={() => store.removePhoto()}
+            >
+              <Icon name="x" size={16} />
+            </button>
+          </div>
+        )}
+        {app.photoError && (
+          <p class="photo-error" role="alert">
+            {app.photoError}
+          </p>
+        )}
+        {pending && (
+          <div class="photo-tray">
+            <img src={pending.data} alt="첨부할 가구 사진" />
+            <span>사진을 붙였어요. 설명을 덧붙이거나 그대로 보내세요.</span>
+            <button
+              type="button"
+              class="icon-btn"
+              aria-label="사진 빼기"
+              onClick={() => store.removePhoto()}
+            >
+              <Icon name="x" size={16} />
+            </button>
+          </div>
+        )}
+      </div>
       <div class="composer-box">
-        <div class="tool-menu-wrap" ref={menuRef}>
-          <button
-            type="button"
-            class="icon-btn"
-            aria-label="도구 열기"
-            aria-expanded={menu}
-            onClick={toggleMenu}
-          >
+        <div class="tool-menu-wrap" ref={menuRef} onKeyDown={menuKeys.onKeyDown}>
+          <button type="button" class="icon-btn" aria-label="도구 열기" {...menuKeys.trigger}>
             <Icon name="plus" />
           </button>
           {menu && (
@@ -168,7 +183,7 @@ export function Composer({ onFocusChange, mobile }) {
                       type="button"
                       role="menuitem"
                       data-tool={k}
-                      onClick={() => runTool(k)}
+                      onClick={(event) => runTool(k, event)}
                     >
                       <Icon name={i} size={16} />
                       <span>{l}</span>
@@ -194,7 +209,7 @@ export function Composer({ onFocusChange, mobile }) {
           onFocus={() => onFocusChange?.(true)}
           onBlur={() => onFocusChange?.(false)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) submit(e);
+            if (e.key === 'Enter' && !e.shiftKey && !isComposingKey(e)) submit(e);
           }}
           onPaste={(e) => {
             const file = [...(e.clipboardData?.files || [])].find(isPhotoFile);
@@ -220,6 +235,11 @@ export function Composer({ onFocusChange, mobile }) {
       <div class="composer-foot">
         {!mobile && <span class="composer-hint">Enter로 보내기 · Shift+Enter로 줄바꿈</span>}
         <span class="save-state">{app.view.saveStatus}</span>
+        {text.length >= 1200 && (
+          <span class="char-count" aria-live={text.length === 1500 ? 'polite' : 'off'}>
+            {text.length}/1500자
+          </span>
+        )}
       </div>
     </form>
   );

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState, useId } from 'preact/hooks';
 import { footprint } from '../data.js';
 import { Icon } from './icons.js';
+import { isComposingKey, parseStepperValue } from '../ui-input.js';
 
 // 상담 상대의 얼굴. 대화 머리와 답마다 같은 표식을 쓴다.
 export function BrandMark() {
@@ -52,6 +53,7 @@ export function Stepper({
   const [text, setText] = useState(fmt(value));
   const [focused, setFocused] = useState(false);
   const [error, setError] = useState('');
+  const errorId = useId();
   // 값이 밖에서 바뀌면 입력란과 안내를 그 값에 맞춘다. 범위를 벗어나 남겨 둔 글은 다시 손댈 때까지 둔다.
   useEffect(() => {
     if (focused || error) return;
@@ -61,10 +63,7 @@ export function Stepper({
     setError('');
     if (!focused) setText(fmt(value));
   }, [value]);
-  const parse = (t) => {
-    const n = Number(String(t).replace(',', '.'));
-    return Number.isFinite(n) && n >= min && n <= max ? n : null;
-  };
+  const parse = (t) => parseStepperValue(t, min, max);
   const bump = (dir) => {
     const n = Math.min(max, Math.max(min, Math.round((value + dir * step) * 100) / 100));
     setError('');
@@ -85,6 +84,8 @@ export function Stepper({
         <label class="stepper-field">
           <input
             aria-label={ariaLabel}
+            aria-invalid={error ? 'true' : undefined}
+            aria-describedby={error ? errorId : undefined}
             inputMode="decimal"
             value={text}
             onFocus={() => {
@@ -101,6 +102,7 @@ export function Stepper({
               }
             }}
             onKeyDown={(e) => {
+              if (isComposingKey(e)) return;
               if (e.key === 'Enter') e.currentTarget.blur();
               if (e.key === 'ArrowUp') {
                 e.preventDefault();
@@ -117,7 +119,10 @@ export function Stepper({
                 n = parse(raw);
               // 입력을 마쳤을 때 범위를 벗어났으면 쓴 글을 남기고 이유를 알린다. 값은 바꾸지 않는다.
               if (n === null && raw) setError(`${min}~${max}${unit}`);
-              else if (n === null) setText(fmt(value));
+              else if (n === null) {
+                setError('');
+                setText(fmt(value));
+              }
               onBlur?.();
             }}
           />
@@ -135,7 +140,7 @@ export function Stepper({
       {(error || source !== false) && (
         <span class="stepper-source">
           {error ? (
-            <em class="field-error" role="alert">
+            <em id={errorId} class="field-error" role="alert">
               {error} 범위로 입력해 주세요 · 지금 값 {fmt(value)}
               {unit}
             </em>
@@ -378,17 +383,23 @@ export function FitBadge({ fit }) {
 }
 
 export function useOutside(ref, onClose, active) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active) return;
     const h = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose();
+      if (ref.current && !ref.current.contains(e.target)) onClose(e);
     };
-    const k = (e) => e.key === 'Escape' && onClose();
+    const k = (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || e.target.closest?.('[aria-modal="true"]'))
+        return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClose(e);
+    };
     document.addEventListener('pointerdown', h);
-    document.addEventListener('keydown', k);
+    document.addEventListener('keydown', k, true);
     return () => {
       document.removeEventListener('pointerdown', h);
-      document.removeEventListener('keydown', k);
+      document.removeEventListener('keydown', k, true);
     };
   }, [active]);
 }
@@ -399,11 +410,138 @@ export function footprintOf(item) {
 
 export function useAutosize(value) {
   const ref = useRef(null);
+  const resize = () => {
+    const el = ref.current;
+    if (!el) return;
+    const sheet = el.closest('.sheet'),
+      composer = el.closest('.composer');
+    const min = parseFloat(getComputedStyle(el).minHeight) || 40;
+    let max = 168;
+    if (sheet && composer) {
+      const other = composer.offsetHeight - el.offsetHeight;
+      const chrome = [...sheet.children]
+        .filter(
+          (n) =>
+            n !== composer &&
+            !n.classList.contains('thread') &&
+            !n.classList.contains('sheet-resize'),
+        )
+        .reduce((sum, n) => sum + n.offsetHeight, 0);
+      const height = sheet.classList.contains('is-collapsed')
+        ? (window.visualViewport?.height || innerHeight) - 48
+        : sheet.clientHeight;
+      max = Math.max(min, Math.min(max, height - chrome - other - 12));
+    }
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(min, Math.min(el.scrollHeight, max))}px`;
+  };
+  useLayoutEffect(resize, [value]);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 168)}px`;
-  }, [value]);
+    let frame;
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(resize);
+    };
+    const observer = new ResizeObserver(schedule);
+    for (const node of [el.closest('.sheet'), el.closest('.composer'), el.closest('.composer-box')])
+      if (node) observer.observe(node);
+    window.addEventListener('resize', schedule);
+    window.visualViewport?.addEventListener('resize', schedule);
+    document.fonts?.ready.then(schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener('resize', schedule);
+      window.visualViewport?.removeEventListener('resize', schedule);
+    };
+  }, []);
   return ref;
+}
+
+// 포인터와 키보드가 같은 메뉴 항목과 닫기 동작을 쓴다.
+export function useMenu(ref, active, onChange) {
+  const trigger = useRef(null),
+    initial = useRef(null);
+  const items = () =>
+    [
+      ...(ref.current?.querySelectorAll('[role="menuitem"],[role="menuitemcheckbox"]') || []),
+    ].filter((el) => !el.disabled);
+  const close = (restore = false) => {
+    onChange(false);
+    if (restore) trigger.current?.focus({ preventScroll: true });
+  };
+  useOutside(ref, (event) => close(event?.key === 'Escape'), active);
+  useLayoutEffect(() => {
+    if (!active || !initial.current) return;
+    const list = items();
+    (initial.current === 'last' ? list.at(-1) : list[0])?.focus({ preventScroll: true });
+    initial.current = null;
+  }, [active]);
+  const openAt = (last) => {
+    initial.current = last ? 'last' : 'first';
+    onChange(true);
+    if (active) {
+      const list = items();
+      (last ? list.at(-1) : list[0])?.focus();
+      initial.current = null;
+    }
+  };
+  return {
+    close,
+    trigger: {
+      ref: trigger,
+      'aria-haspopup': 'menu',
+      'aria-expanded': active,
+      onClick: (event) => {
+        initial.current = event.detail === 0 ? 'first' : null;
+        onChange(!active);
+      },
+      onKeyDown: (event) => {
+        if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        openAt(event.key === 'ArrowUp');
+      },
+    },
+    onKeyDown: (event) => {
+      if (!active || isComposingKey(event)) return;
+      if (event.key === 'Tab') {
+        const list = [
+          ...document.querySelectorAll('a[href],button,input,textarea,select,[tabindex]'),
+        ].filter(
+          (el) =>
+            !el.disabled &&
+            el.tabIndex >= 0 &&
+            el.getClientRects().length &&
+            !el.closest('[inert]') &&
+            (!ref.current?.contains(el) || el === trigger.current),
+        );
+        const at = list.indexOf(trigger.current),
+          next = list[(at + (event.shiftKey ? -1 : 1) + list.length) % list.length];
+        event.preventDefault();
+        close();
+        next?.focus();
+        return;
+      }
+      const list = items(),
+        at = list.indexOf(document.activeElement);
+      const next =
+        event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? list.length - 1
+            : event.key === 'ArrowDown'
+              ? (at + 1) % list.length
+              : event.key === 'ArrowUp'
+                ? (at - 1 + list.length) % list.length
+                : null;
+      if (next === null || !list.length) return;
+      event.preventDefault();
+      event.stopPropagation();
+      list[next].focus({ preventScroll: true });
+      list[next].scrollIntoView({ block: 'nearest' });
+    },
+  };
 }

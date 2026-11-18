@@ -1601,6 +1601,10 @@ function Files() {
       <p class="surface-hint">
         자동 저장은 이 브라우저에만 남아요. 사진과 대화는 배치 파일에 넣지 않아요.
       </p>
+      <p class="surface-hint">
+        불러오면 현재 배치와 미배치 초안을 바꿔요. 기존 배치는 실행 취소로 복구해요.
+      </p>
+      {app.fileError && <p class="field-error">{app.fileError}</p>}
     </>
   );
 }

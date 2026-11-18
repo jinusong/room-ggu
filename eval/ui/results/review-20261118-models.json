@@ -1,0 +1,125 @@
+{
+  "date": "2026-11-18",
+  "errors": [],
+  "photo": {
+    "draft": {
+      "id": "2e935f8a-7f3d-498d-8a98-1af8b3158cea",
+      "type": "bed",
+      "name": "침대",
+      "dims": [
+        150,
+        55,
+        210
+      ],
+      "sources": [
+        "사용자 설정",
+        "사용자 설정",
+        "사용자 설정"
+      ],
+      "color": "#b29a80",
+      "x": 0,
+      "z": 0,
+      "angle": 0
+    },
+    "candidates": [
+      {
+        "type": "bed",
+        "p": 0.9760454956901639
+      },
+      {
+        "type": "side",
+        "p": 0.009643862528840178
+      },
+      {
+        "type": "sofa",
+        "p": 0.0040994505034556775
+      }
+    ]
+  },
+  "model": {
+    "state": "ready",
+    "model": "gemma3-1b-it-q4f16_1-MLC",
+    "error": ""
+  },
+  "normal": {
+    "draft": {
+      "id": "28011c86-304f-4317-adcf-c5b43042453c",
+      "type": "bed",
+      "name": "나의 침대",
+      "dims": [
+        180,
+        55,
+        210
+      ],
+      "sources": [
+        "사용자 설정",
+        "사용자 설정",
+        "사용자 설정"
+      ],
+      "color": "#b29a80",
+      "x": 0,
+      "z": 0,
+      "angle": 0
+    },
+    "turn": {
+      "id": "tmwlspsz68",
+      "roomId": "a67faaeb-a0a3-45ca-8911-48eddf881cad",
+      "role": "assistant",
+      "text": "침대 초안은 180 × 210 × 55cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+      "surfaces": [
+        {
+          "id": "tmwlspvkv9",
+          "kind": "furniture-dims",
+          "target": {
+            "type": "draft",
+            "id": "28011c86-304f-4317-adcf-c5b43042453c"
+          }
+        }
+      ],
+      "receipt": [
+        {
+          "label": "새 초안",
+          "to": "침대 · 180 × 210 × 55cm"
+        }
+      ],
+      "suggestions": [
+        {
+          "label": "방에 놓기",
+          "action": "place",
+          "primary": true
+        },
+        {
+          "label": "조금 더 작게",
+          "text": "조금 더 작게"
+        },
+        {
+          "label": "색 바꾸기",
+          "text": "침대 색을 바꾸고 싶어"
+        }
+      ],
+      "engine": "gemma",
+      "status": "done",
+      "fixes": [
+        "도구는 요청 단어에 맞춰 치수 직접 입력"
+      ]
+    }
+  },
+  "import": {
+    "wasPending": true,
+    "name": "실제 상담 중 불러온 방",
+    "draft": null,
+    "busy": null,
+    "turn": {
+      "id": "tmwlspvlpb",
+      "roomId": "a67faaeb-a0a3-45ca-8911-48eddf881cad",
+      "role": "assistant",
+      "text": "배치 파일을 불러와 이전 상담을 멈췄어요.",
+      "surfaces": [],
+      "receipt": [],
+      "suggestions": [],
+      "engine": "app",
+      "status": "done"
+    }
+  },
+  "pass": true
+}

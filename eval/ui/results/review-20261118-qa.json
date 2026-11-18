@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-18",
+  "version": "5.13.0",
+  "baseline_commit": "1d88795b77c80a192da32c5df394a3a91837b4bb",
+  "environment": "macOS; Chrome, Playwright Firefox and WebKit; real models on Chrome WebGPU",
+  "unit": {
+    "passed": 272,
+    "new": 16
+  },
+  "chrome_full": {
+    "passed": 193,
+    "new": 54
+  },
+  "cross_engine_photo_and_ux": {
+    "firefox": 99,
+    "webkit": 99,
+    "photo": 45,
+    "new_ux_files": 54
+  },
+  "last_toast_focus_refinement": {
+    "chromium": 54,
+    "firefox": 54,
+    "webkit": 54,
+    "note": "Re-ran all new UI/file tests after the final pointer+focus notification refinement. Full release Chrome suite also runs in Pages CI."
+  },
+  "artifact": {
+    "widths": [
+      1440,
+      390,
+      320
+    ],
+    "horizontal_document_overflow": false,
+    "broken_images": 0,
+    "page_errors": 0
+  },
+  "limits": [
+    "Real iPhone/Android keyboard, camera and OS clipboard untested",
+    "WebKit engine is not physical Safari verification",
+    "Windows GPU untested",
+    "Gemma 4 and f32 paths not re-run",
+    "Photo classification benchmark unchanged; prior 58-photo results retained"
+  ]
+}

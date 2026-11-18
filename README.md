@@ -2,14 +2,20 @@
 
 **룸꾸와 대화하며 방과 가구를 설명하면 필요한 도구가 대화에 나타나고, 실제 치수의 2D·3D 방에 바로 반영되는 인테리어 상담 웹.**
 
-[사이트 열기](https://jinusong.github.io/room-ggu/) · [v5.12 사진 개선·검증](https://jinusong.github.io/room-ggu/review/) · [v5.10 개선 리뷰](https://room-ggu-review-20261117.divine-angel-0926.chatgpt.site) · [기획](docs/product-plan.md) ([HTML](docs/product-plan.html)) · [디자인 방향](docs/design-direction.md) · [검증 기록](docs/verification.md)
+[사이트 열기](https://jinusong.github.io/room-ggu/) · [v5.13 UI/UX·QA 보고서](https://jinusong.github.io/room-ggu/review/) · [v5.12 사진 검증](https://jinusong.github.io/room-ggu/review/photo/) · [v5.10 개선 리뷰](https://room-ggu-review-20261117.divine-angel-0926.chatgpt.site) · [기획](docs/product-plan.md) ([HTML](docs/product-plan.html)) · [디자인 방향](docs/design-direction.md) · [검증 기록](docs/verification.md)
 
+
+## v5.13 입력·키보드·파일 복구
+
+한글 조합 중 전송을 막고, 메뉴의 방향키·Tab·Esc 조작과 초점 복귀를 보완했습니다. 모바일 가로 화면·작은 화면에서는 작성 중인 글의 높이를 다시 맞추고 입력·전송을 남깁니다. 시트·대화 폭 드래그를 취소하면 원래 상태로 돌아갑니다.
+
+배치 파일을 연속 선택해도 마지막 선택만 반영합니다. 읽는 동안 직접 고친 배치는 지키고, 정상 파일을 불러오면 이전 상담·사진 작업과 미배치 초안을 정리합니다. 불러오기 상태·취소·오류를 입력창 위에 표시하며 실행 취소로 이전 배치를 복구합니다.
 
 ## v5.12 사진 입력과 판별 복구
 
 사진을 빠르게 교체하거나 준비 중 취소해도 마지막 선택을 유지합니다. 판별 중 직접 고친 배치와 초안은 보호하며, 새 대화를 시작하면 사진 작업도 끝냅니다. 손상·용량 초과 파일은 기존 사진과 입력하던 설명을 남기고 복구 방법을 안내합니다.
 
-투명 사진은 흰 배경으로 변환하고 휴대폰 JPEG의 회전 방향을 유지합니다. 사진의 **다른 종류**에서 40종을 검색해 골라도 함께 보낸 치수·색 설명이 반영됩니다. 후보 점수의 의미와 실제 모델 평가 결과는 [개선·검증 보고서](https://jinusong.github.io/room-ggu/review/)에서 확인하세요.
+투명 사진은 흰 배경으로 변환하고 휴대폰 JPEG의 회전 방향을 유지합니다. 사진의 **다른 종류**에서 40종을 검색해 골라도 함께 보낸 치수·색 설명이 반영됩니다. 후보 점수의 의미와 실제 모델 평가 결과는 [사진 개선·검증 보고서](https://jinusong.github.io/room-ggu/review/photo/)에서 확인하세요.
 
 ## v5.11 창문 직접 조작과 모델별 안내
 

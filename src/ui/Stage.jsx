@@ -12,7 +12,7 @@ import { app } from '../app/store.js';
 import { findFreeSpot, fitStatus } from '../app/ops.js';
 import { Icon } from './icons.js';
 import { josa } from '../app/text.js';
-import { useOutside } from './widgets.jsx';
+import { useOutside, useMenu } from './widgets.jsx';
 
 // 초안과 규격 미리보기를 방 안의 점선 가구로 계산한다.
 export function ghostItem() {
@@ -190,20 +190,15 @@ function ScopeNav() {
 function MoreMenu({ mobile }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
-  useOutside(ref, () => setOpen(false), open);
-  const run = (fn) => () => {
-    setOpen(false);
+  const menuKeys = useMenu(ref, open, setOpen);
+  const run = (fn) => (event) => {
+    menuKeys.close(event.detail === 0);
     fn();
   };
   const s = app.state;
   return (
-    <div class="more" ref={ref}>
-      <button
-        class="icon-btn on-stage"
-        aria-label="파일과 설정"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
+    <div class="more" ref={ref} onKeyDown={menuKeys.onKeyDown}>
+      <button class="icon-btn on-stage" aria-label="파일과 설정" {...menuKeys.trigger}>
         <Icon name="ellipsis" />
       </button>
       {open && (

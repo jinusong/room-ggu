@@ -1,10 +1,10 @@
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import * as store from '../app/store.js';
 import { app } from '../app/store.js';
 import { Icon } from './icons.js';
 import { Thread } from './Thread.jsx';
 import { Composer } from './Composer.jsx';
-import { BrandMark } from './widgets.jsx';
+import { BrandMark, useOutside } from './widgets.jsx';
 
 const OFF_TEXT = {
   user: '모델 꺼 둠',
@@ -119,7 +119,38 @@ function Resizer({ sheetRef }) {
     redraw((n) => n + 1);
   };
   const width = () => Math.round(sheetRef.current?.getBoundingClientRect().width || 0);
-  const [min, max] = widthLimits();
+  const [metrics, setMetrics] = useState(() => ({
+    min: widthLimits()[0],
+    max: widthLimits()[1],
+    now: 0,
+  }));
+  const cancel = () => {
+    const d = drag.current;
+    drag.current = null;
+    document.documentElement.classList.remove('is-resizing');
+    if (!d) return;
+    if (d.css) document.documentElement.style.setProperty('--chat-w', d.css);
+    else applyWidth(0);
+  };
+  useLayoutEffect(() => {
+    const update = () => {
+      const [min, max] = widthLimits(),
+        now = width();
+      setMetrics((old) =>
+        old.min === min && old.max === max && old.now === now ? old : { min, max, now },
+      );
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(sheetRef.current);
+    window.addEventListener('resize', update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+      cancel();
+    };
+  }, []);
+  const { min, max } = metrics;
   return (
     <div
       class="sheet-resize"
@@ -128,11 +159,15 @@ function Resizer({ sheetRef }) {
       aria-label="대화 폭 조절"
       aria-valuemin={min}
       aria-valuemax={max}
-      aria-valuenow={width() || undefined}
+      aria-valuenow={metrics.now || undefined}
       tabIndex={0}
       title="끌어서 대화 폭 조절 · 두 번 누르면 기본 폭"
       onPointerDown={(e) => {
-        drag.current = { x: e.clientX, w: width() };
+        drag.current = {
+          x: e.clientX,
+          w: width(),
+          css: document.documentElement.style.getPropertyValue('--chat-w'),
+        };
         e.currentTarget.setPointerCapture(e.pointerId);
         document.documentElement.classList.add('is-resizing');
       }}
@@ -143,6 +178,8 @@ function Resizer({ sheetRef }) {
         document.documentElement.classList.remove('is-resizing');
         set(width());
       }}
+      onPointerCancel={cancel}
+      onLostPointerCapture={cancel}
       onDblClick={() => {
         applyWidth(0);
         try {
@@ -169,6 +206,20 @@ const SNAPS = ['peek', 'half', 'full'];
 
 export function Sheet({ mobile, sheetRef }) {
   const [confirmClear, setConfirmClear] = useState(false);
+  const clearRef = useRef(null),
+    clearTrigger = useRef(null),
+    clearCancel = useRef(null);
+  const closeClear = (restore = false) => {
+    setConfirmClear(false);
+    if (restore) clearTrigger.current?.focus({ preventScroll: true });
+  };
+  useOutside(clearRef, (event) => closeClear(event?.key === 'Escape'), confirmClear);
+  useLayoutEffect(() => {
+    if (confirmClear) clearCancel.current?.focus({ preventScroll: true });
+  }, [confirmClear]);
+  useEffect(() => {
+    if (!app.thread.length) setConfirmClear(false);
+  }, [app.thread.length]);
   const drag = useRef(null);
   const collapsed = !mobile && app.view.collapsed;
   const snap = app.view.sheet;
@@ -185,7 +236,8 @@ export function Sheet({ mobile, sheetRef }) {
     if (Math.abs(dy) > 4) d.moved = true;
     if (!d.moved) return;
     const el = sheetRef.current;
-    el.style.height = `${Math.max(150, Math.min(window.innerHeight - 56, d.h + dy))}px`;
+    const limit = Math.max(80, (window.visualViewport?.height || innerHeight) - 52);
+    el.style.height = `${Math.max(Math.min(150, limit), Math.min(limit, d.h + dy))}px`;
     el.classList.add('is-dragging');
   };
   const onHandleUp = () => {
@@ -202,6 +254,11 @@ export function Sheet({ mobile, sheetRef }) {
     el.style.height = '';
     store.setSheet(h < 0.36 ? 'peek' : h < 0.75 ? 'half' : 'full');
   };
+  const cancelHandle = () => {
+    drag.current = null;
+    sheetRef.current?.classList.remove('is-dragging');
+    if (sheetRef.current) sheetRef.current.style.height = '';
+  };
   const lastAssistant = [...app.thread].reverse().find((t) => t.role === 'assistant');
   return (
     <aside
@@ -217,7 +274,11 @@ export function Sheet({ mobile, sheetRef }) {
           onPointerDown={onHandleDown}
           onPointerMove={onHandleMove}
           onPointerUp={onHandleUp}
-          onPointerCancel={onHandleUp}
+          onPointerCancel={cancelHandle}
+          onLostPointerCapture={cancelHandle}
+          onClick={(event) => {
+            if (event.detail === 0) store.setSheet(SNAPS[(SNAPS.indexOf(snap) + 1) % SNAPS.length]);
+          }}
         >
           <span />
         </button>
@@ -240,27 +301,53 @@ export function Sheet({ mobile, sheetRef }) {
           >
             <Icon name="cpu" />
           </button>
-          {app.thread.length > 0 &&
-            (confirmClear ? (
+          {app.thread.length > 0 && (
+            <div
+              class="clear-wrap"
+              ref={clearRef}
+              onBlurCapture={(event) => {
+                // WebKit은 마우스로 단추를 누를 때 relatedTarget 없이 초점을 뺀다.
+                // 바깥 클릭은 useOutside가 맡고, 여기서는 실제로 옮겨 간 초점만 따른다.
+                if (
+                  confirmClear &&
+                  event.relatedTarget &&
+                  !event.currentTarget.contains(event.relatedTarget)
+                )
+                  closeClear();
+              }}
+            >
               <button
-                class="btn small"
-                onClick={() => {
-                  setConfirmClear(false);
-                  store.clearThread();
-                }}
-              >
-                대화 지우기
-              </button>
-            ) : (
-              <button
+                ref={clearTrigger}
                 class="icon-btn"
                 aria-label="새 대화"
                 title="새 대화"
-                onClick={() => setConfirmClear(true)}
+                aria-expanded={confirmClear}
+                onClick={() => setConfirmClear(!confirmClear)}
               >
                 <Icon name="square-pen" />
               </button>
-            ))}
+              {confirmClear && (
+                <div class="clear-confirm" role="group" aria-label="대화 기록 삭제 확인">
+                  <p>대화 기록과 미배치 초안을 지워요. 방에 놓은 가구는 남아요.</p>
+                  <div class="clear-actions">
+                    <button ref={clearCancel} class="btn small" onClick={() => closeClear(true)}>
+                      취소
+                    </button>
+                    <button
+                      class="btn small"
+                      onClick={() => {
+                        setConfirmClear(false);
+                        store.clearThread();
+                        requestAnimationFrame(() => document.getElementById('chat-input')?.focus());
+                      }}
+                    >
+                      대화 지우기
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           {!mobile && (
             <button
               class="icon-btn"
@@ -286,7 +373,10 @@ export function Sheet({ mobile, sheetRef }) {
       <Composer
         mobile={mobile}
         onFocusChange={(f) => {
-          if (mobile && f && snap === 'peek') store.setSheet('half');
+          if (mobile && f) {
+            if ((window.visualViewport?.height || innerHeight) < 500) store.setSheet('full');
+            else if (snap === 'peek') store.setSheet('half');
+          }
         }}
       />
       {!mobile && !collapsed && <Resizer sheetRef={sheetRef} />}

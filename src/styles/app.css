@@ -516,6 +516,39 @@ button[aria-disabled='true'] {
   gap: 4px;
   margin-left: auto;
 }
+.clear-wrap {
+  position: relative;
+}
+.clear-confirm {
+  position: absolute;
+  z-index: 35;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(280px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-float);
+}
+.clear-confirm p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.clear-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.clear-actions .btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+.char-count {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .collapsed-last {
   display: flex;
   align-items: center;
@@ -1712,6 +1745,20 @@ button.row:hover,
   border-top: 1px solid var(--line);
   background: var(--sheet);
 }
+.composer-extras {
+  max-height: min(160px, max(40px, calc(var(--app-h, 100dvh) - 300px)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.composer-extras:empty {
+  display: none;
+}
+[data-compact-viewport] .sheet.is-mobile:focus-within .sheet-head {
+  display: none;
+}
+.composer-foot {
+  flex-wrap: wrap;
+}
 .target {
   display: inline-flex;
   align-items: center;
@@ -2569,6 +2616,9 @@ button.avatar-tag {
 }
 /* 잠깐 뜨는 알림과 모델 아일랜드는 화면 위 가운데 한 축에 둔다. */
 .toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   position: fixed;
   z-index: 50;
   top: var(--notice-top);
@@ -2578,7 +2628,7 @@ button.avatar-tag {
   max-width: min(440px, calc(100% - 32px));
   word-break: keep-all;
   overflow-wrap: anywhere;
-  padding: 10px 16px;
+  padding: 4px 6px 4px 16px;
   border-radius: 12px;
   background: var(--ink);
   color: var(--sheet);
@@ -2592,6 +2642,15 @@ button.avatar-tag {
   transition:
     opacity 0.2s var(--ease),
     transform 0.2s var(--ease);
+}
+.toast .icon-btn {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  color: inherit;
+}
+.toast .icon-btn:focus-visible {
+  outline-color: var(--tape);
 }
 .toast.is-visible {
   opacity: 1;

@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'preact/hooks';
 import * as store from '../app/store.js';
 import { app } from '../app/store.js';
 import { Stage } from './Stage.jsx';
@@ -6,6 +6,7 @@ import { Sheet } from './Sheet.jsx';
 import { ModelIsland } from './ModelIsland.jsx';
 import { Icon } from './icons.js';
 import { isPhotoFile } from '../photo-input.js';
+import { isComposingKey } from '../ui-input.js';
 
 // 대화 열과 방이 나란히 설 폭이 안 되면 대화를 아래 시트로 내린다.
 export const MOBILE = 900;
@@ -30,7 +31,15 @@ function useViewport() {
       const h = vv?.height || innerHeight;
       document.documentElement.style.setProperty('--app-h', `${Math.round(h)}px`);
       document.documentElement.style.setProperty('--vv-top', `${Math.round(vv?.offsetTop || 0)}px`);
+      document.documentElement.toggleAttribute('data-compact-viewport', h < 320);
       setMobile(innerWidth < MOBILE);
+      if (
+        innerWidth < MOBILE &&
+        h < 500 &&
+        document.activeElement?.id === 'chat-input' &&
+        app.view.sheet !== 'full'
+      )
+        store.setSheet('full');
     };
     update();
     vv?.addEventListener('resize', update);
@@ -40,6 +49,7 @@ function useViewport() {
       vv?.removeEventListener('resize', update);
       vv?.removeEventListener('scroll', update);
       window.removeEventListener('resize', update);
+      document.documentElement.removeAttribute('data-compact-viewport');
     };
   }, []);
   return mobile;
@@ -48,7 +58,7 @@ function useViewport() {
 function useShortcuts() {
   useEffect(() => {
     const onKey = (e) => {
-      if (e.defaultPrevented) return;
+      if (e.defaultPrevented || isComposingKey(e)) return;
       const typing = e.target.closest?.('input,textarea,select,[contenteditable]');
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !typing) {
         e.preventDefault();
@@ -96,18 +106,66 @@ function useShortcuts() {
 
 function Toast() {
   const t = app.view.toast;
+  const ref = useRef(null),
+    before = useRef(null);
+  useLayoutEffect(() => {
+    if (!t) return;
+    if (ref.current?.contains(document.activeElement)) store.holdToast();
+    else before.current = document.activeElement;
+  }, [t?.at]);
+  const releaseWhenIdle = () => {
+    if (ref.current?.contains(document.activeElement) || ref.current?.matches(':hover')) return;
+    store.releaseToast();
+  };
+  const dismiss = () => {
+    const restore = ref.current?.contains(document.activeElement);
+    store.dismissToast();
+    if (restore && before.current?.isConnected && !before.current.closest?.('[inert]'))
+      before.current.focus?.({ preventScroll: true });
+  };
   return (
     <div
+      ref={ref}
       id="toast"
       class={`toast ${t ? 'is-visible' : ''}`}
       role="status"
       aria-live="polite"
       title={t ? '누르면 닫혀요' : undefined}
       onPointerEnter={store.holdToast}
-      onPointerLeave={store.releaseToast}
-      onClick={store.dismissToast}
+      onPointerLeave={releaseWhenIdle}
+      onFocusCapture={store.holdToast}
+      onBlurCapture={(event) => {
+        if (
+          !event.currentTarget.contains(event.relatedTarget) &&
+          !event.currentTarget.matches(':hover')
+        )
+          store.releaseToast();
+      }}
+      onKeyDown={(event) => {
+        if (t && event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          dismiss();
+        }
+      }}
+      onClick={dismiss}
     >
-      {t?.text}
+      {t && (
+        <>
+          <span>{t.text}</span>
+          <button
+            type="button"
+            class="icon-btn"
+            aria-label="알림 닫기"
+            onClick={(event) => {
+              event.stopPropagation();
+              dismiss();
+            }}
+          >
+            <Icon name="x" size={16} />
+          </button>
+        </>
+      )}
     </div>
   );
 }

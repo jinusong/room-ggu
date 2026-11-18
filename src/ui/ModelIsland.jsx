@@ -55,6 +55,11 @@ function ModelAsk({ ask }) {
   const ref = useRef(null);
   useLayoutEffect(() => {
     const before = document.activeElement;
+    const background = [...document.querySelectorAll('.stage,.sheet')].map((node) => [
+      node,
+      node.inert,
+    ]);
+    for (const [node] of background) node.inert = true;
     // 초점은 팝업 자체에 둔다. 단추에 두면 Enter 한 번에 큰 파일을 받기 시작할 수 있다.
     ref.current?.focus({ preventScroll: true });
     const onKey = (e) => {
@@ -74,6 +79,7 @@ function ModelAsk({ ask }) {
     document.addEventListener('keydown', onKey, true);
     return () => {
       document.removeEventListener('keydown', onKey, true);
+      for (const [node, inert] of background) node.inert = inert;
       if (before && before !== document.body && before.isConnected)
         before.focus?.({ preventScroll: true });
     };

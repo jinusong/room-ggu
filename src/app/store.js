@@ -85,6 +85,8 @@ export const app = {
   photo: null,
   photoLoading: false,
   photoError: '',
+  fileLoading: false,
+  fileError: '',
   ai: {
     // text: off | loading | ready | error | unsupported. 기본은 켜짐이며 bootModel()이 자동으로 준비한다.
     text: 'off',
@@ -365,6 +367,9 @@ export function clearThread() {
   photoReadSeq++;
   app.photoLoading = false;
   app.photoError = '';
+  fileReadSeq++;
+  app.fileLoading = false;
+  app.fileError = '';
   app.target = app.selected ? { type: 'item', id: app.selected } : { type: 'room' };
   persist();
   emit();
@@ -752,7 +757,7 @@ export async function send(raw) {
     .trim()
     .slice(0, 1500);
   const pendingPhoto = app.photo && !app.photo.sent ? app.photo : null;
-  if ((!text && !pendingPhoto) || app.busy || app.photoLoading) return;
+  if ((!text && !pendingPhoto) || app.busy || app.photoLoading || app.fileLoading) return;
   const history = historyForModel();
   push({ role: 'user', text, ...(pendingPhoto ? { photo: pendingPhoto.data } : {}) });
   const turn = push({ role: 'assistant', text: '' });
@@ -1830,22 +1835,81 @@ export function exportJSON() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   toast('배치 파일을 저장했어요. 다른 기기에서 불러올 수 있어요.');
 }
+let fileReadSeq = 0;
+export function cancelImport() {
+  if (!app.fileLoading) return;
+  fileReadSeq++;
+  app.fileLoading = false;
+  app.fileError = '';
+  toast('배치 불러오기를 취소했어요.');
+}
 export async function importJSON(file) {
+  if (!file) return;
+  const seq = ++fileReadSeq;
+  const stamp = () => JSON.stringify([designBase(), app.state.roomId, app.draft, app.queue]);
+  const before = stamp();
+  app.fileLoading = true;
+  app.fileError = '';
+  emit();
   try {
-    if (!file) return;
     if (file.size > 5e6) throw Error('배치 파일은 5MB 이하로 선택해주세요.');
     const next = loadState(JSON.parse(await file.text()));
+    if (seq !== fileReadSeq) return;
+    if (stamp() !== before)
+      throw Error(
+        '파일을 읽는 동안 직접 고친 배치를 유지했어요. 다시 불러오면 파일의 배치로 바꿔요.',
+      );
+    // 불러오기 전에 시작한 상담·사진의 결과가 새 파일에 섞이지 않게 한다.
+    if (pending) {
+      const { turn } = pending;
+      pending = null;
+      app.modelSeq++;
+      interruptAI();
+      turn.status = 'done';
+      turn.engine = 'app';
+      turn.text = '배치 파일을 불러와 이전 상담을 멈췄어요.';
+    }
+    if (app.busy?.kind === 'model') app.busy = null;
+    if (app.busy?.kind === 'vision') cancelModel();
+    finishWindowGesture(true);
     snapshot();
     Object.assign(app.state, next);
     for (const a of app.state.items) clampItem(a, app.state.room);
+    if (app.view.webglError) app.state.view = '2d';
     app.selected = null;
-    app.target = app.draft ? { type: 'draft' } : { type: 'room' };
+    app.draft = null;
+    app.queue = [];
+    app.design = null;
+    app.target = { type: 'room' };
+    app.photo = null;
+    photoReadSeq++;
+    app.photoLoading = false;
+    app.photoError = '';
+    Object.assign(app.view, {
+      preview: null,
+      door: null,
+      doorList: false,
+      addSide: null,
+      ghostRoom: null,
+      avatarBar: false,
+      menu: null,
+    });
     event(`배치 파일을 불러왔어요 · 공간 ${spaces(app.state).length}개`);
     persist();
     emit();
     toast('배치를 불러왔어요.');
   } catch (e) {
-    toast(`불러오기 실패: ${e.message}`);
+    if (seq !== fileReadSeq) return;
+    app.fileError =
+      e instanceof SyntaxError
+        ? '배치 JSON 형식을 읽지 못했어요. 룸꾸에서 저장한 배치 파일을 선택해 주세요.'
+        : e.message;
+    toast(`불러오기 실패: ${app.fileError}`);
+  } finally {
+    if (seq === fileReadSeq) {
+      app.fileLoading = false;
+      emit();
+    }
   }
 }
 export function exportPNG() {
