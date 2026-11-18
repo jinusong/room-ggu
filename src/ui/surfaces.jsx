@@ -1503,8 +1503,10 @@ function AIPanel() {
             tabIndex={ai.choice === m.key ? 0 : -1}
             data-model={m.key}
             class={`model-choice ${ai.choice === m.key ? 'is-active' : ''}`}
-            disabled={ai.text === 'unsupported'}
-            onClick={() => store.setModelChoice(m.key)}
+            aria-disabled={ai.text === 'unsupported' ? 'true' : undefined}
+            onClick={() => {
+              if (ai.text !== 'unsupported') store.setModelChoice(m.key);
+            }}
             onKeyDown={(e) => {
               const keys = Object.keys(TEXT_MODELS),
                 at = keys.indexOf(m.key);
@@ -1520,7 +1522,7 @@ function AIPanel() {
                         : null;
               if (next === null) return;
               e.preventDefault();
-              store.setModelChoice(keys[next]);
+              if (ai.text !== 'unsupported') store.setModelChoice(keys[next]);
               e.currentTarget.parentElement.querySelector(`[data-model="${keys[next]}"]`)?.focus();
             }}
           >

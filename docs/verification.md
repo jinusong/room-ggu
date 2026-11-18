@@ -1,6 +1,6 @@
 # 검증 기록 · 2026-11-16
 
-## v5.13 UI/UX·입력·파일 복구 · 2026-11-18
+## v5.13.1 UI/UX·입력·파일 복구 · 2026-11-18
 
 ### 수정과 재현
 
@@ -13,8 +13,8 @@
 ### 자동 검증
 
 - `npm run verify`: 공용 스킬 연결·문법·단위 **272개**·프로덕션 빌드 통과. 새 단위 검사는 조합 3개와 숫자 경계 13개다.
-- Chrome 전체 **193개** 통과. 기존 139개에 새 입력·화면 34개, 파일 20개를 추가했다.
-- Firefox와 WebKit 각각 **99개** 통과. 명령은 `BROWSER=firefox PORT=4282 node node_modules/@playwright/test/cli.js test tests/ux-input.spec.js tests/ux-files.spec.js tests/photo-input.spec.js tests/photo-flow.spec.js --grep-invert 레이아웃`이며 WebKit은 BROWSER·PORT만 바꿨다. 새 54개와 기존 사진 45개다.
+- Chrome 전체 **194개** 통과. 기존 139개에 새 입력·화면 35개, 파일 20개를 추가했다.
+- Firefox와 WebKit 각각 **100개** 통과. 명령은 `BROWSER=firefox PORT=4282 node node_modules/@playwright/test/cli.js test tests/ux-input.spec.js tests/ux-files.spec.js tests/photo-input.spec.js tests/photo-flow.spec.js --grep-invert 레이아웃`이며 WebKit은 BROWSER·PORT만 바꿨다. 새 55개와 기존 사진 45개다.
 - 새 UI·파일 검사는 대부분 WebGL을 차단해 2D 복구 경로를 빠르게 확인한다. 긴 글·회전 4개는 실제 WebGL을 사용하고 Chrome 전체에는 기존 2D·3D 기능이 포함된다. 비동기 실패·늦은 응답은 Worker와 파일 읽기 시점을 제어한 검사다.
 - 초기 새 QA 52개 중 2개는 확인창 직후 Esc를 놓쳤다. useOutside를 layout effect로 바꿔 해결하고 즉시 Esc·초점 이탈 회귀 검사를 추가했다. WebKit 교차 검사에서는 삭제 버튼 클릭 시 relatedTarget 없는 blur가 확인창을 먼저 닫는 1건을 발견해 실제 초점 이동만 닫도록 수정했다. 최종 검사는 수정본으로 다시 실행했다.
 - 알림의 초점·포인터 혼합 조건을 마지막으로 보완한 뒤 새 54개를 세 브라우저에서 다시 통과했다.
@@ -26,9 +26,13 @@ Mac Chrome WebGPU에서 실제 SigLIP과 Gemma 3 1B f16을 실행했다. `bed-2.
 
 모델·사진 전처리·판별 기준은 바꾸지 않아 사진 58장 정확도 평가는 반복하지 않았다. 이전 v5.12 결과는 유지한다. Gemma 4와 각 모델의 f32 경로는 이번에 다시 실행하지 않았다. 실제 iPhone·Android의 카메라·가상 키보드·OS 클립보드, Windows GPU는 미확인이다. WebKit 자동 검사를 Safari 실기기 검증으로 해석하지 않는다.
 
+### 첫 배포 로그에서 찾은 모델 카드 초점
+
+첫 v5.13 Pages 실행 ae20c7f는 성공했지만 Chrome 192개와 기존 모델 선택 1개의 재시도 통과로 끝났다. 최초 실패는 Qwen 카드에 초점을 옮긴 뒤 GPU 미지원 응답이 와 native disabled로 바뀌면서 초점이 빠진 경우였다. 모델 카드에 aria-disabled를 쓰고 실행을 막되 초점·방향키로 안내를 읽도록 고쳤다. 미지원 카드의 글자 대비도 유지했다. 늦은 Worker 미지원 응답을 제어하는 회귀 1개를 추가해 새 입력·화면 검사는 35개, 새 전체 브라우저 검사는 55개가 됐다. 최종 Chrome 전체 194개, Firefox·WebKit 사진+UI 각 100개를 통과했다. 화면 기록은 `docs/screenshots/ux-gpu-unsupported.png`다.
+
 ### 시각화와 공개
 
-최신 보고서 원고는 `docs/ux-review.md`, 공개 페이지는 `public/review/index.html`이다. v5.12 사진 보고서는 `public/review/photo/index.html`에 보존했다. 최신 보고서는 humanize-korean light에서 본문 변경률 0%·게이트 exit 0·등급 B·자체검증 6/6을 통과했다. 수치·주장은 그대로 유지했다. 화면·오류·빈 값·준비·극단값을 기존 디자인 방향과 접근성 기준으로 대조했다.
+최신 보고서 원고는 `docs/ux-review.md`, 공개 페이지는 `public/review/index.html`이다. v5.12 사진 보고서는 `public/review/photo/index.html`에 보존했다. 최신 보고서는 humanize-korean light에서 본문 변경률 약 0.01%·게이트 exit 0·등급 B·자체검증 6/6을 통과했다. 수치·주장은 그대로 유지했다. 화면·오류·빈 값·준비·극단값을 기존 디자인 방향과 접근성 기준으로 대조했다.
 
 
 ## v5.12 사진 입력·직접 편집 보호 · 2026-11-17

@@ -3395,6 +3395,9 @@ button.avatar-tag {
   border-color: var(--ink);
   box-shadow: inset 0 0 0 1px var(--ink);
 }
+.model-choice[aria-disabled='true'] {
+  opacity: 1;
+}
 .model-choice strong {
   font-weight: 600;
   font-size: 14px;

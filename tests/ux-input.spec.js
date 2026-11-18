@@ -18,6 +18,38 @@ const say = async (page, text) => {
   await page.getByRole('button', { name: '설명 보내기' }).click();
 };
 
+test('GPU 미지원 응답이 늦게 와도 모델 선택 초점을 유지하고 설명을 읽는다', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__loads = [];
+    window.Worker = class {
+      postMessage(data) {
+        if (data.task === 'load-text') window.__loads.push({ ...data, worker: this });
+      }
+      terminate() {}
+    };
+  });
+  await start(page);
+  await page.getByRole('button', { name: '상담 모델 선택', exact: true }).click();
+  await page.locator('[data-model=large]').focus();
+  await page.keyboard.press('ArrowRight');
+  const qwen = page.locator('[data-model=qwen]');
+  await expect(qwen).toBeFocused();
+  await page.waitForFunction(() => window.__loads.length === 1);
+  await page.evaluate(() => {
+    const job = window.__loads[0];
+    job.worker.onmessage({
+      data: { id: job.id, error: '이 브라우저는 WebGPU를 지원하지 않아요.' },
+    });
+  });
+  await expect(qwen).toHaveAttribute('aria-disabled', 'true');
+  await expect(qwen).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('[data-model=light]')).toBeFocused();
+  await page.locator('[data-model=light]').evaluate((el) => el.click());
+  expect(await page.evaluate(() => window.__roomggu.app.ai.choice)).toBe('qwen');
+  expect(await page.evaluate(() => window.__loads.length)).toBe(1);
+});
+
 for (const trigger of ['도구 열기', '파일과 설정'])
   test(`${trigger}: 키보드로 열고 방향키·Home·End·Esc 조작`, async ({ page }) => {
     await start(page);

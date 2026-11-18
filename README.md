@@ -2,12 +2,12 @@
 
 **룸꾸와 대화하며 방과 가구를 설명하면 필요한 도구가 대화에 나타나고, 실제 치수의 2D·3D 방에 바로 반영되는 인테리어 상담 웹.**
 
-[사이트 열기](https://jinusong.github.io/room-ggu/) · [v5.13 UI/UX·QA 보고서](https://jinusong.github.io/room-ggu/review/) · [v5.12 사진 검증](https://jinusong.github.io/room-ggu/review/photo/) · [v5.10 개선 리뷰](https://room-ggu-review-20261117.divine-angel-0926.chatgpt.site) · [기획](docs/product-plan.md) ([HTML](docs/product-plan.html)) · [디자인 방향](docs/design-direction.md) · [검증 기록](docs/verification.md)
+[사이트 열기](https://jinusong.github.io/room-ggu/) · [v5.13.1 UI/UX·QA 보고서](https://jinusong.github.io/room-ggu/review/) · [v5.12 사진 검증](https://jinusong.github.io/room-ggu/review/photo/) · [v5.10 개선 리뷰](https://room-ggu-review-20261117.divine-angel-0926.chatgpt.site) · [기획](docs/product-plan.md) ([HTML](docs/product-plan.html)) · [디자인 방향](docs/design-direction.md) · [검증 기록](docs/verification.md)
 
 
-## v5.13 입력·키보드·파일 복구
+## v5.13.1 입력·키보드·파일 복구
 
-한글 조합 중 전송을 막고, 메뉴의 방향키·Tab·Esc 조작과 초점 복귀를 보완했습니다. 모바일 가로 화면·작은 화면에서는 작성 중인 글의 높이를 다시 맞추고 입력·전송을 남깁니다. 시트·대화 폭 드래그를 취소하면 원래 상태로 돌아갑니다.
+GPU 미지원 판정 뒤에도 모델 카드의 초점을 지키고 설명을 읽도록 했습니다. 한글 조합 중 전송을 막고, 메뉴의 방향키·Tab·Esc 조작과 초점 복귀를 보완했습니다. 모바일 가로 화면·작은 화면에서는 작성 중인 글의 높이를 다시 맞추고 입력·전송을 남깁니다. 시트·대화 폭 드래그를 취소하면 원래 상태로 돌아갑니다.
 
 배치 파일을 연속 선택해도 마지막 선택만 반영합니다. 읽는 동안 직접 고친 배치는 지키고, 정상 파일을 불러오면 이전 상담·사진 작업과 미배치 초안을 정리합니다. 불러오기 상태·취소·오류를 입력창 위에 표시하며 실행 취소로 이전 배치를 복구합니다.
 
