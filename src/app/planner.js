@@ -636,10 +636,9 @@ const NOT_THING =
   /^(?:(?:이|그|저)?(?:거|것|걸|건|게)|여기|거기|저기|이쪽|그쪽|가구|물건|초안|아바타|사람|(?:공간|방)(?:하나|한개|두개)?|집|벽|바닥|천장|문|창문|크기|색|자리|방향|위치|각도|반대|이름|높이|가로|세로|깊이|너비|폭|색깔|색상|사이즈|치수|배치|순서|간격|왜|자꾸|계속|또|진짜|정말|제발|이렇게|그렇게|저렇게|어떻게|빨리|일단|먼저|혹시|근데|그럼|이제|아니|다|모두|전부|나|내가|너|네가|니가|우리|뭐|뭘|무엇|어디|언제|누가|한번|아무것도)$/;
 
 export function objectsOf(t) {
-  const words = String(t)
-    .replace(/[.!?~…]/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean);
+  const sentence = String(t).replace(/[.!?~…]/g, ' ');
+  const tokens = [...sentence.matchAll(/\S+/g)];
+  const words = tokens.map((token) => token[0]);
   // “컴퓨터 놓을 책상”에서 놓을은 뒤의 책상을 꾸민다. 이 동사로 컴퓨터 추가를 해석하지 않는다.
   const v = words.findIndex(
     (w, i) =>
@@ -665,6 +664,7 @@ export function objectsOf(t) {
   while (picked[0] > 0 && AND_TAIL.test(words[picked[0] - 1])) picked.unshift(picked[0] - 1);
   const known = [],
     unlisted = [];
+  let mentions;
   for (const j of picked) {
     const raw = words[j].replace(/,$/, '');
     const w =
@@ -672,7 +672,13 @@ export function objectsOf(t) {
         ? raw
         : raw.replace(PARTICLE, '') || raw;
     const odd = unlistedInfo(w);
-    const type = !odd && detectType(w);
+    let type = !odd && detectType(w);
+    // “캣 타워”처럼 앞 단어와 합쳐 가구 이름이 된 경우 마지막 단어만으로 판단하지 않는다.
+    if (!odd && !type && j > 0) {
+      mentions ||= furnitureMentions(sentence);
+      const start = tokens[j].index;
+      type = mentions.find((m) => !m.ref && m.index < start && m.end > start)?.type;
+    }
     if (odd) unlisted.push(odd);
     else if (type) known.push(type);
     else if (!NOT_THING.test(w) && !mentionsRoom(w) && /[가-힣a-z]/i.test(w))

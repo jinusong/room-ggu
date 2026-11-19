@@ -1,11 +1,16 @@
 // 같은 Chrome 프로필의 모델 캐시를 재사용한다. 앱 동작은 UI로 실행하고 Worker 메시지는 관찰한다.
-// MODEL=large|light|qwen|balanced|off SET=all|tuning|holdout|placement|furniture|grid REPEAT=1 PROFILE=... FORWARD_ORIGIN=...
+// MODEL=large|light|qwen|balanced|off SET=all|tuning|holdout|placement|furniture|new-furniture|transfer-furniture|implicit-furniture|grid REPEAT=1 PROFILE=... FORWARD_ORIGIN=...
 // BASELINE/AFTER 각각: node eval/chat/korean-qa.mjs http://127.0.0.1:4187/ /tmp/result.json
 import { chromium } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 import { equal, deepEqual, ok } from 'node:assert/strict';
 import { spaces } from '../../src/data.js';
 import { cases, seed, furnitureHoldout } from './korean-cases.mjs';
+import {
+  namedFurniture,
+  unnamedFurniture,
+  transferFurniture,
+} from './furniture-generalization.mjs';
 
 const [base = 'http://127.0.0.1:4187/', out = '/tmp/room-ggu-korean-eval.json'] =
   process.argv.slice(2);
@@ -15,6 +20,9 @@ const all = [...cases.tuning, ...cases.holdout];
 const sets = {
   ...cases,
   all,
+  'new-furniture': namedFurniture,
+  'implicit-furniture': unnamedFurniture,
+  'transfer-furniture': transferFurniture,
   placement: all.filter((c) => c.turns.some((t) => t.place)),
   grid: all.filter((c) => ['negative-room-and-followup', 'equivalent-units'].includes(c.id)),
   furniture: [...all.filter((c) => c.turns.some((t) => t.model?.furniture)), ...furnitureHoldout],

@@ -639,3 +639,12 @@ test('가구 용도를 설명하는 동사가 추가 요청을 가로채지 않�
   assert.equal(p.changes.draft.type, 'desk');
   assert.equal(p.changes.draft.dims[2], 68);
 });
+
+test('띄어 쓴 여러 단어의 가구 이름도 목록의 가구로 처리한다', () => {
+  const ctx = { state: freshState(), target: room };
+  const t = '소파 바로 옆에 높이 1.44m 캣 타워 하나 두고 싶어';
+  for (const p of [planFromModel(model({ furniture: 'cat_tower' }), t, ctx), planTurn(t, ctx)]) {
+    assert.equal(p.changes.draft.type, 'cat_tower');
+    assert.equal(p.changes.draft.dims[1], 144);
+  }
+});

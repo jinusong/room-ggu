@@ -8,6 +8,7 @@ import { PHOTO_MODEL, PHOTO_LABELS } from './app/photo.js';
 import { textModel, modelCached } from './app/models.js';
 import { prepareTextModel } from './app/model-download.js';
 import { designSchema, designPrompt } from './app/design.js';
+import { compactConsultationGrammar, furnitureNameEvidence } from './app/model-furniture.js';
 
 let engine = null,
   textId = null,
@@ -142,12 +143,15 @@ const oneLineExample = (neutral) =>
 async function interpret(payload) {
   await loadText();
   const compact = textId.startsWith('Qwen3-0.6B');
+  const isGemma3 = textId.startsWith('gemma3-1b-');
+  const text = String(payload.text || '').slice(0, 1500);
+  const furniture = isGemma3 ? furnitureNameEvidence(text) : null;
   const c = payload.context || {};
   const spaces = (c.spaces || []).filter((s) => typeof s === 'string' && s).slice(0, 12);
   const prompt = `룸꾸 상담. 요청을 JSON으로 해석하세요.
 intent: furniture 가구, room 방 유형·치수·마감, action 동작, chat 질문·인사.
 action: place 초안 놓기, undo 되돌리기, redo 다시 실행, rotate 회전, duplicate 복제, delete 삭제, relocate 겹침 정리, clear 비우기, example 예시, catalog 가구 고르기, spaces 공간 목록, items 놓인 가구 목록, files 저장·불러오기, help 사용법, ai 모델 설정, new_space 공간 추가, switch_space 공간 이동.
-furniture: ${typeList(TYPES)}.
+furniture: ${furniture ? '요청에서 새로 놓거나 고칠 가구의 ID' : typeList(TYPES)}.
 room_type: ${typeList(ROOM_TYPES)}. space는 가려는 방 이름. “A 옆에 B 추가”, “A 말고 B”에서 A는 변경 대상이 아닙니다.
 seats: 소파 인원. size compact/standard/large, depth shallow/deep, height low/tall.
 color 가구: ${names(FURNITURE_COLORS).join(', ')}. wall 벽: ${names(WALL_COLORS).join(', ')}. floor 바닥: ${names(FLOOR_COLORS).join(', ')}.
@@ -156,28 +160,38 @@ ui: room_size 치수, room_type 방 유형, finishes 마감, furniture_sizes 규
 reply: ${compact ? '빈 문자열.' : '편집 요청은 빈 문자열. 질문에는 한국어 한 문장.'} 사진을 봤거나 치수를 쟀다고 말하지 마세요.
 공간: ${c.room || '방'}. 대상: ${c.target || '방'}.
 ${c.furniture?.length ? `놓인 종류: ${c.furniture.join(', ')}. ` : ''}${spaces.length ? `다른 방: ${spaces.join(', ')}. ` : ''}${c.photo || ''}
-한 줄 예시: ${oneLineExample(textId.startsWith('gemma3-1b-'))}
+한 줄 예시: ${oneLineExample(isGemma3)}
 최근 사용자 요청: ${(payload.history || [])
     .filter((t) => t.role === 'user')
     .slice(-2)
     .map((t) => t.content.slice(0, 160))
     .join(' / ')}
-요청: ${String(payload.text || '').slice(0, 1500)}
-JSON(한 줄):`;
+요청: ${text}
+${
+  furniture
+    ? [
+        furniture.references.length &&
+          `위치 기준물(변경하지 않음): ${furniture.references.join(', ')}.`,
+        `요청한 가구의 furniture 값 후보: ${furniture.targets.join(', ')}. 대상에 맞는 ID 문자열을 쓰세요.`,
+      ]
+        .filter(Boolean)
+        .join('\n') + '\n'
+    : ''
+}JSON(한 줄):`;
+  const schema = interpretSchema(spaces, compact);
   const r = await engine.chat.completions.create({
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 384,
     temperature: 0.1,
-    response_format: {
-      type: 'json_object',
-      schema: JSON.stringify(interpretSchema(spaces, compact)),
-    },
+    response_format: furniture
+      ? { type: 'grammar', grammar: compactConsultationGrammar(schema) }
+      : { type: 'json_object', schema: JSON.stringify(schema) },
     ...(textId.startsWith('Qwen3') ? { enable_thinking: false } : {}),
   });
   if (import.meta.env.MODE === 'benchmark' && payload.qa) {
     self.postMessage({
       qa: {
-        contract: 'one-line',
+        contract: furniture ? 'named-furniture' : 'one-line',
         promptChars: prompt.length,
         ...r.usage,
         finish: r.choices[0]?.finish_reason,
