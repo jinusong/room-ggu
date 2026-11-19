@@ -1,5 +1,6 @@
 import { UI_SURFACES } from './ui-schema.js';
 import { TYPES, makeItem, DEFAULT_SOURCE } from './data.js';
+import { sizeFields } from './dimensions.js';
 import { josa } from './app/text.js';
 export const aliases = {
   office_chair: /사무용\s*의자|사무\s*의자|컴퓨터\s*의자|오피스\s*체어|office\s*chair/i,
@@ -36,9 +37,9 @@ export const aliases = {
   toilet: /변기|toilet/i,
   basin: /세면대|세면기|wash\s*basin|basin/i,
   shower: /샤워\s*(?:부스|기|실|박스|공간)|shower/i,
-  sofa: /소파|쇼파|sofa|couch/i,
-  bed: /침대|매트리스|bed|mattress/i,
-  desk: /책상|테이블|desk|table/i,
+  sofa: /[소쇼]\s*파|sofa|couch/i,
+  bed: /침\s*[대데]|매트리스|bed|mattress/i,
+  desk: /책\s*상|테이블|desk|table/i,
   chair: /의자|chair|stool/i,
   wardrobe: /옷장|장롱|wardrobe|closet/i,
   shelf: /선반|책장|shelf|bookcase|bookshelf/i,
@@ -113,38 +114,7 @@ export function unlistedInfo(word) {
 }
 
 export function extractDimensions(t) {
-  const out = {},
-    axes = {
-      0: '(?:가로|너비|폭|길이|width|length)',
-      1: '(?:전체\\s*높이|높이|height)',
-      2: '(?:깊이|세로|depth)',
-    };
-  const factor = (u) =>
-    /^(?:m|미터)$/.test(u || '') ? 100 : /^(?:mm|밀리미터)$/.test(u || '') ? 0.1 : 1;
-  for (const [i, name] of Object.entries(axes)) {
-    const r = new RegExp(
-      name +
-        '(?:는|가|를|은|이|:|\\s)*([0-9]+(?:\\.[0-9]+)?)\\s*(mm|cm|m|밀리미터|센티미터|센치|센티|미터)?',
-      'ig',
-    );
-    for (const m of t.matchAll(r)) {
-      const n = +m[1] * factor(m[2]?.toLowerCase());
-      if (n >= 1 && n <= 1500) out[i] = Math.round(n * 10) / 10;
-    }
-  }
-  const triple = t.match(
-    /(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*(cm|m)?/i,
-  );
-  if (triple) {
-    const f = factor(triple[4]);
-    for (const [i, n] of [
-      [0, +triple[1] * f],
-      [2, +triple[2] * f],
-      [1, +triple[3] * f],
-    ])
-      if (n >= 1 && n <= 1500 && out[i] === undefined) out[i] = n;
-  }
-  return out;
+  return Object.fromEntries(Object.entries(sizeFields(t).values).map(([key, x]) => [key, x.value]));
 }
 export function consult(text, previous, caption = '', { keepType = false } = {}) {
   const a = structuredClone(previous || makeItem());
@@ -177,7 +147,7 @@ export function consult(text, previous, caption = '', { keepType = false } = {})
       [/퀸/, 150],
       [/킹/, 180],
     ])
-      if (p.test(text)) {
+      if (p.test(text) && !a.sources[0].startsWith('사용자')) {
         set(0, w, '대화 추정 · 침대 규격 가정');
         break;
       }
@@ -195,6 +165,17 @@ export function consult(text, previous, caption = '', { keepType = false } = {})
   ])
     if (p.test(text.trim()) && explicit[i] === undefined && !updated.includes(i))
       set(i, Math.max(1, a.dims[i] - 10), '사용자 요청 · 10cm 감소');
+  // 규격·자세에서 가늠한 값은 직접 정한 값보다 우선하지 않는다.
+  for (const i of updated) {
+    if (
+      previous?.type !== a.type ||
+      !previous.sources[i].startsWith('사용자') ||
+      !a.sources[i].startsWith('대화 추정')
+    )
+      continue;
+    a.dims[i] = previous.dims[i];
+    a.sources[i] = previous.sources[i];
+  }
   for (const [i, n] of Object.entries(explicit)) set(+i, n, '사용자 설정');
   if (/무릎/.test(text) && explicit[1] === undefined)
     return {

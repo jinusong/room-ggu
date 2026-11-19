@@ -7,10 +7,13 @@ import { isComposingKey, parseStepperValue } from '../ui-input.js';
 export function BrandMark() {
   return (
     <span class="chat-avatar" aria-hidden="true">
-      <svg class="brand-mark" viewBox="0 0 24 24">
-        <path d="M4 20V4h16" />
-        <rect x="9" y="11" width="8" height="5" rx="1" />
-      </svg>
+      <img
+        class="brand-mark"
+        src={`${import.meta.env.BASE_URL}room-ggu-icon.png`}
+        alt=""
+        width="32"
+        height="32"
+      />
     </span>
   );
 }

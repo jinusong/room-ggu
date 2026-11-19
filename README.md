@@ -2,8 +2,14 @@
 
 **룸꾸와 대화하며 방과 가구를 설명하면 필요한 도구가 대화에 나타나고, 실제 치수의 2D·3D 방에 바로 반영되는 인테리어 상담 웹.**
 
-[사이트 열기](https://jinusong.github.io/room-ggu/) · [v5.13.1 UI/UX·QA 보고서](https://jinusong.github.io/room-ggu/review/) · [v5.12 사진 검증](https://jinusong.github.io/room-ggu/review/photo/) · [v5.10 개선 리뷰](https://room-ggu-review-20261117.divine-angel-0926.chatgpt.site) · [기획](docs/product-plan.md) ([HTML](docs/product-plan.html)) · [디자인 방향](docs/design-direction.md) · [검증 기록](docs/verification.md)
+[사이트 열기](https://jinusong.github.io/room-ggu/) · [한국어 상담·성능 QA 보고서](https://jinusong.github.io/room-ggu/review/) · [v5.12 사진 검증](https://jinusong.github.io/room-ggu/review/photo/) · [v5.10 개선 리뷰](https://room-ggu-review-20261117.divine-angel-0926.chatgpt.site) · [기획](docs/product-plan.md) ([HTML](docs/product-plan.html)) · [디자인 방향](docs/design-direction.md) · [검증 기록](docs/verification.md)
 
+
+## v5.14 한국어 상담과 서비스 아이콘
+
+“안방 침대 말고 작은방 침대”처럼 대상을 정정하고, 바로 다음 말에서 방금 바꾼 치수를 다시 고칠 수 있습니다. 지정한 가구가 여럿이거나 치수 값이 충돌하면 확인을 요청합니다. 사진과 설명이 다른 가구를 가리키면 사용자가 종류를 고른 뒤 설명의 치수를 반영합니다.
+
+브라우저 탭, 홈 화면과 대화에 입체 방과 노란 안락의자를 담은 룸꾸 아이콘을 적용했습니다.
 
 ## v5.13.1 입력·키보드·파일 복구
 

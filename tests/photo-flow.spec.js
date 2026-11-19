@@ -503,3 +503,25 @@ test('판별 중 다른 방으로 이동하면 그 방을 바꾸지 않고 원�
   }, roomId);
   expect((await snapshot(page)).draft.dims).toEqual([120, 50, 200]);
 });
+
+test('사진과 설명의 가구 종류가 다르면 확인하고 고른 가구에 치수를 반영한다', async ({ page }) => {
+  await start(page);
+  await sendPhoto(page, '책상 가로 130cm 깊이 70cm로 해줘');
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => window.__finishPhoto('bed'));
+  await expect(page.locator('.msg.assistant').last()).toContainText('설명은 책상');
+  expect((await snapshot(page)).draft).toBeNull();
+  await page.getByRole('button', { name: '침대로 잡기', exact: true }).click();
+  expect((await snapshot(page)).draft).toMatchObject({ type: 'bed', dims: [130, 55, 70] });
+});
+
+test('사진 Worker 오류 뒤 직접 고른 종류에 원래 설명의 치수를 반영한다', async ({ page }) => {
+  await start(page);
+  await sendPhoto(page, '침대 가로 130cm 깊이 67cm');
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => window.__photoJob.worker.onerror());
+  await expect.poll(async () => (await snapshot(page)).vision).toBe('error');
+  await page.getByRole('button', { name: '다른 종류', exact: true }).click();
+  await page.locator('.photo-kind-grid').getByRole('button', { name: '책상', exact: true }).click();
+  expect((await snapshot(page)).draft).toMatchObject({ type: 'desk', dims: [130, 74, 67] });
+});

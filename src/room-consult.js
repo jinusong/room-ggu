@@ -1,3 +1,4 @@
+import { sizeFields } from './dimensions.js';
 import { UI_SURFACES } from './ui-schema.js';
 import { detectType } from './estimator.js';
 import { ROOM_TYPES, makeRoom, retypeRoom } from './catalog.js';
@@ -90,43 +91,11 @@ export function consultationScope(text, requested = 'auto') {
 }
 const round = (n) => Math.round(n * 100) / 100;
 export function parseRoomDimensions(text) {
-  const dims = {},
-    axes = { w: '(?:가로|너비|폭)', d: '(?:세로|깊이)', h: '(?:천장\\s*높이|천장|높이)' };
-  const meters = (value, unit) =>
-    /^(cm|센티미터|센티|센치)$/.test(unit || '')
-      ? value / 100
-      : /^(mm|밀리미터)$/.test(unit || '')
-        ? value / 1000
-        : unit
-          ? value
-          : value > 15
-            ? value / 100
-            : value;
-  const put = (k, n) => {
-    if (n < 1 || n > 15) throw Error('방 치수는 1~15m 범위로 알려주세요.');
-    dims[k] = round(n);
-  };
-  for (const [k, axis] of Object.entries(axes)) {
-    const regex = new RegExp(
-      axis +
-        '(?:는|은|가|이|:|\\s)*([0-9]+(?:\\.[0-9]+)?)\\s*(mm|cm|m(?![²2])|밀리미터|센티미터|센티|센치|미터)?',
-      'ig',
-    );
-    for (const m of text.matchAll(regex)) put(k, meters(+m[1], m[2]?.toLowerCase()));
-  }
-  const tuple = text.match(
-    /(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)(?:\s*[x×*]\s*(\d+(?:\.\d+)?))?\s*(cm|m|미터)?/i,
-  );
-  if (tuple) {
-    for (const [k, value] of [
-      ['w', tuple[1]],
-      ['d', tuple[2]],
-      ['h', tuple[3]],
-    ])
-      if (value !== undefined && dims[k] === undefined)
-        put(k, meters(+value, tuple[4]?.toLowerCase()));
-  }
-  return dims;
+  const { values, issue } = sizeFields(text, true);
+  if (issue?.kind === 'range') throw Error('방 치수는 1~15m 범위로 알려주세요.');
+  if (issue?.kind === 'conflict')
+    throw Error('같은 치수에 숫자가 두 개 있어요. 어느 값으로 맞출까요?');
+  return Object.fromEntries(Object.entries(values).map(([k, x]) => [k, x.value]));
 }
 export function consultRoom(text, previous) {
   const mentions = roomMentions(text),
@@ -157,6 +126,11 @@ export function consultRoom(text, previous) {
       if (!room.sources[k].startsWith('사용자')) set(k, base[i], '대화 추정 · 공간 크기');
   }
   const area = text.match(/(\d+(?:\.\d+)?)\s*(평|m²|m2|제곱미터)/i);
+  if (area && explicit.w && explicit.d) {
+    const square = +area[1] * (area[2] === '평' ? 3.3058 : 1);
+    if (Math.abs(explicit.w * explicit.d - square) / square > 0.02)
+      throw Error('가로·세로로 계산한 면적과 요청한 면적이 달라요. 어느 쪽을 기준으로 할까요?');
+  }
   if (area && !(explicit.w && explicit.d)) {
     const square = +area[1] * (area[2] === '평' ? 3.3058 : 1);
     if (square < 1 || square > 225) throw Error('면적은 1~225m² 범위로 알려주세요.');
@@ -166,11 +140,13 @@ export function consultRoom(text, previous) {
     const nice = (n) => Math.round(n * 20) / 20,
       fits = (a, b) => Math.abs(a * b - square) / square <= 0.02,
       square1 = /정사각|정방형/.test(text);
-    let w = explicit.w,
-      d = explicit.d;
-    if (w) d = fits(w, nice(square / w)) ? nice(square / w) : square / w;
-    else if (d) w = fits(nice(square / d), d) ? nice(square / d) : square / d;
-    else {
+    let w = explicit.w ?? (room.sources.w.startsWith('사용자') ? room.w : null),
+      d = explicit.d ?? (room.sources.d.startsWith('사용자') ? room.d : null);
+    if (w && d && !fits(w, d))
+      throw Error('정한 가로·세로와 요청한 면적이 달라요. 어느 쪽 치수를 바꿀까요?');
+    if (w && !d) d = fits(w, nice(square / w)) ? nice(square / w) : square / w;
+    else if (d && !w) w = fits(nice(square / d), d) ? nice(square / d) : square / d;
+    else if (!w && !d) {
       const ratio = square1 ? 1 : room.w / room.d,
         exact = Math.sqrt(square * ratio);
       w = nice(exact);
@@ -179,8 +155,10 @@ export function consultRoom(text, previous) {
     }
     if (w < 1 || w > 15 || d < 1 || d > 15)
       throw Error('그 면적과 치수를 조합하면 방 치수가 범위를 벗어나요.');
-    set('w', w, '대화 추정 · 면적에서 가정');
-    set('d', d, '대화 추정 · 면적에서 가정');
+    if (!room.sources.w.startsWith('사용자') || explicit.w)
+      set('w', w, '대화 추정 · 면적에서 가정');
+    if (!room.sources.d.startsWith('사용자') || explicit.d)
+      set('d', d, '대화 추정 · 면적에서 가정');
     // 답에서 사용자가 말한 면적을 그대로 받아 준다: "6평(약 19.8m²)".
     const pyeong = area[2] === '평';
     areaSaid = {

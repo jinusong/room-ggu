@@ -587,3 +587,39 @@ test('실제 Qwen의 가구 높이 오분류: 방 높이 검증이 실패해도 
   assert.equal(s.room.h, 2.4);
   assert.ok(p.fixes.length);
 });
+
+test('모델이 공간 도구를 골라도 문장에 있는 치수 편집을 처리한다', () => {
+  const state = exampleState();
+  const p = planFromModel(
+    model({ intent: 'room', action: 'spaces', furniture: 'bed' }),
+    '침대 깊이 2050mm로',
+    { state, target: room },
+  );
+  assert.equal(p.changes.item.next.dims[2], 205);
+  assert.equal(p.changes.room, undefined);
+  assert.ok(p.fixes.length);
+});
+
+test('선택한 가구의 치수를 방으로 오해한 결과를 고친다', () => {
+  const state = exampleState();
+  const bed = state.items.find((i) => i.type === 'bed');
+  const p = planFromModel(model({ intent: 'room', furniture: 'sofa' }), '너비 162cm로 바꿔줘', {
+    state,
+    target: { type: 'item', id: bed.id },
+  });
+  assert.equal(p.changes.item.id, bed.id);
+  assert.equal(p.changes.item.next.dims[0], 162);
+  assert.equal(p.changes.room, undefined);
+});
+
+test('방 이름이 명확하면 모델 JSON에서 이름을 빠뜨려도 지정한 방을 연다', () => {
+  const state = exampleState();
+  state.otherRooms = [{ roomId: 'small', name: '작은방', room: makeRoom('bedroom'), items: [] }];
+  const p = planFromModel(model({ intent: 'room', action: 'switch_space' }), '작은 방으로 가자', {
+    state,
+    target: room,
+  });
+  assert.equal(p.action, 'switch');
+  assert.deepEqual(p.arg, { id: 'small' });
+  assert.ok(p.fixes.includes('문장에 나온 방으로 이동'));
+});

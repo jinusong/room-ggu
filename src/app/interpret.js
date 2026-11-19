@@ -44,6 +44,8 @@ import {
   actionSubject,
   editSubject,
 } from './planner.js';
+import { sizeFields } from '../dimensions.js';
+import { roomNameSpan } from './consult-context.js';
 import { usableReply } from './model-turn.js';
 import { dimsText, josa } from './text.js';
 
@@ -137,11 +139,12 @@ export function readModel(raw) {
 }
 
 // 문장 자체에 적힌 이름으로 방 이야기인지 가구 이야기인지 분명하면 그 값을, 아니면 null.
-function literalScope(t, named) {
+function literalScope(t, named, target, intent) {
   const surfaceWords = WALL_WORDS.test(t) || FLOOR_WORDS.test(t) || /천장/.test(t);
   if (named.length && !surfaceWords) return 'furniture';
   if (!named.length && (mentionsRoom(t) || ROOM_REFERENCE.test(t) || ROOM_TALK.test(t)))
     return 'room';
+  if (intent !== 'chat' && Object.keys(sizeFields(t).values).length) return resolveScope(t, target);
   return null;
 }
 
@@ -158,11 +161,18 @@ export function planFromModel(raw, text, ctx) {
   let item =
     target.type === 'item' ? ctx.state.items.find((a) => a.id === target.id) || null : null;
   const named = mentionedTypes(t);
-  const literal = literalScope(t, named);
+  const literal = literalScope(t, named, target, v.intent);
   // 모델이 쓴 답(modelReply)은 바로잡은 것이 없고, 바꾼 것 없이 "했어요"라고 하지 않을 때만 쓴다.
   const done = ({ modelReply, ...plan }) => {
     const out = { ...plan, decidedBy: 'model', fixes };
-    if (modelReply && !fixes.length && (hasChanges(out) || !CLAIMS_DONE.test(modelReply))) {
+    if (
+      modelReply &&
+      !fixes.length &&
+      !plan.ask &&
+      !plan.changes?.item &&
+      !plan.changes?.room &&
+      (hasChanges(out) || !CLAIMS_DONE.test(modelReply))
+    ) {
       out.reply = modelReply;
       out.replyBy = 'model';
     }
@@ -170,14 +180,26 @@ export function planFromModel(raw, text, ctx) {
   };
 
   // "되돌려줘", "공간 목록", "파일로 저장"처럼 문장에 명령이 분명한데 모델이 다른 일을 고르면 명령을 따른다.
-  const rule = planTurn(t, ctx);
-  if (rule.batchLimit) return done(rule);
-  if (rule.ask === 'item') return done(rule);
+  const request = splitRequest(t);
+  const rule = planTurn(t, ctx, request);
+  if (rule.batchLimit || ['constraint', 'item', 'mood'].includes(rule.ask)) {
+    fixes.push(
+      rule.ask === 'constraint'
+        ? '모호하거나 충돌하는 치수·배치는 확인 후 반영'
+        : '선택이 필요한 부분을 되물음',
+    );
+    return done(rule);
+  }
   const edit = editSubject(t, ctx);
   if (edit?.item) item = edit.item;
   if (rule.intent === 'meta') {
     const command = rule.action || rule.surfaces[0]?.kind;
     const modelCommand = v.action === 'switch_space' ? 'switch' : v.action;
+    if (command === 'switch') {
+      const room = spaces(ctx.state).find((r) => r.roomId === rule.arg?.id);
+      if (command !== modelCommand || v.space !== room?.name) fixes.push('문장에 나온 방으로 이동');
+      return done(rule);
+    }
     if (command && command !== modelCommand) {
       fixes.push(`문장의 명령(${COMMAND_NAMES[command] || command})을 따름`);
       return done(rule);
@@ -199,8 +221,7 @@ export function planFromModel(raw, text, ctx) {
   // 읽어 냈으면("잠잘 방 하나 추가해줘") 모델을 따른다.
   if (rule.ask === 'space-type' && !(v.action === 'new_space' && v.roomType)) return done(rule);
   // 방 이야기와 가구 이야기가 섞였거나 가구가 여럿이면 나눠서 처리한다.
-  const request = splitRequest(t);
-  if (request) {
+  if (request && !request.limit) {
     const plan = compoundPlan(v, request, ctx, item, fixes);
     if (plan) return done(plan);
   }
@@ -212,6 +233,13 @@ export function planFromModel(raw, text, ctx) {
     return done(rule);
   }
 
+  if (
+    (Object.hasOwn(OPEN_TEXT, v.action) && rule.intent !== 'meta' && hasChanges(rule)) ||
+    (v.action === 'new_space' && literal === 'furniture')
+  ) {
+    fixes.push('문장의 편집 요청을 기타 동작보다 우선');
+    v.action = 'none';
+  }
   if (
     v.action === 'place' &&
     named.length &&
@@ -236,7 +264,7 @@ export function planFromModel(raw, text, ctx) {
     if (literal) intent = literal;
     else {
       // 모델이 바꿀 것이 없다고 봤지만 규칙이 바꿀 내용을 찾으면 규칙으로 처리한다.
-      if (hasChanges(planTurn(t, ctx))) return { fallback: 'model-chat' };
+      if (hasChanges(rule)) return { fallback: 'model-chat' };
       const upset = COMPLAINT.test(t);
       return done({
         intent: 'chat',
@@ -287,7 +315,7 @@ function actionPlan(v, t, ctx, item, named, fixes) {
     // 이름을 그대로 말했거나, 옮기자는 말과 함께 그 공간의 유형을 말했을 때만 옮긴다.
     // "거실 말고 침실로 바꿔줘"의 "바꿔"만 보고 모델이 고른 엉뚱한 공간으로 가지 않는다.
     const typed = hit && roomMentions(t).some((m) => m.type === hit.room.type && m.role !== 'neg');
-    if (!hit || !(t.includes(hit.name) || (typed && ACTION_EVIDENCE.switch_space.test(t)))) {
+    if (!hit || !(roomNameSpan(t, hit.name) || (typed && ACTION_EVIDENCE.switch_space.test(t)))) {
       fixes.push('공간 이동은 문장에 그 공간의 이름이나 유형이 있을 때만 실행');
       return null;
     }
@@ -481,7 +509,7 @@ function compoundPlan(v, request, ctx, item, fixes) {
   if (!room && pieces.length < 2) return null;
   if (pieces.length === 1 && item) return null;
   // 새 초안으로만 잡는다. 지금 고른 가구를 고치는 말은 보통 경로가 맡는다.
-  const fresh = { ...ctx, target: { type: 'room' } };
+  const fresh = { ...ctx, target: { type: 'room' }, draft: null };
   const drafts = pieces.map((piece) => {
     const mine = piece.type === v.furniture || (pieces.length === 1 && !v.furniture);
     const plan = furniturePlan(
