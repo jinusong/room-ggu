@@ -16,6 +16,7 @@ import {
   detectType,
   extractDimensions,
   furnitureMentions,
+  furnitureSubjects,
   unlistedInfo,
 } from '../estimator.js';
 import {
@@ -556,7 +557,7 @@ function planCompound(req, ctx, item) {
 
 function planFurniture(t, ctx, item) {
   const { state, draft, caption = '' } = ctx;
-  const type = detectType(t);
+  const type = furnitureSubjects(t)[0] || detectType(t);
   let base, mode;
   if (item && (!type || type === item.type)) [base, mode] = [item, 'item'];
   else if (draft && (!type || type === draft.type)) [base, mode] = [draft, 'draft'];
@@ -570,7 +571,7 @@ function planFurniture(t, ctx, item) {
       surfaces: [surface('catalog')],
       suggestions: [say('2인 소파', '두 명이 앉는 소파'), say('책상', '기본 책상 하나')],
     };
-  const res = consult(t, structuredClone(base));
+  const res = consult(t, structuredClone(base), '', { keepType: true });
   const next = res.item,
     color = parseFurnitureColor(t);
   // “네이비”, “네이비로”처럼 색 이름만 말해도 색 이야기다.
@@ -639,7 +640,16 @@ export function objectsOf(t) {
     .replace(/[.!?~…]/g, ' ')
     .split(/\s+/)
     .filter(Boolean);
-  const v = words.findIndex((w) => OBJECT_VERB.test(w));
+  // “컴퓨터 놓을 책상”에서 놓을은 뒤의 책상을 꾸민다. 이 동사로 컴퓨터 추가를 해석하지 않는다.
+  const v = words.findIndex(
+    (w, i) =>
+      OBJECT_VERB.test(w) &&
+      !(
+        /(?:놓을|놓는|둘|두는|넣을|넣는|올릴|올리는|달|다는|설치할|설치하는)$/.test(w) &&
+        words[i + 1] &&
+        detectType(words[i + 1])
+      ),
+  );
   let i = v - 1;
   // “책상 위에”처럼 띄어 쓴 놓을 곳도 건너뛴다.
   while (

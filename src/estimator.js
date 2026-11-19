@@ -48,19 +48,6 @@ export const aliases = {
 export function detectType(t) {
   return Object.entries(aliases).find(([, r]) => r.test(t))?.[0] || null;
 }
-// 문장에 이름이 나온 가구 유형을 모두 찾는다. "소파 테이블"처럼 긴 이름이 먼저 잡히면 그 부분은 지운다.
-export function mentionedTypes(t) {
-  let rest = String(t);
-  const found = [];
-  for (const [type, re] of Object.entries(aliases)) {
-    const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
-    if (g.test(rest)) {
-      found.push(type);
-      rest = rest.replace(g, ' ');
-    }
-  }
-  return found;
-}
 // 문장에 나온 가구 이름을 나온 순서대로 찾는다. 긴 이름("소파 테이블")이 먼저 잡히면 그 자리는 가린다.
 // ref는 "침대 옆에", "책상에 놓을"처럼 자리나 짝을 가리킬 뿐 새로 놓을 가구가 아닌 이름이다.
 const FURNITURE_REF =
@@ -82,6 +69,15 @@ export function furnitureMentions(t) {
     rest = rest.replace(g, (word) => ' '.repeat(word.length));
   }
   return found.sort((a, b) => a.index - b.index);
+}
+export function furnitureSubjects(text) {
+  return [
+    ...new Set(
+      furnitureMentions(text)
+        .filter((m) => !m.ref)
+        .map((m) => m.type),
+    ),
+  ];
 }
 // 목록에 없다고 알려진 물건. 목록에 없는 물건은 이 표에 없어도 없다고 답한다(planner.js의 unlistedPlan).
 // 이 표는 이름을 바로잡고 성질을 더할 때만 쓴다: "안마의자"를 의자로 읽지 않고,

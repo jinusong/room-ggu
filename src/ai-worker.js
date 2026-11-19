@@ -120,6 +120,25 @@ const typeList = (obj) =>
     .map(([k, v]) => `${k} ${v.name}`)
     .join(', ');
 
+// 작은 Gemma는 형식 예시의 가구를 답에 옮기기 쉬워 종류가 비어 있는 예시를 쓴다.
+const oneLineExample = (neutral) =>
+  JSON.stringify({
+    intent: 'furniture',
+    action: 'none',
+    furniture: neutral ? 'none' : 'sofa',
+    room_type: 'none',
+    space: 'none',
+    seats: neutral ? null : 2,
+    size: 'unknown',
+    depth: 'unknown',
+    height: neutral ? 'unknown' : 'low',
+    color: 'none',
+    wall: 'none',
+    floor: 'none',
+    ui: neutral ? 'none' : 'furniture_sizes',
+    reply: '',
+  });
+
 async function interpret(payload) {
   await loadText();
   const compact = textId.startsWith('Qwen3-0.6B');
@@ -137,7 +156,7 @@ ui: room_size 치수, room_type 방 유형, finishes 마감, furniture_sizes 규
 reply: ${compact ? '빈 문자열.' : '편집 요청은 빈 문자열. 질문에는 한국어 한 문장.'} 사진을 봤거나 치수를 쟀다고 말하지 마세요.
 공간: ${c.room || '방'}. 대상: ${c.target || '방'}.
 ${c.furniture?.length ? `놓인 종류: ${c.furniture.join(', ')}. ` : ''}${spaces.length ? `다른 방: ${spaces.join(', ')}. ` : ''}${c.photo || ''}
-한 줄 예시: {"intent":"furniture","action":"none","furniture":"sofa","room_type":"none","space":"none","seats":2,"size":"unknown","depth":"unknown","height":"low","color":"none","wall":"none","floor":"none","ui":"furniture_sizes","reply":""}
+한 줄 예시: ${oneLineExample(textId.startsWith('gemma3-1b-'))}
 최근 사용자 요청: ${(payload.history || [])
     .filter((t) => t.role === 'user')
     .slice(-2)

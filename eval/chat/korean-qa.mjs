@@ -1,26 +1,32 @@
 // 같은 Chrome 프로필의 모델 캐시를 재사용한다. 앱 동작은 UI로 실행하고 Worker 메시지는 관찰한다.
-// MODEL=large|light|qwen|balanced|off SET=tuning|holdout|all PROFILE=... FORWARD_ORIGIN=...
+// MODEL=large|light|qwen|balanced|off SET=all|tuning|holdout|placement|furniture|grid REPEAT=1 PROFILE=... FORWARD_ORIGIN=...
 // BASELINE/AFTER 각각: node eval/chat/korean-qa.mjs http://127.0.0.1:4187/ /tmp/result.json
 import { chromium } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 import { equal, deepEqual, ok } from 'node:assert/strict';
 import { spaces } from '../../src/data.js';
-import { cases, seed } from './korean-cases.mjs';
+import { cases, seed, furnitureHoldout } from './korean-cases.mjs';
 
 const [base = 'http://127.0.0.1:4187/', out = '/tmp/room-ggu-korean-eval.json'] =
   process.argv.slice(2);
 const model = process.env.MODEL || 'large';
 const set = process.env.SET || 'all';
 const all = [...cases.tuning, ...cases.holdout];
-const selected =
-  set === 'all'
-    ? all
-    : set === 'placement'
-      ? all.filter((c) => c.turns.some((t) => t.place))
-      : cases[set];
+const sets = {
+  ...cases,
+  all,
+  placement: all.filter((c) => c.turns.some((t) => t.place)),
+  grid: all.filter((c) => ['negative-room-and-followup', 'equivalent-units'].includes(c.id)),
+  furniture: [...all.filter((c) => c.turns.some((t) => t.model?.furniture)), ...furnitureHoldout],
+};
+const selected = sets[set];
+ok(selected, 'Unknown evaluation set');
+const repeat = Number(process.env.REPEAT || 1);
+ok(Number.isInteger(repeat) && repeat > 0);
 const report = {
   model,
   set,
+  repeat,
   build: process.env.BUILD,
   at: new Date().toISOString(),
   cases: [],
@@ -149,11 +155,60 @@ try {
   });
   console.log('model', JSON.stringify(report.environment), report.prepareMs);
   if (model !== 'off' && report.environment.ai !== 'ready') throw Error('실제 모델 준비 실패');
-  for (const scenario of selected) {
+  // Use the browser clock for input/DOM timing, independent of Playwright's round trip.
+  await page.evaluate(() => {
+    const { scenes } = window.__roomggu.app;
+    for (const [label, obj, method] of [
+      ['room', scenes.three, 'renderRoom'],
+      ['draw3d', scenes.three?.renderer, 'render'],
+      ['draw2d', scenes.plan, 'draw'],
+      ['drawHouse', scenes.house, 'draw'],
+      ['save', Storage.prototype, 'setItem'],
+    ]) {
+      if (!obj?.[method]) continue;
+      const original = obj[method];
+      obj[method] = function (...args) {
+        const timing = window.__qaTiming;
+        if (!timing?.running) return original.apply(this, args);
+        const start = performance.now();
+        try {
+          return original.apply(this, args);
+        } finally {
+          timing.work.push({ label, start: start - timing.start, ms: performance.now() - start });
+        }
+      };
+    }
+    document.addEventListener(
+      'pointerdown',
+      (e) => {
+        const timing = window.__qaTiming;
+        if (!e.target.closest?.('#grid') || !timing?.running) return;
+        const g = (timing.grid = {
+          start: e.timeStamp - timing.start,
+          input: performance.now() - timing.start,
+        });
+        const button = document.getElementById('grid');
+        const observer = new MutationObserver(() => {
+          g.dom = performance.now() - timing.start;
+          observer.disconnect();
+          requestAnimationFrame(() => {
+            g.frame = performance.now() - timing.start;
+          });
+        });
+        observer.observe(button, { attributes: true, attributeFilter: ['aria-pressed'] });
+      },
+      true,
+    );
+  });
+  for (const scenario of Array.from({ length: repeat }, () => selected).flat()) {
     await page.evaluate((s) => {
       const { app, store } = window.__roomggu;
+      // Keep the object held by the already mounted 3D and 2D scenes.
+      Object.assign(app.state, s);
+      for (const scene of [app.scenes.three, app.scenes.plan, app.scenes.house])
+        if (scene && scene.state !== app.state)
+          throw Error('평가 배치와 장면의 상태 참조가 달라요.');
       Object.assign(app, {
-        state: s,
         thread: [],
         draft: null,
         queue: [],
@@ -165,13 +220,23 @@ try {
       store.setTarget({ type: 'room' });
       store.emit();
     }, seed(scenario.seed));
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
     for (const t of scenario.turns) {
       const prior = await read();
       const chat = page.locator('#chat-input');
       await chat.fill(t.text);
       await page.evaluate(() => {
         window.__qaWorker.length = 0;
-        const m = { start: performance.now(), frames: [], longTasks: [], running: true };
+        const m = {
+          start: performance.now(),
+          frames: [],
+          longTasks: [],
+          tasks: [],
+          work: [],
+          running: true,
+        };
         window.__qaTiming = m;
         let prev = m.start;
         const frame = (now) => {
@@ -181,9 +246,12 @@ try {
           requestAnimationFrame(frame);
         };
         requestAnimationFrame(frame);
-        m.observer = new PerformanceObserver((list) =>
-          m.longTasks.push(...list.getEntries().map((e) => e.duration)),
-        );
+        m.observer = new PerformanceObserver((list) => {
+          for (const e of list.getEntries()) {
+            m.longTasks.push(e.duration);
+            m.tasks.push({ start: e.startTime - m.start, ms: e.duration });
+          }
+        });
         m.observer.observe({ type: 'longtask' });
       });
       await chat.press('Enter');
@@ -216,6 +284,9 @@ try {
           ms: performance.now() - m.start,
           frameMs: m.frames,
           longTasks: m.longTasks,
+          tasks: m.tasks,
+          sceneWork: m.work,
+          grid: m.grid,
           worker: window.__qaWorker,
         };
       });
@@ -234,6 +305,9 @@ try {
         expected: t.expect,
         ms: Math.round(observed.ms),
         gridMs,
+        grid: observed.grid,
+        sceneWork: observed.sceneWork,
+        tasks: observed.tasks,
         frameMs: observed.frameMs.map(Math.round),
         longTasks: observed.longTasks,
         usage,

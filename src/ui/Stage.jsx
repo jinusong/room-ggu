@@ -43,7 +43,6 @@ function syncScenes(force = false) {
       s.roomId,
       list ? list.map((r) => [r.roomId, r.name, r.room]) : s.room,
       s.floorplan,
-      s.grid,
       s.dimensions,
     ]),
     items = JSON.stringify(list ? list.map((r) => r.items) : s.items),
@@ -75,10 +74,15 @@ function syncScenes(force = false) {
     if (fresh || s.scope !== last.scope) sc.home?.();
     else if (room !== last.room && !sc.userMoved) sc.home?.();
   }
+  if (s.grid !== last.grid) {
+    app.scenes.three?.setGridVisibility();
+    if (s.scope === 'room' && s.view === '2d') app.scenes.plan?.draw();
+  }
   if (door !== last.door) app.scenes.plan?.draw();
   app.scenes.house?.draw();
   last = {
     room,
+    grid: s.grid,
     items,
     sel: app.selected,
     warn: warnSig,

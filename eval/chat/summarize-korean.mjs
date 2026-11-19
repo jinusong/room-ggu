@@ -54,6 +54,17 @@ for (const file of process.argv.slice(2)) {
     matchesBedTarget(c) &&
     (!c.expected.active || c.active === c.expected.active) &&
     (!c.expected.draft || c.expected.draft[0] === c.draft?.type);
+  const grid = turns.filter((c) => Number.isFinite(c.grid?.frame));
+  const workAfterGrid = (c) =>
+    (c.sceneWork || []).filter((w) => w.start >= c.grid.start && w.start <= c.grid.frame);
+  const drawAfterGrid = grid.map((c) =>
+    Math.max(
+      0,
+      ...workAfterGrid(c)
+        .filter((w) => w.label === 'draw3d')
+        .map((w) => w.ms),
+    ),
+  );
   const holdout = rows.filter((c) => holdoutIds.has(c.id));
   console.log(
     JSON.stringify({
@@ -87,6 +98,11 @@ for (const file of process.argv.slice(2)) {
       promptTokens: pairs(turns.map((c) => c.usage?.prompt_tokens).filter(Number.isFinite)),
       completionTokens: pairs(turns.map((c) => c.usage?.completion_tokens).filter(Number.isFinite)),
       gridMs: pairs(turns.map((c) => c.gridMs).filter(Number.isFinite)),
+      gridDomMs: pairs(grid.map((c) => c.grid.dom - c.grid.start)),
+      gridFrameMs: pairs(grid.map((c) => c.grid.frame - c.grid.start)),
+      gridDraw3dMs: pairs(drawAfterGrid),
+      gridDrawsOver50Ms: drawAfterGrid.filter((ms) => ms > 50).length,
+      gridRoomRebuilds: grid.filter((c) => workAfterGrid(c).some((w) => w.label === 'room')).length,
       rafMs: pairs(turns.flatMap((c) => c.frameMs || [])),
       longTasks: turns.flatMap((c) => c.longTasks || []).length,
       pageErrors: r.pageErrors.length,

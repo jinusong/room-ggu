@@ -217,3 +217,67 @@ export function seed(mode) {
   if (mode === 'tight') Object.assign(state.room, { w: 1.6, d: 1, h: 2.5 });
   return validateState(state);
 }
+
+// 가구 이름을 직접 말하거나 용도로 설명하는 별도 확인 문장. 이전 21턴에는 넣지 않는다.
+export const furnitureHoldout = [
+  {
+    id: 'name-chair',
+    turns: [
+      {
+        text: '앉는 의자 하나, 높이 78cm로 잡아줘',
+        expect: { draft: ['chair', null, 78] },
+        model: { furniture: 'chair' },
+      },
+    ],
+  },
+  {
+    id: 'name-desk',
+    turns: [
+      {
+        text: '컴퓨터 놓을 책상, 깊이는 68cm면 돼',
+        expect: { draft: ['desk', null, null, 68] },
+        model: { furniture: 'desk' },
+      },
+    ],
+  },
+  {
+    id: 'name-dresser',
+    turns: [
+      {
+        text: '옷접어 넣는 서랍장 가로 95cm로 보여줘',
+        expect: { draft: ['dresser', 95] },
+        model: { furniture: 'dresser' },
+      },
+    ],
+  },
+  {
+    id: 'name-nightstand',
+    turns: [
+      {
+        text: '침대 옆에는 폭 40cm 협탁을 둘래',
+        expect: { draft: ['side', 40] },
+        model: { furniture: 'side' },
+      },
+    ],
+  },
+  {
+    id: 'name-shoe',
+    turns: [
+      {
+        text: '현관에 신발장 깊이 330mm로 하나',
+        expect: { draft: ['shoe_cabinet', null, null, 33] },
+        model: { furniture: 'shoe_cabinet' },
+      },
+    ],
+  },
+  {
+    id: 'implicit-dining',
+    turns: [
+      {
+        text: '넷이 마주 앉아 밥 먹을 식탁 하나',
+        expect: { draft: ['dining'] },
+        model: { furniture: 'dining' },
+      },
+    ],
+  },
+];

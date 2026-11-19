@@ -17,7 +17,7 @@ import {
   retypeRoom,
 } from '../catalog.js';
 import { makeItem, layoutWarnings, clampItem, spaces } from '../data.js';
-import { consult, applyModelResult, mentionedTypes } from '../estimator.js';
+import { consult, applyModelResult, furnitureSubjects } from '../estimator.js';
 import { mentionsRoom, roomMentions, assertedType, parseRoomDimensions } from '../room-consult.js';
 import {
   chooseSurface,
@@ -160,7 +160,7 @@ export function planFromModel(raw, text, ctx) {
   const target = ctx.target || { type: 'room' };
   let item =
     target.type === 'item' ? ctx.state.items.find((a) => a.id === target.id) || null : null;
-  const named = mentionedTypes(t);
+  const named = furnitureSubjects(t);
   const literal = literalScope(t, named, target, v.intent);
   // 모델이 쓴 답(modelReply)은 바로잡은 것이 없고, 바꾼 것 없이 "했어요"라고 하지 않을 때만 쓴다.
   const done = ({ modelReply, ...plan }) => {

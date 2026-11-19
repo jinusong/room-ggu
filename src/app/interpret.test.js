@@ -623,3 +623,19 @@ test('방 이름이 명확하면 모델 JSON에서 이름을 빠뜨려도 지정
   assert.deepEqual(p.arg, { id: 'small' });
   assert.ok(p.fixes.includes('문장에 나온 방으로 이동'));
 });
+
+test('치수를 적용할 가구를 위치 참조와 구별한다', () => {
+  const text = '침대 옆에는 폭 40cm 협탁을 둘래';
+  const ctx = { state: freshState(), target: room };
+  for (const p of [planFromModel(model({ furniture: 'bed' }), text, ctx), planTurn(text, ctx)]) {
+    assert.equal(p.changes.draft.type, 'side');
+    assert.equal(p.changes.draft.dims[0], 40);
+  }
+});
+
+test('가구 용도를 설명하는 동사가 추가 요청을 가로채지 않는다', () => {
+  const ctx = { state: freshState(), target: room };
+  const p = planFromModel(model({ furniture: 'desk' }), '컴퓨터 놓을 책상, 깊이는 68cm면 돼', ctx);
+  assert.equal(p.changes.draft.type, 'desk');
+  assert.equal(p.changes.draft.dims[2], 68);
+});

@@ -137,6 +137,8 @@ export class RoomScene {
     const pmrem = new T.PMREMGenerator(this.renderer);
     this.envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
+    // 카메라 이동·격자 표시로는 물체의 그림자가 바뀌지 않는다.
+    this.renderer.shadowMap.autoUpdate = false;
     this.scene.environment = this.envMap;
     this.scene.environmentIntensity = 0.5;
     this.camera = new T.PerspectiveCamera(30, 1, 0.05, 200);
@@ -395,7 +397,9 @@ export class RoomScene {
     }
   }
   renderRoom() {
+    this.renderer.shadowMap.needsUpdate = true;
     this.clear(this.room);
+    this.floorGrid = null;
     if (this.state.scope === 'house') {
       this.renderer.domElement.setAttribute(
         'aria-label',
@@ -545,43 +549,9 @@ export class RoomScene {
       arc.userData.door = true;
       this.room.add(arc);
     }
-    if (this.state.grid) {
-      const fine = [],
-        bold = [];
-      for (let x = 0; x <= w + 0.001; x += 0.25)
-        (Math.abs(x % 1) < 0.01 ? bold : fine).push(
-          x - w / 2,
-          0.002,
-          -d / 2,
-          x - w / 2,
-          0.002,
-          d / 2,
-        );
-      for (let z = 0; z <= d + 0.001; z += 0.25)
-        (Math.abs(z % 1) < 0.01 ? bold : fine).push(
-          -w / 2,
-          0.002,
-          z - d / 2,
-          w / 2,
-          0.002,
-          z - d / 2,
-        );
-      for (const [pts, o] of [
-        [fine, 0.1],
-        [bold, 0.22],
-      ])
-        this.room.add(
-          new T.LineSegments(
-            new T.BufferGeometry().setAttribute('position', new T.Float32BufferAttribute(pts, 3)),
-            new T.LineBasicMaterial({
-              color: '#3a3326',
-              transparent: true,
-              opacity: o,
-              depthWrite: false,
-            }),
-          ),
-        );
-    }
+    this.floorGrid = this.makeFloorGrid(w, d);
+    this.floorGrid.visible = this.state.grid;
+    this.room.add(this.floorGrid);
     if (this.state.dimensions) {
       const wl = tapeSprite(`${Math.round(w * 100)} cm`, undefined, this.height);
       wl.position.set(0, 0.06, d / 2 + WALL_T + 0.32);
@@ -594,6 +564,52 @@ export class RoomScene {
       this.room.add(wl, dl, hl);
     }
     this.dirty = true;
+  }
+  // 격자는 표시만 바뀐다. 방·창문·가구·카메라의 상태를 다시 만들 필요가 없다.
+  setGridVisibility() {
+    const grid = this.floorGrid;
+    if (!grid || grid.visible === this.state.grid) return;
+    grid.visible = this.state.grid;
+    this.invalidate();
+  }
+  makeFloorGrid(w, d) {
+    const group = new T.Group();
+    const fine = [],
+      bold = [];
+    for (let x = 0; x <= w + 0.001; x += 0.25)
+      (Math.abs(x % 1) < 0.01 ? bold : fine).push(
+        x - w / 2,
+        0.002,
+        -d / 2,
+        x - w / 2,
+        0.002,
+        d / 2,
+      );
+    for (let z = 0; z <= d + 0.001; z += 0.25)
+      (Math.abs(z % 1) < 0.01 ? bold : fine).push(
+        -w / 2,
+        0.002,
+        z - d / 2,
+        w / 2,
+        0.002,
+        z - d / 2,
+      );
+    for (const [pts, o] of [
+      [fine, 0.1],
+      [bold, 0.22],
+    ])
+      group.add(
+        new T.LineSegments(
+          new T.BufferGeometry().setAttribute('position', new T.Float32BufferAttribute(pts, 3)),
+          new T.LineBasicMaterial({
+            color: '#3a3326',
+            transparent: true,
+            opacity: o,
+            depthWrite: false,
+          }),
+        ),
+      );
+    return group;
   }
   fitDistance() {
     const { w, d, h } = this.extent();
@@ -638,12 +654,14 @@ export class RoomScene {
     this.dirty = true;
   }
   sync() {
+    this.renderer.shadowMap.needsUpdate = true;
     this.clear(this.objects);
     if (this.state.scope === 'house') this.objects.add(houseFurniture(this.state));
     else for (const i of this.state.items) this.objects.add(furniture(i));
     this.decorate(this.selected, this.warnings || new Set());
   }
   setAvatar() {
+    this.renderer.shadowMap.needsUpdate = true;
     this.clear(this.comparison);
     this.avatarAt = null;
     const house = this.state.scope === 'house';
@@ -670,7 +688,10 @@ export class RoomScene {
   }
   moveObject(id, x, z) {
     const o = this.objects.children.find((c) => c.userData.id === id);
-    if (o) o.position.set(x, 0, z);
+    if (o) {
+      o.position.set(x, 0, z);
+      this.renderer.shadowMap.needsUpdate = true;
+    }
     this.decorate(this.selected, this.warnings || new Set());
   }
   setGhost(item) {

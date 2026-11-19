@@ -5,6 +5,10 @@
 [사이트 열기](https://jinusong.github.io/room-ggu/) · [한국어 상담·성능 QA 보고서](https://jinusong.github.io/room-ggu/review/) · [v5.12 사진 검증](https://jinusong.github.io/room-ggu/review/photo/) · [v5.10 개선 리뷰](https://room-ggu-review-20261117.divine-angel-0926.chatgpt.site) · [기획](docs/product-plan.md) ([HTML](docs/product-plan.html)) · [디자인 방향](docs/design-direction.md) · [검증 기록](docs/verification.md)
 
 
+## v5.14.1 가구 분류와 3D 격자
+
+Gemma 3 1B의 JSON 예시에서 특정 가구를 빼고, 문장에 나온 대상과 위치를 가리키는 가구를 구분합니다. 3D 격자를 켜고 끌 때는 방과 가구를 그대로 그려 두고 격자 표시만 바꿉니다. 그림자 맵은 방이나 물체가 바뀔 때 갱신합니다.
+
 ## v5.14 한국어 상담과 서비스 아이콘
 
 “안방 침대 말고 작은방 침대”처럼 대상을 정정하고, 바로 다음 말에서 방금 바꾼 치수를 다시 고칠 수 있습니다. 지정한 가구가 여럿이거나 치수 값이 충돌하면 확인을 요청합니다. 사진과 설명이 다른 가구를 가리키면 사용자가 종류를 고른 뒤 설명의 치수를 반영합니다.
