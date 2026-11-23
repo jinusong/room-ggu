@@ -144,7 +144,7 @@ function Thinking() {
   );
 }
 
-function Turn({ turn, live, latest, canUndo }) {
+function Turn({ turn, live, latest, canUndo, showMeta }) {
   if (turn.role === 'event')
     return (
       <div class="event" role="note">
@@ -207,7 +207,7 @@ function Turn({ turn, live, latest, canUndo }) {
           </div>
         )}
         {/* 답을 쓰는 중에는 무엇이 처리했는지 아직 정해지지 않았다. */}
-        {turn.engine === 'app' || turn.status === 'thinking' ? null : turn.fixes?.length > 0 ? (
+        {!showMeta ? null : turn.fixes?.length > 0 ? (
           <details class="msg-meta">
             <summary>{engineLabel(turn)}</summary>
             <ul>
@@ -266,6 +266,16 @@ export function Thread({ mobile }) {
   const lastReceipt = [...thread]
     .reverse()
     .find((t) => t.role === 'assistant' && t.receipt?.length);
+  // 무엇이 처리했는지는 바뀔 때만 적는다. 모델을 꺼 둔 동안 답마다 같은 말이 붙지 않게 한다.
+  // 앱이 바로잡은 내용(fixes)이 있으면 펼쳐 볼 수 있게 늘 남긴다.
+  const showMeta = new Set();
+  let previous = null;
+  for (const t of thread) {
+    if (t.role !== 'assistant' || t.engine === 'app' || t.status === 'thinking') continue;
+    const label = engineLabel(t);
+    if (label !== previous || t.fixes?.length) showMeta.add(t.id);
+    previous = label;
+  }
   return (
     <div class="thread" ref={ref} role="log" aria-live="polite" aria-label="상담 대화">
       <Greeting mobile={mobile} />
@@ -276,6 +286,7 @@ export function Thread({ mobile }) {
           live={live}
           latest={t === lastAssistant}
           canUndo={t === lastReceipt && t === lastAssistant && app.history.length > 0}
+          showMeta={showMeta.has(t.id)}
         />
       ))}
     </div>
