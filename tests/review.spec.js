@@ -80,7 +80,7 @@ test('방 위의 사람 버튼으로 아바타를 세우고 키 출처를 구별
   await expect(page.locator('[data-surface=avatar] .field-error')).toHaveCount(0);
   await field.blur();
   await expect(page.locator('[data-surface=avatar] .field-error')).toContainText(
-    '80~230cm 범위로 입력해 주세요 · 지금 값 182cm',
+    '80~230cm 범위로 입력해 주세요. 지금 값 182cm',
   );
   expect((await stored(page)).avatar.height).toBe(182);
   await field.fill('168');
@@ -437,7 +437,7 @@ test('모델을 받거나 준비하는 동안 위쪽 아일랜드로 알리고, 
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   const panel = page.locator('#island-panel');
   await expect(panel.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '43');
-  await expect(panel).toContainText('Gemma 3 1B · 약 600MB · 이 기기에서 실행');
+  await expect(panel).toContainText('Gemma 3 1B, 약 600MB, 이 기기에서 실행');
   await expect(panel).toContainText('258MB / 약 600MB');
   await expect(panel).toContainText('규칙으로 답하니');
   await page.screenshot({ path: 'test-results/model-island.png' });

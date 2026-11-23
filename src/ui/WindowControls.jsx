@@ -221,8 +221,8 @@ export function WindowControls() {
                 </button>
                 <small>
                   {app.state.view === '2d'
-                    ? '끌어서 이동 · 양끝으로 폭 조절'
-                    : '끌어서 이동 · 모서리로 크기 조절'}
+                    ? '끌어서 이동, 양끝으로 폭 조절'
+                    : '끌어서 이동, 모서리로 크기 조절'}
                 </small>
                 {error && <p role="status">{error}</p>}
               </div>

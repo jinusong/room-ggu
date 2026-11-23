@@ -103,8 +103,8 @@ export function buildDesign(state, spec) {
       wallColor: theme.wall,
       floorColor: r.type === 'bathroom' ? '#dce1dc' : theme.floor,
       sources: {
-        w: '대화 추정 · 집 전체 면적 배분',
-        d: '대화 추정 · 집 전체 면적 배분',
+        w: '대화 추정(집 전체 면적 배분)',
+        d: '대화 추정(집 전체 면적 배분)',
         h: '상담 초안',
       },
     });
@@ -199,7 +199,7 @@ export function buildDesign(state, spec) {
         spot = findFreeSpot(local, item);
       }
       if (!spot.free) {
-        omitted.push(`${r.name} · ${TYPES[type].name}`);
+        omitted.push(`${r.name}의 ${TYPES[type].name}`);
         continue;
       }
       local.items.push({ ...item, x: spot.x, z: spot.z, angle: spot.angle });
@@ -321,7 +321,7 @@ export function setRoom(state, room) {
     rows.push({ label: '집 배치', to: `${moved.length}개 공간을 겹치지 않게 옮김` });
   if (before.type !== room.type && room.type === 'bathroom') {
     const n = fillBathroom(state);
-    if (n) rows.push({ label: '설비', to: `변기·세면대·샤워부스 ${n}개` });
+    if (n) rows.push({ label: '설비', to: `변기, 세면대, 샤워부스 ${n}개` });
   }
   for (const r of spaces(state))
     assertWindowDoors(r.room, roomOpenings(spaces(state), state.floorplan, r.roomId));
@@ -436,7 +436,7 @@ export function roomWithPreset(room, index) {
   const next = structuredClone(room);
   for (const [i, k] of ['w', 'd', 'h'].entries()) {
     next[k] = size[i];
-    next.sources[k] = '사용자 선택 · 크기 초안';
+    next.sources[k] = '사용자 선택(크기 초안)';
   }
   return next;
 }
@@ -976,7 +976,7 @@ export function setAvatar(state, patch = {}, selectedId = null) {
       throw Error(
         patch.pose === 'lying'
           ? '먼저 이 방의 침대를 골라 주세요.'
-          : '먼저 이 방의 의자·소파·라운지체어·벤치를 골라 주세요.',
+          : '먼저 이 방에서 의자나 소파, 라운지체어, 벤치를 골라 주세요.',
       );
     next.itemId = item.id;
   }

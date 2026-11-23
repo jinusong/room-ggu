@@ -68,7 +68,7 @@ function Avatar() {
       <Head
         icon="person-standing"
         title="내 키로 크기 비교"
-        meta={layout ? `${a.height}cm · ${POSES[layout.pose]}` : '선택 기능'}
+        meta={layout ? `${a.height}cm, ${POSES[layout.pose]}` : '선택 기능'}
       />
       <Stepper
         label="내 키"
@@ -116,7 +116,7 @@ function Avatar() {
         })}
       </div>
       {!targets.length && (
-        <p class="surface-hint">의자·소파·침대를 이 방에 놓으면 앉히거나 눕혀 볼 수 있어요.</p>
+        <p class="surface-hint">의자나 소파, 침대를 이 방에 놓으면 앉히거나 눕혀 볼 수 있어요.</p>
       )}
       {layout?.warnings.map((w) => (
         <p class="warn-text" role="status" key={w}>
@@ -144,8 +144,8 @@ function Avatar() {
         </button>
       </footer>
       <p class="surface-hint">
-        키만 실제 값이고 팔다리 비율·앉은 높이는 단순 모형이에요. 실제 착석감과 침대에서 쓸 수 있는
-        길이는 제품에서 확인해 주세요.
+        키만 실제 값이고 팔다리 비율과 앉은 높이는 단순 모형이에요. 실제 착석감과 침대에서 쓸 수
+        있는 길이는 제품에서 확인해 주세요.
       </p>
     </>
   );
@@ -167,7 +167,7 @@ function DoorRow({ link }) {
       <div class="house-door-head">
         <strong>{title}</strong>
         <small class="mono">
-          맞닿은 벽 {cm(link.length)}cm{link.closed ? '' : ` · ${from} 끝부터 잼`}
+          맞닿은 벽 {cm(link.length)}cm{link.closed ? '' : `, ${from} 끝부터 잼`}
         </small>
       </div>
       {link.closed ? (
@@ -185,7 +185,7 @@ function DoorRow({ link }) {
         <>
           <Stepper
             label="위치"
-            ariaLabel={`${title} 문 위치 · 벽 ${from} 끝에서`}
+            ariaLabel={`${title} 문 위치, 벽 ${from} 끝에서`}
             value={edge}
             unit="cm"
             source={link.door.offset !== undefined ? '사용자 설정' : '자동 위치'}
@@ -246,7 +246,7 @@ function Floorplan() {
       <Head
         icon="house"
         title="집 전체"
-        meta={`${list.length}개 공간 · ${list.reduce((sum, r) => sum + r.room.w * r.room.d, 0).toFixed(1)}m²`}
+        meta={`${list.length}개 공간, ${list.reduce((sum, r) => sum + r.room.w * r.room.d, 0).toFixed(1)}m²`}
       />
       <div class="house-actions">
         <div class="segmented" role="group" aria-label="집 전체 보기 방식">
@@ -289,14 +289,14 @@ function Floorplan() {
               <button class="row-main as-button" onClick={() => store.switchSpace(r.roomId)}>
                 <strong>{r.name}</strong>
                 <small class="mono">
-                  {r.room.w} × {r.room.d}m · 가구 {r.items.length}개
-                  {conflicts.has(r.roomId) ? ' · 겹침' : ''}
+                  {r.room.w} × {r.room.d}m, 가구 {r.items.length}개
+                  {conflicts.has(r.roomId) ? ', 겹침' : ''}
                 </small>
               </button>
               <button
                 class="icon-btn"
                 aria-label={`${r.name} 90도 돌리기`}
-                title="방 돌리기 · 가구도 함께 돌아요"
+                title="방 돌리기, 가구도 함께 돌아요"
                 onClick={() => store.rotateSpace(r.roomId)}
               >
                 <Icon name="rotate-cw" size={16} />
@@ -357,11 +357,11 @@ function Floorplan() {
           onToggle={(e) => store.setDoorList(e.currentTarget.open)}
         >
           <summary>
-            문 {links.length - blocked}개{blocked ? ` · 막은 벽 ${blocked}곳` : ''} · 위치와 폭
-            맞추기
+            문 {links.length - blocked}개{blocked ? `, 막은 벽 ${blocked}곳` : ''}, 위치와 폭 맞추기
           </summary>
           <p class="surface-hint">
-            2D에서는 문을 끌어 옮길 수 있어요. 문을 누르면 폭·여는 방향·막기 막대가 떠요.
+            2D에서는 문을 끌어 옮길 수 있어요. 문을 누르면 폭과 여는 방향, 막기를 고르는 막대가
+            떠요.
           </p>
           {links.map((link) => (
             <DoorRow key={link.ids.join('|')} link={link} />
@@ -386,7 +386,7 @@ function RoomSize() {
       <Head
         icon="ruler"
         title="방 크기"
-        meta={`${(r.w * r.d).toFixed(1)}m² · ${pyeong(r.w, r.d).toFixed(1)}평`}
+        meta={`${(r.w * r.d).toFixed(1)}m², ${pyeong(r.w, r.d).toFixed(1)}평`}
       />
       <div class="room-size">
         <MiniPlan room={r} items={s.items} warnings={warn.all} />
@@ -432,8 +432,8 @@ function RoomSize() {
       <footer class="surface-foot">
         <span class="foot-note">
           <Icon name={ROOM_TYPES[r.type].icon} size={16} />
-          {ROOM_TYPES[r.type].name} · 가구 {s.items.length}개
-          {warn.all.size > 0 && <em class="warn-text"> · 확인 필요 {warn.all.size}개</em>}
+          {ROOM_TYPES[r.type].name}, 가구 {s.items.length}개
+          {warn.all.size > 0 && <em class="warn-text">, 확인 필요 {warn.all.size}개</em>}
         </span>
         <button class="link" onClick={() => store.openTool('room-type')}>
           유형 바꾸기
@@ -605,8 +605,8 @@ function Windows() {
         {error}
       </div>
       <p class="surface-hint">
-        2D·3D와 배치 파일에 저장해요. 앞쪽·오른쪽 벽은 낮춰 보여도 창은 실제 높이에 남아요. 자동
-        문은 창문을 피해 옮겨질 수 있어요. 햇빛·채광은 계산하지 않아요.
+        2D와 3D, 배치 파일에 저장해요. 앞쪽과 오른쪽 벽은 낮춰 보여도 창은 실제 높이에 남아요. 자동
+        문은 창문을 피해 옮겨질 수 있어요. 햇빛과 채광은 계산하지 않아요.
       </p>
     </>
   );
@@ -662,7 +662,7 @@ function Finishes() {
       <Head
         icon="paint-roller"
         title="벽과 바닥"
-        meta={`${wallName(r.wallColor)} · ${floorName(r.floorColor)}`}
+        meta={`${wallName(r.wallColor)}, ${floorName(r.floorColor)}`}
       />
       <div class="corners">
         <Corner wall={r.wallColor} floor={r.floorColor} label="지금" active />
@@ -718,7 +718,7 @@ function PlaceFoot({ target, item }) {
     return (
       <footer class="surface-foot">
         <span class="foot-note mono">
-          벽까지 ← {c.left} · {c.right} → · ↑ {c.back} · {c.front} ↓ cm
+          벽까지 ← {c.left}, {c.right} →, ↑ {c.back}, {c.front} ↓ cm
         </span>
       </footer>
     );
@@ -1012,7 +1012,7 @@ function Catalog() {
       <Head
         icon="armchair"
         title="가구 고르기"
-        meta={`${Object.keys(TYPES).length}종 · ${total}가지 크기`}
+        meta={`${Object.keys(TYPES).length}종, ${total}가지 크기`}
       />
       <div class="search catalog-search">
         <Icon name="search" size={16} />
@@ -1049,7 +1049,7 @@ function Catalog() {
         ))}
       </div>
       <p class="surface-hint" role="status">
-        {CATEGORIES[cat]} · {list.length}종
+        {CATEGORIES[cat]} {list.length}종
       </p>
       {list.length ? (
         <div class="catalog-grid">
@@ -1077,7 +1077,7 @@ function Catalog() {
               setCat('all');
             }}
           >
-            검색·분류 초기화
+            검색과 분류 초기화
           </button>
         </div>
       )}
@@ -1153,7 +1153,7 @@ function Impact() {
         !rooms.length && (
           <p class="surface-ok">
             <Icon name="check" size={16} />
-            겹침·벽 넘침이나 문·창 앞을 가리는 가구가 없어요.
+            겹치거나 벽을 넘는 가구, 문이나 창 앞을 가리는 가구가 없어요.
           </p>
         )
       )}
@@ -1196,8 +1196,7 @@ function Spaces() {
                     <strong>{r.name}</strong>
                   )}
                   <small class="mono">
-                    {ROOM_TYPES[r.room.type].name} · {r.room.w} × {r.room.d}m · 가구{' '}
-                    {r.items.length}
+                    {ROOM_TYPES[r.room.type].name}, {r.room.w} × {r.room.d}m, 가구 {r.items.length}
                   </small>
                 </span>
                 {active ? (
@@ -1266,7 +1265,7 @@ function Items() {
                   <strong>{a.name}</strong>
                   <small class="mono">
                     {a.dims[0]} × {a.dims[2]} × {a.dims[1]}cm
-                    {warn.all.has(a.id) ? ' · 확인 필요' : ''}
+                    {warn.all.has(a.id) ? ', 확인 필요' : ''}
                   </small>
                 </button>
                 <button
@@ -1329,7 +1328,7 @@ function Photo({ spec }) {
     <>
       <Head icon="image" title="가구 사진" meta={p.analyzed ? '판별함' : '판별 전'} />
       <p class="surface-hint">
-        가구 하나가 잘 보이는 사진을 올려 주세요. JPG·PNG·WebP, 최대 20MB예요.
+        가구 하나가 잘 보이는 사진을 올려 주세요. JPG, PNG, WebP 파일을 20MB까지 올릴 수 있어요.
       </p>
       <div class="photo-surface">
         <img src={p.data} alt="첨부한 가구 사진" />
@@ -1361,8 +1360,8 @@ function Photo({ spec }) {
                 </ul>
               )}
               <p class="surface-hint">
-                SigLIP · {p.device === 'wasm' ? 'CPU' : 'GPU'}에서 실행. 사진만으로는 cm를 잴 수
-                없어 크기는 유형 기본값이에요.
+                SigLIP 모델이 {p.device === 'wasm' ? 'CPU' : 'GPU'}에서 실행돼요. 사진만으로는 cm를
+                잴 수 없어 크기는 유형 기본값이에요.
               </p>
               <p class="surface-hint">
                 %는 후보 간 상대 점수예요. 정답 확률이나 치수 정확도가 아니에요.
@@ -1470,8 +1469,8 @@ function Design({ spec }) {
     <>
       <Head
         icon="house"
-        title={`${THEMES[d.theme].name} · ${d.mode === 'house' ? '집 전체 초안' : '마감 초안'}`}
-        meta={`${rooms.length}개 공간 · 약 ${(area / 3.3058).toFixed(1)}평`}
+        title={`${THEMES[d.theme].name} ${d.mode === 'house' ? '집 전체 초안' : '마감 초안'}`}
+        meta={`${rooms.length}개 공간, 약 ${(area / 3.3058).toFixed(1)}평`}
       />
       <div class="design-palette" aria-label="테마 색상">
         {[THEMES[d.theme].wall, THEMES[d.theme].floor, ...THEMES[d.theme].colors].map(
@@ -1479,7 +1478,7 @@ function Design({ spec }) {
             <span key={i} style={{ background: color }} />
           ),
         )}
-        <small>벽 · 바닥 · 가구</small>
+        <small>벽, 바닥, 가구</small>
       </div>
       <ul class="design-rooms" aria-label="공간별 구성">
         {rooms.map((r) => (
@@ -1487,7 +1486,7 @@ function Design({ spec }) {
             <Icon name={ROOM_TYPES[r.room.type].icon} size={16} />
             <div>
               <strong>{r.name}</strong>
-              <small>{r.items.map((i) => TYPES[i.type].name).join(' · ') || '가구 없음'}</small>
+              <small>{r.items.map((i) => TYPES[i.type].name).join(', ') || '가구 없음'}</small>
             </div>
             <span class="mono">{(r.room.w * r.room.d).toFixed(1)}m²</span>
           </li>
@@ -1511,7 +1510,7 @@ function Design({ spec }) {
       <footer class="surface-foot">
         <span class="foot-note" role="status">
           {d.applied
-            ? '적용됨 · 실행 취소로 되돌리기'
+            ? '적용했어요. 실행 취소로 되돌릴 수 있어요'
             : stale
               ? '배치가 바뀌었어요. 지금 배치를 기준으로 다시 요청해 주세요.'
               : d.mode === 'house'
@@ -1559,7 +1558,7 @@ function AIPanel() {
         <span class={`status-dot is-${ai.text}`} />
         <div class="row-main">
           <strong>상담 모델</strong>
-          <small>{textState} · 기본으로 켜짐 · WebGPU 필요</small>
+          <small>{textState}, 기본으로 켜짐, WebGPU 필요</small>
           {(ai.text === 'error' || ai.text === 'unsupported') && ai.error && (
             <small class="field-error">{ai.error}</small>
           )}
@@ -1631,9 +1630,9 @@ function AIPanel() {
       </div>
       <p class="surface-hint model-evidence-context">{MODEL_EVIDENCE_CONTEXT}</p>
       <p class="surface-hint">
-        네 모델 모두 같은 편집 도구를 써요. 집 전체는 모델이 공간별 가구 구성을 고르고 앱이
-        치수·충돌을 검사한 초안이에요. 사진 판별은 별도 SigLIP 모델이 20종만 다루며 실제 cm
-        치수·채광·시공 도면은 계산하지 않아요.
+        네 모델 모두 같은 편집 도구를 써요. 집 전체는 모델이 공간별 가구 구성을 고르고 앱이 치수와
+        충돌을 검사한 초안이에요. 사진 판별은 별도 SigLIP 모델이 20종만 다루며 실제 cm 치수, 채광,
+        시공 도면은 계산하지 않아요.
       </p>
       <p class="surface-hint model-note">
         기본은 Gemma 4 E2B예요. 다운로드를 줄이려면 Qwen3 0.6B, GPU 메모리를 아끼려면 Gemma 3 1B를
@@ -1642,16 +1641,16 @@ function AIPanel() {
       <div class="model-row">
         <span class={`status-dot is-${ai.vision}`} />
         <div class="row-main">
-          <strong>사진 판별 · SigLIP base</strong>
+          <strong>사진 판별 (SigLIP base)</strong>
           <small>
-            {ai.vision === 'ready' ? '준비됨' : '사진을 보내면 준비'} · GPU 약 150MB, CPU 약 210MB
+            {ai.vision === 'ready' ? '준비됨' : '사진을 보내면 준비'}, GPU 약 150MB, CPU 약 210MB
           </small>
         </div>
       </div>
       <p class="surface-hint">
-        켜 두면 모델이 문장을 해석하고, 앱은 숫자·범위·말하지 않은 속성만 확인해요. 모델이 준비되기
-        전이나 쓸 수 없는 기기에서는 규칙으로 답해요. 모델 파일은 공개 저장소에서 한 번 내려받아
-        브라우저에 보관될 수 있고, 대화와 사진은 추론 서버로 보내지 않아요.
+        켜 두면 모델이 문장을 해석하고, 앱은 숫자와 범위, 말하지 않은 속성만 확인해요. 모델이
+        준비되기 전이나 쓸 수 없는 기기에서는 규칙으로 답해요. 모델 파일은 공개 저장소에서 한 번
+        내려받아 브라우저에 보관될 수 있고, 대화와 사진은 추론 서버로 보내지 않아요.
       </p>
     </>
   );
@@ -1666,7 +1665,7 @@ function Files() {
           <Icon name="download" />
           <span>
             <strong>배치 파일 저장</strong>
-            <small>공간 {spaces(app.state).length}개 · JSON</small>
+            <small>공간 {spaces(app.state).length}개, JSON</small>
           </span>
         </button>
         <button class="file-action" onClick={() => document.getElementById('layout-file')?.click()}>
@@ -1682,7 +1681,7 @@ function Files() {
             <strong>지금 화면 이미지로</strong>
             <small>
               {app.state.scope === 'house' ? '집 전체 ' : ''}
-              {app.state.view === '2d' ? '2D 평면' : '3D 모형'} · PNG
+              {app.state.view === '2d' ? '2D 평면' : '3D 모형'}, PNG
             </small>
           </span>
         </button>
@@ -1711,7 +1710,7 @@ function Help() {
         </li>
         <li>
           <b>도구로 다듬기</b>
-          <span>대화에 나타난 크기·규격·마감 도구를 만지면 방에 바로 반영돼요.</span>
+          <span>대화에 나타난 크기, 규격, 마감 도구를 만지면 방에 바로 반영돼요.</span>
         </li>
         <li>
           <b>방에 놓기</b>
@@ -1720,8 +1719,8 @@ function Help() {
         <li>
           <b>내 키로 가늠하기</b>
           <span>
-            방 아래의 사람 버튼을 누르거나 “내 키 175cm”라고 말하면 같은 축척의 아바타가 서요. 의자·
-            소파·침대를 고르면 앉히거나 눕힐 수 있어요.
+            방 아래의 사람 버튼을 누르거나 “내 키 175cm”라고 말하면 같은 축척의 아바타가 서요.
+            의자나 소파, 침대를 고르면 앉히거나 눕힐 수 있어요.
           </span>
         </li>
         <li>
@@ -1736,7 +1735,9 @@ function Help() {
           <span>배치 파일이나 이미지로 저장해요. ⌘/Ctrl+Z로 되돌려요.</span>
         </li>
       </ol>
-      <p class="surface-hint">치수는 배치를 위한 초안이에요. 구매·설치 전에는 실제로 재 주세요.</p>
+      <p class="surface-hint">
+        치수는 배치를 위한 초안이에요. 구매하거나 설치하기 전에는 실제로 재 주세요.
+      </p>
       <a class="link" href="./review/" target="_blank" rel="noopener noreferrer">
         업데이트와 사진 검증 결과
       </a>
@@ -1786,7 +1787,7 @@ export function surfaceSummary(spec) {
   switch (spec.kind) {
     case 'avatar': {
       const layout = avatarLayout(s);
-      return `${s.avatar.height}cm · ${layout ? POSES[layout.pose] : '숨김'}`;
+      return `${s.avatar.height}cm, ${layout ? POSES[layout.pose] : '숨김'}`;
     }
     case 'floorplan':
       return `${spaces(s).length}개 공간`;
@@ -1795,7 +1796,7 @@ export function surfaceSummary(spec) {
     case 'room-type':
       return ROOM_TYPES[s.room.type].name;
     case 'finishes':
-      return `${wallName(s.room.wallColor)} · ${floorName(s.room.floorColor)}`;
+      return `${wallName(s.room.wallColor)}, ${floorName(s.room.floorColor)}`;
     case 'furniture-size':
     case 'furniture-dims':
       return item
@@ -1813,7 +1814,7 @@ export function surfaceSummary(spec) {
         store
           .recommendationFor(spec.id)
           ?.types.map((k) => TYPES[k].name)
-          .join(' · ') || ''
+          .join(', ') || ''
       );
     case 'spaces':
       return `${spaces(s).length}개`;

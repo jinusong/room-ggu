@@ -97,7 +97,7 @@ test('카탈로그는 용도를 검색하고 분류와 빈 결과에서 복구�
   await expect(page.locator('.catalog-card')).toHaveCount(93);
   await input.fill('검색결과없는단어');
   await expect(page.locator('.catalog-card')).toHaveCount(0);
-  await page.getByRole('button', { name: '검색·분류 초기화' }).click();
+  await page.getByRole('button', { name: '검색과 분류 초기화' }).click();
   await expect(page.locator('.catalog-card')).toHaveCount(93);
 });
 

@@ -222,7 +222,7 @@ test('휴대 기기 첫 다운로드 안내에서 Qwen3로 바꿔도 동의 전�
   await page.getByRole('combobox', { name: '받을 상담 모델' }).selectOption('qwen');
   await expect(ask.locator('.ask-facts')).toContainText('Qwen3 0.6B');
   await expect(ask.locator('.ask-capabilities')).toContainText('앱이 답문 작성');
-  await expect(ask.locator('.ask-capabilities')).toContainText('가구·방·복수 요청 4/4');
+  await expect(ask.locator('.ask-capabilities')).toContainText('가구, 방, 복수 요청 4/4');
   await expect(page.locator('#ask-go')).toContainText('350MB');
   expect(requested).toEqual([]);
   await expect(page.locator('#ask-later')).toBeInViewport();

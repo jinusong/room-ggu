@@ -142,7 +142,7 @@ function ScopeNav() {
       {open && (
         <div class="popover space-pop" role="group" aria-label="공간 목록">
           <span class="pop-label">
-            공간 {list.length} / 12 · {house ? '누르면 그 방을 편집해요' : '누르면 그 방으로 가요'}
+            공간 {list.length} / 12, {house ? '누르면 그 방을 편집해요' : '누르면 그 방으로 가요'}
           </span>
           {list.map((x) => (
             <button
@@ -183,7 +183,7 @@ function ScopeNav() {
           )}
           <button class="pop-row" onClick={close(() => store.openTool('spaces'))}>
             <Icon name="layers" size={16} />
-            <span>공간 이름·삭제 관리</span>
+            <span>공간 이름과 삭제 관리</span>
           </button>
         </div>
       )}
@@ -321,7 +321,7 @@ function ObjectBar({ barRef, mobile }) {
         class="bar-btn"
         id="rotate"
         aria-label="90도 회전"
-        title="90° 회전 · R"
+        title="90° 회전 (R)"
         onClick={() => store.itemAction('rotate')}
       >
         <Icon name="rotate-cw" />
@@ -339,7 +339,7 @@ function ObjectBar({ barRef, mobile }) {
         class="bar-btn danger"
         id="delete"
         aria-label="가구 삭제"
-        title="삭제 · Delete"
+        title="삭제 (Delete)"
         onClick={() => store.itemAction('delete')}
       >
         <Icon name="trash-2" />
@@ -347,7 +347,7 @@ function ObjectBar({ barRef, mobile }) {
       <button
         class="bar-btn bar-close"
         aria-label="선택 해제"
-        title="선택 해제 · Esc"
+        title="선택 해제 (Esc)"
         onClick={() => store.select(null)}
       >
         <Icon name="x" />
@@ -388,10 +388,8 @@ function AvatarTag({ mobile }) {
       <button
         class={`stage-tag avatar-tag tape ${set ? 'is-set' : 'is-draft'}`}
         data-avatar-tag
-        aria-label={`${text} 아바타 · 자세 바꾸기`}
-        title={
-          set ? '직접 정한 키 · 누르면 자세를 바꿔요' : '비교용 기본 키 · 누르면 자세를 바꿔요'
-        }
+        aria-label={`${text} 아바타, 자세 바꾸기`}
+        title={set ? '직접 정한 키, 누르면 자세를 바꿔요' : '비교용 기본 키, 누르면 자세를 바꿔요'}
         onClick={() => store.pickAvatar()}
         {...data}
       >
@@ -402,7 +400,7 @@ function AvatarTag({ mobile }) {
     <div class="stage-tag avatar-bar" data-avatar-tag role="group" aria-label="아바타 자세">
       <button
         class={`tape ${set ? 'is-set' : 'is-draft'}`}
-        aria-label={`${text} · 키 바꾸기`}
+        aria-label={`${text}, 키 바꾸기`}
         title="키 바꾸기"
         onClick={() => {
           if (mobile && app.view.sheet === 'peek') store.setSheet('half');
@@ -424,7 +422,7 @@ function AvatarTag({ mobile }) {
               pose !== 'standing' && !store.poseTarget(pose)
                 ? pose === 'lying'
                   ? '이 방에 침대를 놓으면 누울 수 있어요'
-                  : '이 방에 의자·소파를 놓으면 앉을 수 있어요'
+                  : '이 방에 의자나 소파를 놓으면 앉을 수 있어요'
                 : POSES[pose]
             }
             onClick={() => store.setPose(pose)}
@@ -466,11 +464,11 @@ function DoorTags() {
       data-door-tag={o.roomId}
       data-tag-kind="room"
       data-tag-text={`${o.name} 문`}
-      aria-label={`${o.name}(으)로 가는 문 · 그 공간 편집`}
+      aria-label={`${o.name}(으)로 가는 문, 그 공간 편집`}
       title={
         o.custom
-          ? '누르면 그 공간으로 가요 · 2D에서 문을 끌어 옮길 수 있어요'
-          : '문 위치는 초안이에요 · 2D에서 문을 끌어 옮길 수 있어요'
+          ? '누르면 그 공간으로 가요. 2D에서 문을 끌어 옮길 수 있어요'
+          : '문 위치는 초안이에요. 2D에서 문을 끌어 옮길 수 있어요'
       }
       onClick={() => store.editSpace(o.roomId)}
     >
@@ -710,7 +708,7 @@ function RoomTags() {
         <button
           class="tag-main"
           aria-pressed={selected}
-          aria-label={`${r.name} ${dims}${selected ? ' · 선택됨' : ' 선택'}`}
+          aria-label={`${r.name} ${dims}${selected ? ', 선택됨' : ' 선택'}`}
           title={`${r.name} ${dims}`}
           data-tag-kind={selected ? 'selected' : 'room'}
           data-tag-text={s.dimensions ? `${r.name} ${dims}` : r.name}
@@ -725,7 +723,7 @@ function RoomTags() {
           <button
             class="tag-turn"
             aria-label="선택한 방 90도 돌리기"
-            title="방 돌리기 · 가구도 함께 돌아요"
+            title="방 돌리기, 가구도 함께 돌아요"
             data-room-turn
             onClick={() => store.rotateSpace(r.roomId)}
           >
@@ -1095,7 +1093,7 @@ export function Stage({ mobile, sheetRef }) {
         class="icon-btn on-stage"
         id="undo"
         aria-label="실행 취소"
-        title="실행 취소 · ⌘/Ctrl Z"
+        title="실행 취소 (⌘/Ctrl Z)"
         disabled={!app.history.length}
         onClick={store.undo}
       >
@@ -1105,7 +1103,7 @@ export function Stage({ mobile, sheetRef }) {
         class="icon-btn on-stage"
         id="redo"
         aria-label="다시 실행"
-        title="다시 실행 · ⌘/Ctrl ⇧ Z"
+        title="다시 실행 (⌘/Ctrl ⇧ Z)"
         disabled={!app.future.length}
         onClick={store.redo}
       >
@@ -1186,7 +1184,7 @@ export function Stage({ mobile, sheetRef }) {
       {!house && app.draft && !app.selected && (
         <div class="draft-note" role="status">
           <span class="tape is-draft">점선</span>
-          {TYPES[app.draft.type].name} 초안 · 아직 놓지 않았어요
+          {TYPES[app.draft.type].name} 초안을 아직 놓지 않았어요
           <button class="link" onClick={() => store.placeDraft()}>
             놓기
           </button>
@@ -1200,13 +1198,13 @@ export function Stage({ mobile, sheetRef }) {
           <span class="stage-hint">
             {house
               ? s.view === '3d'
-                ? '끌어서 돌려 보기 · ＋로 벽에 공간 붙이기 · 두 번 눌러 방 편집'
-                : '＋로 벽에 공간 붙이기 · 공간과 문은 끌어 옮기기 · 두 번 눌러 방 편집'
+                ? '끌어서 돌려 보기, ＋로 벽에 공간 붙이기, 두 번 눌러 방 편집'
+                : '＋로 벽에 공간 붙이기, 공간과 문은 끌어 옮기기, 두 번 눌러 방 편집'
               : s.view === '2d'
                 ? hasDoor
-                  ? '가구와 문을 끌어 옮기기 · 방향키로 5cm씩'
-                  : '가구를 끌어 옮기기 · 방향키로 5cm씩'
-                : '빈 곳을 끌어 돌리기 · 휠로 확대 · 가구 끌어 옮기기'}
+                  ? '가구와 문을 끌어 옮기기, 방향키로 5cm씩'
+                  : '가구를 끌어 옮기기, 방향키로 5cm씩'
+                : '빈 곳을 끌어 돌리기, 휠로 확대, 가구 끌어 옮기기'}
           </span>
         )}
         <div class="tool-group">
@@ -1215,7 +1213,7 @@ export function Stage({ mobile, sheetRef }) {
             id="avatar-toggle"
             aria-pressed={avatarOn}
             aria-label="내 키 아바타 표시"
-            title={avatarOn ? '아바타 숨기기' : '내 키로 크기 비교 · 아바타 세우기'}
+            title={avatarOn ? '아바타 숨기기' : '아바타를 세워 내 키로 크기 비교'}
             onClick={() => {
               if (mobile && !avatarOn && app.view.sheet === 'full') store.setSheet('half');
               store.toggleAvatar();
@@ -1230,7 +1228,7 @@ export function Stage({ mobile, sheetRef }) {
                 id="grid"
                 aria-pressed={s.grid}
                 aria-label="격자 표시"
-                title={house ? '격자 50cm · 화장실 타일 30cm' : '격자 25cm'}
+                title={house ? '격자 50cm, 화장실 타일 30cm' : '격자 25cm'}
                 onClick={() => store.toggle('grid')}
               >
                 <Icon name="grid-2x2" />

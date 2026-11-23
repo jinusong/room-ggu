@@ -156,7 +156,7 @@ export function followupSize(text, ctx, focus) {
       ),
     };
   const axis = relative?.axis || validFocus?.axis;
-  if (!axis) return { text, guard: ask('가로·깊이·높이 중 어느 치수를 바꿀까요?') };
+  if (!axis) return { text, guard: ask('가로, 깊이, 높이 중 어느 치수를 바꿀까요?') };
   const room = !item;
   if (correction) {
     const oldCm = lengthCm(correction.from, correction.fromUnit || validFocus?.unit);

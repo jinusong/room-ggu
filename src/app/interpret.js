@@ -100,7 +100,7 @@ const COMMAND_NAMES = {
   catalog: '가구 고르기',
   spaces: '공간 목록',
   items: '가구 목록',
-  files: '저장·불러오기',
+  files: '저장과 불러오기',
   help: '사용법',
   ai: '모델 설정',
 };
@@ -212,7 +212,7 @@ export function planFromModel(raw, text, ctx) {
   if (rule.batchLimit || ['constraint', 'item', 'mood', 'delete-space'].includes(rule.ask)) {
     fixes.push(
       rule.ask === 'constraint'
-        ? '모호하거나 충돌하는 치수·배치는 확인 후 반영'
+        ? '모호하거나 충돌하는 치수와 배치는 확인 후 반영'
         : '선택이 필요한 부분을 되물음',
     );
     return done(rule);
@@ -259,7 +259,7 @@ export function planFromModel(raw, text, ctx) {
   // 목록에 없는 물건을 말했으면 모델이 비슷한 가구나 지금 대상을 골랐어도 만들거나 바꾸지 않는다.
   if (rule.unlisted) {
     if (v.furniture || v.action !== 'none')
-      fixes.push(`목록에 없는 물건(${rule.unlisted.join('·')})이라 가구를 만들지 않음`);
+      fixes.push(`목록에 없는 물건(${rule.unlisted.join(', ')})이라 가구를 만들지 않음`);
     return done(rule);
   }
 
@@ -423,13 +423,13 @@ function newSpacePlan(type, t, v, ctx) {
     label = roomLabel(t, type);
   for (const [k, n] of Object.entries(parseRoomDimensions(t))) {
     room[k] = n;
-    room.sources[k] = '사용자 설정 · 대화';
+    room.sources[k] = '사용자 설정(대화)';
   }
   return {
     intent: 'room',
     scope: 'room',
     // 답은 실제로 붙은 공간과 벽, 크기를 넣어 store가 쓴다(applyPlan). 모델 답은 어디에 붙었는지 모른다.
-    reply: `${josa(label || ROOM_TYPES[type].name, '을/를')} 새 공간으로 만들었어요. 가로·세로를 알려주면 바로 맞출게요.`,
+    reply: `${josa(label || ROOM_TYPES[type].name, '을/를')} 새 공간으로 만들었어요. 가로와 세로를 알려주면 바로 맞출게요.`,
     changes: { addSpace: type, room, near: refSpace(t, ctx.state), label },
     surfaces: [{ kind: 'room-size', target: { type: 'room' } }],
     suggestions: [
@@ -464,7 +464,7 @@ function roomPlan(v, t, ctx, fixes) {
     for (const [i, k] of ['w', 'd', 'h'].entries())
       if (!keep(room.sources[k])) {
         room[k] = sizes[i];
-        room.sources[k] = 'AI 단서 · 공간 크기';
+        room.sources[k] = 'AI 단서(공간 크기)';
       }
   }
   const literalWall = !!base.changes?.room && base.changes.room.wallColor !== before.wallColor;

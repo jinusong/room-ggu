@@ -20,7 +20,7 @@ export const CATEGORIES = {
   bath: '욕실',
   pet: '반려동물',
   kids: '아이',
-  fitness: '운동·취미',
+  fitness: '운동과 취미',
 };
 export const TYPES = {
   sofa: type('소파', 'sofa', 'living', [
@@ -86,7 +86,7 @@ export const TYPES = {
     ['기본 수납장', [100, 80, 40]],
     ['와이드 수납장', [140, 90, 45]],
   ]),
-  shelf: type('책장·선반', 'library', 'storage', [
+  shelf: type('책장', 'library', 'storage', [
     ['낮은 선반', [60, 90, 30]],
     ['기본 책장', [90, 160, 35]],
     ['높은 책장', [120, 200, 35]],
@@ -297,7 +297,7 @@ export const TYPES = {
     ['떡갈고무나무', [60, 180, 60]],
     ['여인초', [80, 210, 80]],
   ]),
-  succulent: type('다육·선인장', 'shrub', 'plant', [
+  succulent: type('다육 식물', 'shrub', 'plant', [
     ['작은 다육', [15, 20, 15]],
     ['스투키', [25, 45, 25]],
     ['기둥 선인장', [35, 90, 35]],

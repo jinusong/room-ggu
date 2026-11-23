@@ -180,13 +180,13 @@ export function consult(text, previous, caption = '', { keepType = false } = {})
     updated.push(i);
   };
   if (a.type === 'sofa') {
-    if (/1인|한\s*명|혼자/.test(text)) set(0, 90, '대화 추정 · 1인용');
+    if (/1인|한\s*명|혼자/.test(text)) set(0, 90, '대화 추정(1인용)');
     if (/2인|두\s*명|둘이|둘은/.test(text))
-      set(0, /넉넉|여유/.test(text) ? 190 : 170, '대화 추정 · 2인용');
-    if (/3인|세\s*명|셋이/.test(text)) set(0, 220, '대화 추정 · 3인용');
-    if (/4인|네\s*명/.test(text)) set(0, 270, '대화 추정 · 4인용');
+      set(0, /넉넉|여유/.test(text) ? 190 : 170, '대화 추정(2인용)');
+    if (/3인|세\s*명|셋이/.test(text)) set(0, 220, '대화 추정(3인용)');
+    if (/4인|네\s*명/.test(text)) set(0, 270, '대화 추정(4인용)');
     if (/깊은|깊어|깊고|깊었|깊게|깊숙|푹\s*(?:앉|파묻)|깊이도 꽤/.test(text) && !/얕/.test(text))
-      set(2, 100, '대화 추정 · 깊은 좌석');
+      set(2, 100, '대화 추정(깊은 좌석)');
   }
   if (a.type === 'bed')
     for (const [p, w] of [
@@ -197,7 +197,7 @@ export function consult(text, previous, caption = '', { keepType = false } = {})
       [/킹/, 180],
     ])
       if (p.test(text) && !a.sources[0].startsWith('사용자')) {
-        set(0, w, '대화 추정 · 침대 규격 가정');
+        set(0, w, '대화 추정(침대 규격 가정)');
         break;
       }
   for (const [p, i] of [
@@ -206,14 +206,14 @@ export function consult(text, previous, caption = '', { keepType = false } = {})
     [/(?:깊이|세로)[^.!?\n]{0,12}(?:늘려|더\s*깊게)/, 2],
   ])
     if (p.test(text) && explicit[i] === undefined)
-      set(i, Math.min(1500, a.dims[i] + 10), '사용자 요청 · 10cm 증가');
+      set(i, Math.min(1500, a.dims[i] + 10), '사용자 요청(10cm 증가)');
   for (const [p, i] of [
     [/(?:가로|너비|폭|길이)[^.!?\n]{0,12}(?:더\s*작게|줄여|짧게)|^(?:조금\s*)?(?:더\s*)?작게/, 0],
     [/높이[^.!?\n]{0,12}(?:더\s*낮게|낮춰|줄여)/, 1],
     [/(?:깊이|세로)[^.!?\n]{0,12}(?:줄여|더\s*얕게)/, 2],
   ])
     if (p.test(text.trim()) && explicit[i] === undefined && !updated.includes(i))
-      set(i, Math.max(1, a.dims[i] - 10), '사용자 요청 · 10cm 감소');
+      set(i, Math.max(1, a.dims[i] - 10), '사용자 요청(10cm 감소)');
   // 규격·자세에서 가늠한 값은 직접 정한 값보다 우선하지 않는다.
   for (const i of updated) {
     if (
@@ -242,7 +242,7 @@ export function consult(text, previous, caption = '', { keepType = false } = {})
   if (a.type === 'sofa' && !updated.includes(0) && a.sources[0] === DEFAULT_SOURCE)
     reply += ' 보통 몇 명이 앉나요?';
   else if (a.type === 'bed' && !updated.includes(0) && a.sources[0] === DEFAULT_SOURCE)
-    reply += ' 싱글·슈퍼싱글·퀸 중 어느 크기에 가까운가요?';
+    reply += ' 싱글, 슈퍼싱글, 퀸 중 어느 크기에 가까운가요?';
   else if (allDefault || (updated.length && a.sources[2] === DEFAULT_SOURCE))
     reply += ' 깊이를 알면 “깊이 80cm”처럼 알려주세요. 모르면 이 값으로 먼저 배치해도 돼요.';
   else reply += ' 아래 도구에서 더 조절할 수 있어요.';
@@ -394,7 +394,7 @@ export function applyModelResult(raw, previous, options = {}) {
     if (!Number.isFinite(n)) continue;
     if (!a.sources[i].startsWith('사용자') && !a.sources[i].startsWith('대화 추정')) {
       a.dims[i] = Math.round(n);
-      a.sources[i] = 'AI 단서 · 유형별 추정';
+      a.sources[i] = 'AI 단서(유형별 추정)';
     }
   }
   return {

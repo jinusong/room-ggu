@@ -32,7 +32,7 @@ async function decodeImage(file) {
 }
 
 export async function imageData(file) {
-  if (!isPhotoFile(file)) throw Error('사진 파일을 선택해 주세요. JPG·PNG·WebP를 권장해요.');
+  if (!isPhotoFile(file)) throw Error('사진 파일을 선택해 주세요. JPG, PNG, WebP를 권장해요.');
   if (!file.size) throw Error('비어 있는 사진이에요. 다른 파일을 선택해 주세요.');
   if (file.size > MAX_PHOTO_BYTES) throw Error('사진은 20MB 이하로 선택해 주세요.');
   let bitmap;
@@ -40,7 +40,7 @@ export async function imageData(file) {
     bitmap = await decodeImage(file);
   } catch {
     throw Error(
-      '사진을 읽지 못했어요. 파일이 손상됐거나 지원하지 않는 형식이에요. JPG·PNG·WebP로 바꿔 다시 올려 주세요.',
+      '사진을 읽지 못했어요. 파일이 손상됐거나 지원하지 않는 형식이에요. JPG, PNG, WebP로 바꿔 다시 올려 주세요.',
     );
   }
   try {

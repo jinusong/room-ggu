@@ -91,12 +91,12 @@ const FALLBACK = {
 // 답마다 무엇이 해석했는지 밝힌다. 모델이 기본이고 규칙은 대체 경로다.
 function engineLabel(turn) {
   if (turn.uiBy === 'user') return '직접 연 도구';
-  if (turn.engine === 'siglip') return 'SigLIP 사진 판별 · 이 기기에서 실행';
+  if (turn.engine === 'siglip') return 'SigLIP 사진 판별, 이 기기에서 실행';
   const model = turn.engine === 'gemma' ? 'Gemma' : turn.engine === 'qwen' ? 'Qwen' : null;
   if (model)
     return turn.fixes?.length
-      ? `${model}가 해석 · 앱이 ${turn.fixes.length}곳 바로잡음`
-      : `${model}가 해석 · 앱이 숫자·범위 확인`;
+      ? `${model}가 해석, 앱이 ${turn.fixes.length}곳 바로잡음`
+      : `${model}가 해석, 앱이 숫자와 범위 확인`;
   return turn.fallback ? `${FALLBACK[turn.fallback]} 규칙으로 처리` : '규칙으로 처리';
 }
 

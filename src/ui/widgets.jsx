@@ -144,7 +144,7 @@ export function Stepper({
         <span class="stepper-source">
           {error ? (
             <em id={errorId} class="field-error" role="alert">
-              {error} 범위로 입력해 주세요 · 지금 값 {fmt(value)}
+              {error} 범위로 입력해 주세요. 지금 값 {fmt(value)}
               {unit}
             </em>
           ) : (
@@ -321,7 +321,7 @@ export function HeightScale({ height, source, room, items, focus }) {
       <p class="height-scale-note">
         <span class={`tape ${user ? 'is-set' : 'is-draft'}`}>{height}</span>
         cm 선과 가구 높이를 같은 축척으로 그렸어요
-        {list.length > shown.length ? ` · 가구는 ${shown.length}개까지` : ''}
+        {list.length > shown.length ? `, 가구는 ${shown.length}개까지` : ''}
       </p>
     </div>
   );

@@ -163,7 +163,7 @@ test('문을 막으면 벽이 이어지고 집 전체 도구에서 다시 내거
   await page.getByRole('button', { name: '도구 열기' }).click();
   await page.locator('[data-tool=floorplan]').click();
   const list = page.locator('.house-doors').last();
-  await expect(list.locator('summary')).toContainText('문 0개 · 막은 벽 1곳');
+  await expect(list.locator('summary')).toContainText('문 0개, 막은 벽 1곳');
   // 문을 막은 뒤에는 다시 낼 수 있게 문 목록이 펼쳐져 있다.
   await expect(list).toHaveAttribute('open', '');
   await list.locator('[data-door-open]').click();

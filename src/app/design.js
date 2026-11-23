@@ -239,7 +239,7 @@ export function readDesign(raw, request) {
       r.items.length > 10 ||
       r.items.some((k) => !Object.hasOwn(TYPES, k))
     )
-      throw Error('공간 이름·가구·면적 비율을 확인해야 해요. 다시 요청해 주세요.');
+      throw Error('공간 이름과 가구, 면적 비율을 확인해야 해요. 다시 요청해 주세요.');
     let name = r.name.trim(),
       n = 2;
     while (names.has(name)) name = `${r.name.trim()} ${n++}`;

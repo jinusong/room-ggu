@@ -123,7 +123,7 @@ function ModelAsk({ ask }) {
               >
                 {Object.values(TEXT_MODELS).map((m) => (
                   <option key={m.key} value={m.key}>
-                    {m.name} · 약 {sizeText(m.downloadMB)}
+                    {m.name} (약 {sizeText(m.downloadMB)})
                   </option>
                 ))}
               </select>
@@ -160,7 +160,7 @@ function ModelAsk({ ask }) {
               나중에
             </button>
             <button class="island-btn is-primary" id="ask-go" onClick={() => store.acceptModel()}>
-              {ask.partial ? '이어서 받기' : '모델 받기'} · {size}
+              {ask.partial ? '이어서 받기' : '모델 받기'} ({size})
             </button>
           </footer>
         </div>
@@ -250,7 +250,7 @@ export function ModelIsland() {
           id="island-toggle"
           aria-expanded={open}
           aria-controls={open && d.phase !== 'done' ? 'island-panel' : undefined}
-          aria-label={`${title}${d.phase === 'fetch' ? ` ${percent}%` : ''} · ${open ? '접기' : '자세히 보기'}`}
+          aria-label={`${title}${d.phase === 'fetch' ? ` ${percent}%` : ''}, ${open ? '접기' : '자세히 보기'}`}
           onClick={() =>
             d.phase === 'done' ? store.closeDownload() : store.setDownloadOpen(!open)
           }
@@ -275,7 +275,7 @@ export function ModelIsland() {
           </span>
           <span class="island-title">
             {title}
-            {stalled && !open && <small> · 멈춘 것 같아요</small>}
+            {stalled && !open && <small>, 멈춘 것 같아요</small>}
           </span>
           {d.phase === 'fetch' && <b class="island-value mono">{percent}%</b>}
           {d.phase !== 'done' && <Icon name={open ? 'chevron-up' : 'chevron-down'} size={14} />}
@@ -284,7 +284,7 @@ export function ModelIsland() {
           <div class="island-panel" id="island-panel" role="group" aria-label={title}>
             <p class="island-model">
               {d.name}
-              {d.totalMB ? ` · 약 ${sizeText(d.totalMB)}` : ''} · 이 기기에서 실행
+              {d.totalMB ? `, 약 ${sizeText(d.totalMB)}` : ''}, 이 기기에서 실행
             </p>
             {busy && (
               <>
@@ -309,7 +309,7 @@ export function ModelIsland() {
                         ? '모델 파일에 연결하는 중'
                         : d.cached
                           ? '보관해 둔 모델을 불러오는 중'
-                          : '다 받았어요 · 기기에 맞게 준비하는 중'}
+                          : '다 받았어요. 기기에 맞게 준비하는 중'}
                   </span>
                   {d.phase === 'fetch' && <b>{percent}%</b>}
                 </div>
@@ -365,7 +365,7 @@ export function ModelIsland() {
                   aria-disabled={wait > 0}
                   onClick={() => store.retryDownload()}
                 >
-                  {wait > 0 ? `다시 시도 · ${wait}초 뒤` : '다시 시도'}
+                  {wait > 0 ? `${wait}초 뒤 다시 시도` : '다시 시도'}
                 </button>
               )}
               <button

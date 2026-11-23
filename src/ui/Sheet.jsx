@@ -44,7 +44,7 @@ function Status() {
     return (
       <span class="status-line">
         <span class="status-dot is-loading" />
-        상담 모델 준비 중<span class="status-extra"> · 그동안 규칙으로 답해요</span>
+        상담 모델 준비 중<span class="status-extra">, 그동안 규칙으로 답해요</span>
         <button type="button" class="link" onClick={() => store.setModelOn(false)}>
           끄기
         </button>
@@ -71,7 +71,7 @@ function Status() {
       <span class={`status-dot is-${ai.text}`} />
       <span class="status-text">
         {text}
-        <span class="status-extra"> · 규칙으로 답해요</span>
+        <span class="status-extra">, 규칙으로 답해요</span>
       </span>
       <button
         type="button"
@@ -161,7 +161,7 @@ function Resizer({ sheetRef }) {
       aria-valuemax={max}
       aria-valuenow={metrics.now || undefined}
       tabIndex={0}
-      title="끌어서 대화 폭 조절 · 두 번 누르면 기본 폭"
+      title="끌어서 대화 폭 조절, 두 번 누르면 기본 폭"
       onPointerDown={(e) => {
         drag.current = {
           x: e.clientX,

@@ -154,13 +154,13 @@ export function consultRoom(text, previous) {
   if (size !== null) {
     const base = ROOM_TYPES[room.type].sizes[size];
     for (const [i, k] of ['w', 'd', 'h'].entries())
-      if (!room.sources[k].startsWith('사용자')) set(k, base[i], '대화 추정 · 공간 크기');
+      if (!room.sources[k].startsWith('사용자')) set(k, base[i], '대화 추정(공간 크기)');
   }
   const area = text.match(/(\d+(?:\.\d+)?)\s*(평|m²|m2|제곱미터)/i);
   if (area && explicit.w && explicit.d) {
     const square = +area[1] * (area[2] === '평' ? 3.3058 : 1);
     if (Math.abs(explicit.w * explicit.d - square) / square > 0.02)
-      throw Error('가로·세로로 계산한 면적과 요청한 면적이 달라요. 어느 쪽을 기준으로 할까요?');
+      throw Error('가로와 세로로 계산한 면적과 요청한 면적이 달라요. 어느 쪽을 기준으로 할까요?');
   }
   if (area && !(explicit.w && explicit.d)) {
     const square = +area[1] * (area[2] === '평' ? 3.3058 : 1);
@@ -174,7 +174,7 @@ export function consultRoom(text, previous) {
     let w = explicit.w ?? (room.sources.w.startsWith('사용자') ? room.w : null),
       d = explicit.d ?? (room.sources.d.startsWith('사용자') ? room.d : null);
     if (w && d && !fits(w, d))
-      throw Error('정한 가로·세로와 요청한 면적이 달라요. 어느 쪽 치수를 바꿀까요?');
+      throw Error('정한 가로, 세로와 요청한 면적이 달라요. 어느 쪽 치수를 바꿀까요?');
     if (w && !d) d = fits(w, nice(square / w)) ? nice(square / w) : square / w;
     else if (d && !w) w = fits(nice(square / d), d) ? nice(square / d) : square / d;
     else if (!w && !d) {
@@ -186,10 +186,8 @@ export function consultRoom(text, previous) {
     }
     if (w < 1 || w > 15 || d < 1 || d > 15)
       throw Error('그 면적과 치수를 조합하면 방 치수가 범위를 벗어나요.');
-    if (!room.sources.w.startsWith('사용자') || explicit.w)
-      set('w', w, '대화 추정 · 면적에서 가정');
-    if (!room.sources.d.startsWith('사용자') || explicit.d)
-      set('d', d, '대화 추정 · 면적에서 가정');
+    if (!room.sources.w.startsWith('사용자') || explicit.w) set('w', w, '대화 추정(면적에서 가정)');
+    if (!room.sources.d.startsWith('사용자') || explicit.d) set('d', d, '대화 추정(면적에서 가정)');
     // 답에서 사용자가 말한 면적을 그대로 받아 준다: "6평(약 19.8m²)".
     const pyeong = area[2] === '평';
     areaSaid = {
@@ -202,14 +200,14 @@ export function consultRoom(text, previous) {
       square: square1,
     };
   }
-  for (const [k, n] of Object.entries(explicit)) set(k, n, '사용자 설정 · 대화');
+  for (const [k, n] of Object.entries(explicit)) set(k, n, '사용자 설정(대화)');
   for (const [key, pattern] of [
     ['w', /가로[^.!?]{0,8}(?:늘려|넓혀|더\s*넓게)/],
     ['d', /세로[^.!?]{0,8}(?:늘려|넓혀|더\s*길게)/],
     ['h', /천장[^.!?]{0,8}(?:높여|더\s*높게)/],
   ])
     if (pattern.test(text) && explicit[key] === undefined)
-      set(key, Math.min(15, room[key] + 0.5), '사용자 요청 · 0.5m 증가');
+      set(key, Math.min(15, room[key] + 0.5), '사용자 요청(0.5m 증가)');
   const colors = [
     [/세이지|연두|그린/, '#c0cbbb'],
     [/블루|파란/, '#bfcbd1'],
@@ -243,7 +241,7 @@ export function consultRoom(text, previous) {
   let reply =
     changed || add
       ? `${josa(name, '을/를')} 가로 ${room.w}m, 세로 ${room.d}m, 천장 ${room.h}m로 ${add ? '새로 만들었어요' : '반영했어요'}.`
-      : '방 유형과 가로·세로를 알려주세요. “거실 가로 5m 세로 4m”처럼 말하면 도면에 바로 반영해요.';
+      : '방 유형과 가로, 세로를 알려주세요. “거실 가로 5m 세로 4m”처럼 말하면 도면에 바로 반영해요.';
   if (areaSaid)
     reply =
       `${areaSaid.text}(${areaSaid.about})에 맞춰 ${josa(name, '을/를')} 가로 ${room.w}m, 세로 ${room.d}m로 ${add ? '새로 만들었어요' : '잡았어요'}.` +
@@ -295,7 +293,7 @@ export function applyRoomModel(raw, previous, options = {}) {
     for (const [i, k] of ['w', 'd', 'h'].entries())
       if (!/^(사용자|대화 추정)/.test(room.sources[k])) {
         room[k] = values[i];
-        room.sources[k] = 'AI 단서 · 공간 유형 추정';
+        room.sources[k] = 'AI 단서(공간 유형 추정)';
       }
   }
   return { room, reply: v.reply.slice(0, 700), ui: UI_SURFACES.room.includes(v.ui) ? v.ui : null };

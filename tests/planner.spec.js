@@ -27,7 +27,7 @@ test('첫 화면은 대화가 중심이고, 방 설명으로 크기 도구가 �
   await expect(thread.locator('[data-starter]')).toHaveCount(6);
   await expect(page.locator('.sheet-head')).toContainText('방 꾸미기 상담');
   await expect(page.locator('.sheet-head .status-line')).toContainText(
-    '모델 꺼 둠 · 규칙으로 답해요',
+    '모델 꺼 둠, 규칙으로 답해요',
   );
   await expect(page.locator('.surface')).toHaveCount(0);
   // 대화는 화면 높이를 다 쓰는 왼쪽 열이고 화면 폭의 40%를 차지한다.

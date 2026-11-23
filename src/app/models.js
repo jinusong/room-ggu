@@ -4,7 +4,7 @@ export const TEXT_MODELS = {
   large: {
     key: 'large',
     name: 'Gemma 4 E2B',
-    note: '기본 · 대화 답문 사용',
+    note: '기본, 대화 답문 사용',
     f16: 'gemma-4-E2B-it-q4f16_1-MLC',
     f32: 'gemma-4-E2B-it-q4f32_1-MLC',
     downloadMB: 2840,
@@ -35,7 +35,7 @@ export const TEXT_MODELS = {
   balanced: {
     key: 'balanced',
     name: 'Qwen3 1.7B',
-    note: '중간 다운로드 · 대화 답문 사용',
+    note: '중간 다운로드, 대화 답문 사용',
     f16: 'Qwen3-1.7B-q4f16_1-MLC',
     f32: 'Qwen3-1.7B-q4f32_1-MLC',
     downloadMB: 1100,

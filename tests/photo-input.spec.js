@@ -119,7 +119,7 @@ for (const [name, type, size, expected] of [
   ['빈.png', 'image/png', 0, '비어 있는'],
   ['큰.png', 'image/png', 20 * 1024 * 1024 + 1, '20MB'],
   ['문서.pdf', 'application/pdf', 10, '사진 파일'],
-  ['아이폰.heic', 'image/heic', 10, 'JPG·PNG·WebP'],
+  ['아이폰.heic', 'image/heic', 10, 'JPG, PNG, WebP'],
 ])
   test(`${name} 오류에도 기존 사진과 설명을 유지한다`, async ({ page }) => {
     await start(page);

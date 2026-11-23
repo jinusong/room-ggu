@@ -49,7 +49,7 @@ function TargetChip() {
         <span class="dot" style={{ background: s.color }} />
         <span class="target-text">
           <strong>{s.name}</strong>
-          <small>{t.type === 'draft' ? '초안 · 아직 방에 놓지 않음' : '선택한 가구'}</small>
+          <small>{t.type === 'draft' ? '아직 방에 놓지 않은 초안' : '선택한 가구'}</small>
         </span>
         <button
           type="button"
@@ -233,7 +233,7 @@ export function Composer({ onFocusChange, mobile }) {
         </button>
       </div>
       <div class="composer-foot">
-        {!mobile && <span class="composer-hint">Enter로 보내기 · Shift+Enter로 줄바꿈</span>}
+        {!mobile && <span class="composer-hint">Enter로 보내기, Shift+Enter로 줄바꿈</span>}
         <span class="save-state">{app.view.saveStatus}</span>
         {text.length >= 1200 && (
           <span class="char-count" aria-live={text.length === 1500 ? 'polite' : 'off'}>

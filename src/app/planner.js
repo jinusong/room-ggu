@@ -332,7 +332,7 @@ export function planRoom(t, ctx) {
   }
   const userSet = ['w', 'd'].every((k) => r.room.sources[k].startsWith('사용자'));
   if (!userSet && kind !== 'room-size') suggestions.push(say('크기 알려주기', '가로 4m 세로 3m'));
-  if (kind !== 'finishes') suggestions.push(say('벽·바닥 색', '벽과 바닥 색을 바꾸고 싶어'));
+  if (kind !== 'finishes') suggestions.push(say('벽과 바닥 색', '벽과 바닥 색을 바꾸고 싶어'));
   suggestions.push(act('가구 고르기', 'catalog'));
   return {
     intent: 'room',
@@ -627,7 +627,7 @@ function planFurniture(t, ctx, item) {
 
 // 선택한 가구·초안에 하는 동작. 목록에 없는 물건을 말했으면 지금 대상에 하지 않는다.
 const SUBJECT_ACTIONS = ['rotate', 'duplicate', 'delete', 'place'];
-const nameList = (names) => names.slice(0, 3).join('·');
+const nameList = (names) => names.slice(0, 3).join(', ');
 
 // 놓기·빼기 같은 동사 바로 앞의 낱말을 목적어로 읽는다. 목록의 가구면 known, 아니면 무엇이든 unlisted다.
 // "컴퓨터랑 책상"처럼 이어진 말은 함께 보고, "책상에"·"책상 위에"는 놓을 곳(place)으로 본다.
@@ -1018,17 +1018,17 @@ export function planTurn(text, ctx, request = splitRequest(text), ranked = null)
 
 // 첫 화면과 빈 대화에서 보여줄 시작점.
 export const STARTERS = [
-  { label: '방 크기부터', detail: '가로·세로·천장 높이', action: 'tool', arg: 'room-size' },
+  { label: '방 크기부터', detail: '가로, 세로, 천장 높이', action: 'tool', arg: 'room-size' },
   {
     label: '가구 고르기',
-    detail: `${Object.keys(TYPES).length}종 · ${Object.values(TYPES).reduce((n, t) => n + t.presets.length, 0)}가지 크기`,
+    detail: `${Object.keys(TYPES).length}종, ${Object.values(TYPES).reduce((n, t) => n + t.presets.length, 0)}가지 크기`,
     action: 'tool',
     arg: 'catalog',
   },
   { label: '사진으로 시작', detail: '가구 사진에서 종류부터 잡기', action: 'photo' },
   { label: '벽과 바닥', detail: '마감 색 비교하기', action: 'tool', arg: 'finishes' },
   { label: '내 키로 가늠하기', detail: '같은 축척의 아바타 세우기', action: 'tool', arg: 'avatar' },
-  { label: '집 전체로 잇기', detail: '화장실까지 2D·3D로', action: 'tool', arg: 'floorplan' },
+  { label: '집 전체로 잇기', detail: '화장실까지 2D와 3D로', action: 'tool', arg: 'floorplan' },
 ];
 export const EXAMPLE_PROMPTS = [
   '100평 집 전체를 재팬디로 꾸며줘',

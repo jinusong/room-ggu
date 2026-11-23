@@ -59,8 +59,8 @@ test('가구 별칭 검색과 빈 결과 초기화·새 가구 배치', async ({
   await input.fill('식세기');
   await expect(page.locator('[data-type=dishwasher]')).toBeVisible();
   await input.fill('없는가구');
-  await expect(page.getByRole('button', { name: '검색·분류 초기화' })).toBeVisible();
-  await page.getByRole('button', { name: '검색·분류 초기화' }).click();
+  await expect(page.getByRole('button', { name: '검색과 분류 초기화' })).toBeVisible();
+  await page.getByRole('button', { name: '검색과 분류 초기화' }).click();
   await expect(page.locator('.catalog-card')).toHaveCount(93);
   await input.fill('옷걸이');
   await page.locator('[data-type=hanger]').click();

@@ -29,13 +29,15 @@ export function validateWindows(value, room) {
       if (!Number.isFinite(w[k])) throw Error('창문 치수와 위치를 숫자로 입력해 주세요.');
     if (w.width < 0.3 || w.height < 0.3 || w.offset < 0.05 || w.sill < 0.1)
       throw Error(
-        '창 폭·높이는 30cm 이상, 벽 끝 여백은 5cm 이상, 바닥 높이는 10cm 이상으로 입력해 주세요.',
+        '창 폭과 높이는 30cm 이상, 벽 끝 여백은 5cm 이상, 바닥 높이는 10cm 이상으로 입력해 주세요.',
       );
     if (
       w.offset + w.width > wallLength(room, w.wall) - 0.05 + 1e-6 ||
       w.sill + w.height > room.h - 0.05 + 1e-6
     )
-      throw Error('창문이 벽을 벗어나요. 창 크기·위치를 줄이거나 방 크기를 늘려 주세요.');
+      throw Error(
+        '창문이 벽을 벗어나요. 창 크기를 줄이거나 위치를 옮기거나 방 크기를 늘려 주세요.',
+      );
     return {
       id: w.id,
       wall: w.wall,
@@ -53,7 +55,7 @@ export function validateWindows(value, room) {
         overlap(a.offset, a.offset + a.width, b.offset, b.offset + b.width) &&
         overlap(a.sill, a.sill + a.height, b.sill, b.sill + b.height)
       )
-        throw Error('창문끼리 겹쳐요. 벽이나 위치·크기를 바꿔 주세요.');
+        throw Error('창문끼리 겹쳐요. 벽이나 위치, 크기를 바꿔 주세요.');
     }
   return list;
 }
