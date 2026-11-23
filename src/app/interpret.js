@@ -44,6 +44,7 @@ import {
   actionSubject,
   editSubject,
 } from './planner.js';
+import { purposeRequest } from './purpose.js';
 import { sizeFields } from '../dimensions.js';
 import { roomNameSpan } from './consult-context.js';
 import { usableReply } from './model-turn.js';
@@ -154,8 +155,29 @@ function hasChanges(plan) {
 }
 
 export function planFromModel(raw, text, ctx) {
-  const v = readModel(raw);
   const t = String(text).trim().slice(0, 1500);
+  if (purposeRequest(t)) {
+    const ranked = JSON.parse(raw);
+    if (
+      !ranked ||
+      !['first', 'second', 'third'].every(
+        (k) => ranked[k] === 'none' || Object.hasOwn(TYPES, ranked[k]),
+      )
+    )
+      throw Error('가구 후보를 다시 확인해 주세요.');
+    const plan = planTurn(t, ctx, undefined, ranked);
+    const actual =
+      plan.recommendation?.types ??
+      plan.confirmation?.types ??
+      (plan.changes?.draft ? [plan.changes.draft.type] : []);
+    const proposed = [ranked.first, ranked.second, ranked.third].filter((k) => k !== 'none');
+    return {
+      ...plan,
+      decidedBy: 'model',
+      fixes: actual.join() !== proposed.join() ? ['카탈로그 용도와 대조해 선택지를 정리'] : [],
+    };
+  }
+  const v = readModel(raw);
   const fixes = [];
   const target = ctx.target || { type: 'room' };
   let item =

@@ -127,7 +127,7 @@ for (const [width, height] of [
           ),
       )
       .toBe(true);
-    await page.screenshot({ path: `docs/screenshots/photo-review-${width}.png` });
+    await page.screenshot({ path: `test-results/photo-review-${width}.png` });
     expect(errors).toEqual([]);
   });
 

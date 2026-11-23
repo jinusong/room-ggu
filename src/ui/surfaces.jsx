@@ -5,10 +5,11 @@ import {
   modelCoverage,
   modelCaution,
 } from '../app/model-capabilities.js';
+import { uses, activityTypes } from '../app/purpose.js';
 import { catalogMatches } from '../estimator.js';
 import { WINDOW_WALLS, MAX_WINDOWS } from '../windows.js';
 // 대화 안에 나타나는 생성형 UI 컴포넌트. 모델은 이름만 고르고, 값과 동작은 모두 앱 상태에 연결된다.
-import { useEffect, useLayoutEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   TYPES,
   ROOM_TYPES,
@@ -914,29 +915,96 @@ function FurnitureColor({ target }) {
   );
 }
 
-let previewPromise = null;
-function useThumbnails() {
+function useThumbnails(types) {
+  const key = types?.join(',') ?? '*';
   const [map, setMap] = useState(null);
   useEffect(() => {
     let live = true;
     const id = setTimeout(() => {
-      previewPromise ||= import('../catalog-renderer.js').then((m) => m.furniturePreviews());
-      previewPromise.then((m) => live && setMap(m)).catch(() => {});
+      import('../catalog-renderer.js')
+        .then((m) => {
+          if (live) setMap(m.furniturePreviews(key === '*' ? undefined : key.split(',')));
+        })
+        .catch(() => {});
     }, 60);
     return () => {
       live = false;
       clearTimeout(id);
     };
-  }, []);
+  }, [key]);
   return map;
 }
 
+function Recommendations({ spec }) {
+  const rec = store.recommendationFor(spec.id);
+  const thumbs = useThumbnails(rec?.types || []);
+  const listRef = useRef(null);
+  useEffect(() => {
+    if (!rec?.active || !matchMedia('(max-width: 899px)').matches) return;
+    const list = listRef.current;
+    const frame = requestAnimationFrame(() =>
+      list?.scrollIntoView({ block: 'nearest', behavior: 'instant' }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [spec.id, rec?.active]);
+  if (!rec) return <p class="surface-hint">원하는 용도를 말하면 여기에 후보가 나와요.</p>;
+  return (
+    <>
+      <Head icon="armchair" title="용도에 맞는 가구" meta={rec.types.length + '가지'} />
+      <div
+        ref={listRef}
+        class="purpose-list"
+        data-count={rec.types.length}
+        role="group"
+        aria-label="추천 가구"
+      >
+        {rec.types.map((k) => (
+          <button
+            key={k}
+            type="button"
+            class="purpose-option"
+            data-choice={k}
+            disabled={!rec.active}
+            onClick={() => {
+              store.chooseRecommendation(spec.id, k);
+              requestAnimationFrame(() =>
+                [...document.querySelectorAll('.suggestions .is-primary')]
+                  .at(-1)
+                  ?.focus({ preventScroll: true }),
+              );
+            }}
+          >
+            <span class="purpose-preview">
+              {thumbs?.get(k) ? (
+                <img src={thumbs.get(k)} alt="" />
+              ) : (
+                <Icon name={TYPES[k].icon} size={24} />
+              )}
+            </span>
+            <span>
+              <strong>{TYPES[k].name}</strong>
+              <small>{uses[k]}</small>
+            </span>
+            {rec.active && <Icon name="chevron-right" size={16} />}
+          </button>
+        ))}
+      </div>
+      {!rec.active && (
+        <p class="surface-hint">지난 추천이에요. 다른 후보를 보려면 용도를 다시 말해 주세요.</p>
+      )}
+    </>
+  );
+}
+
 function Catalog() {
+  const inputRef = useRef(null);
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('all');
   const thumbs = useThumbnails();
+  const matchingUses = activityTypes(q.trim());
   const list = Object.entries(TYPES).filter(
-    ([k, t]) => (cat === 'all' || t.category === cat) && catalogMatches(k, q),
+    ([k, t]) =>
+      (cat === 'all' || t.category === cat) && (catalogMatches(k, q) || matchingUses.includes(k)),
   );
   const total = Object.values(TYPES).reduce((n, t) => n + t.presets.length, 0);
   return (
@@ -946,16 +1014,29 @@ function Catalog() {
         title="가구 고르기"
         meta={`${Object.keys(TYPES).length}종 · ${total}가지 크기`}
       />
-      <label class="search">
+      <div class="search catalog-search">
         <Icon name="search" size={16} />
         <input
+          ref={inputRef}
           aria-label="가구 검색"
-          placeholder="가구 이름·별칭·규격으로 검색"
+          placeholder="이름이나 용도 검색 (예: 식탁, 독서)"
           value={q}
           onInput={(e) => setQ(e.currentTarget.value)}
         />
-      </label>
-      <div class="chips-row is-scroll" role="group" aria-label="가구 분류">
+        {q && (
+          <button
+            type="button"
+            aria-label="검색어 지우기"
+            onClick={() => {
+              setQ('');
+              inputRef.current?.focus();
+            }}
+          >
+            <Icon name="x" size={16} />
+          </button>
+        )}
+      </div>
+      <div class="chips-row is-scroll catalog-filters" role="group" aria-label="가구 분류">
         {Object.entries(CATEGORIES).map(([k, v]) => (
           <button
             key={k}
@@ -968,7 +1049,7 @@ function Catalog() {
         ))}
       </div>
       <p class="surface-hint" role="status">
-        {list.length}종 표시 · 바닥에 놓는 가구와 가전이에요
+        {CATEGORIES[cat]} · {list.length}종
       </p>
       {list.length ? (
         <div class="catalog-grid">
@@ -982,7 +1063,7 @@ function Catalog() {
                 )}
               </span>
               <strong>{t.name}</strong>
-              <span class="mono">{t.presets.length}가지</span>
+              <span class="catalog-size">기본 폭 {t.dims[0]}cm</span>
             </button>
           ))}
         </div>
@@ -1682,6 +1763,7 @@ const BODIES = {
   'furniture-size': FurnitureSize,
   'furniture-dims': FurnitureDims,
   'furniture-color': FurnitureColor,
+  recommendations: Recommendations,
   catalog: Catalog,
   impact: Impact,
   spaces: Spaces,
@@ -1720,6 +1802,13 @@ export function surfaceSummary(spec) {
       const n = layoutWarnings(s).all.size + floorplanWarnings(spaces(s), s.floorplan).size;
       return n ? `확인 필요 ${n}개` : '문제 없음';
     }
+    case 'recommendations':
+      return (
+        store
+          .recommendationFor(spec.id)
+          ?.types.map((k) => TYPES[k].name)
+          .join(' · ') || ''
+      );
     case 'spaces':
       return `${spaces(s).length}개`;
     case 'windows':

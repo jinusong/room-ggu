@@ -34,6 +34,8 @@ import { chooseSurface, surfaceKind } from '../ui-schema.js';
 // 규칙이 기본값으로 물러난 경우(방: 유형, 가구: 규격)가 아니면 요청 단어로 도구를 확신한 것이다.
 const confidentPick = (scope, pick) => pick !== (scope === 'room' ? 'types' : 'sizes');
 
+import { purposeRequest, recommendedTypes } from './purpose.js';
+
 export const ROOM_REFERENCE =
   /(?:방|공간)(?:을|를|은|는|이|가|의)?\s*(?:가로|세로|크기|치수|넓이|면적)|천장|\d\s*평|평수|m²|제곱미터|벽|바닥/;
 
@@ -787,12 +789,12 @@ function changesSomething(plan, ctx, item) {
   return false;
 }
 
-function consultationGuard(text, ctx, request) {
+function consultationGuard(text, ctx, request, furniturePurpose) {
   if (ctx.guard) return ctx.guard;
   if (!request?.limit) {
     const scopes = request
       ? [[request.roomText, true], ...request.pieces.map((p) => [p.text, false])]
-      : [[text, resolveScope(text, ctx.target) === 'room']];
+      : [[text, !furniturePurpose && resolveScope(text, ctx.target) === 'room']];
     for (const [clause, room] of scopes) {
       const { issue } = sizeFields(clause, room);
       if (issue)
@@ -839,10 +841,57 @@ export function moodQuestion(text) {
   return '아늑한 느낌을 내려면 어디부터 바꿀까요? 벽 색, 조명, 가구 배치 중에 골라 주세요.';
 }
 
-export function planTurn(text, ctx, request = splitRequest(text)) {
+export function purposeDraft(text, type) {
+  const item = draftFrom({ text, type });
+  return {
+    intent: 'furniture',
+    scope: 'furniture',
+    mode: 'new',
+    reply: `${josa(TYPES[type].name, '을/를')} 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.`,
+    changes: { draft: item },
+    surfaces: [surface('furniture-size', { type: 'draft' })],
+    suggestions: furnitureChips(item, 'new'),
+  };
+}
+
+export function offerFurniture(text, types) {
+  if (types.length === 1) return purposeDraft(text, types[0]);
+  return {
+    intent: 'furniture',
+    ask: 'purpose',
+    reply: '어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.',
+    recommendation: { types, text },
+    surfaces: [surface('recommendations')],
+    suggestions: [],
+  };
+}
+
+export function planTurn(text, ctx, request = splitRequest(text), ranked = null) {
   const t = String(text).trim().slice(0, 1500);
-  const guard = consultationGuard(t, ctx, request);
+  const purpose = purposeRequest(t);
+  const guard = consultationGuard(t, ctx, request, !!purpose);
   if (guard) return guard;
+  if (purpose) {
+    const types = recommendedTypes(purpose, ranked);
+    if (types.length && !purpose.matched.length && !purpose.evidence.length)
+      return {
+        intent: 'chat',
+        ask: 'purpose',
+        reply:
+          '어디에 쓰고 싶으세요? 아래 용도가 맞으면 눌러 주세요. 다른 쓰임이라면 한마디 더 알려 주세요.',
+        confirmation: { types, text: t, activity: ranked.activity },
+        suggestions: [{ action: 'confirm-use', label: ranked.activity + ' 용도예요' }],
+        surfaces: [],
+      };
+    if (types.length) return offerFurniture(t, types);
+    return {
+      intent: 'chat',
+      ask: 'purpose',
+      reply: '어디에 쓰고 싶으세요? “혼자 기대서 책을 읽고 싶어”처럼 말해 주세요.',
+      surfaces: [surface('catalog')],
+      suggestions: [],
+    };
+  }
   const target = ctx.target || roomTarget;
   let item = target.type === 'item' ? ctx.state.items.find((a) => a.id === target.id) : null;
   const mood = moodQuestion(t);
@@ -914,7 +963,7 @@ export const STARTERS = [
 export const EXAMPLE_PROMPTS = [
   '100평 집 전체를 재팬디로 꾸며줘',
   '6평 원룸, 천장 2.4m',
-  '두 명이 앉는 소파',
+  '혼자 기대서 책을 읽고 싶어',
   '벽은 세이지, 바닥은 월넛',
   '내 키 175cm',
 ];

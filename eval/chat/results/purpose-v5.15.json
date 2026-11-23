@@ -1,0 +1,2668 @@
+{
+  "version": "5.15.0",
+  "date": "2026-11-23",
+  "baselineCommit": "aeaa982fcd393336ca36bcd8f8a9f41c641d857d",
+  "baseline": {
+    "model": {
+      "ai": "ready",
+      "id": "gemma3-1b-it-q4f16_1-MLC",
+      "error": "",
+      "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.0.0 Safari/537.36",
+      "gpu": "apple",
+      "f16": true
+    },
+    "cases": [
+      {
+        "id": "use-sleep",
+        "text": "한 사람이 누워서 잘 가구 하나가 필요해",
+        "passed": false,
+        "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"chair\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":1,\"size\":\"standard\",\"depth\":\"deep\",\"height\":\"tall\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"\"}",
+        "draft": null,
+        "reply": "하나는 아직 가구 목록에 없어요. 지금은 가구 40종만 놓을 수 있어요. 비슷한 크기의 가구로 자리를 가늠해 보세요.",
+        "failure": "초안 가구 종류\n\nundefined !== 'bed'\n"
+      },
+      {
+        "id": "use-recline",
+        "text": "혼자 푹 기대 앉아서 책을 읽을 가구를 추천해 줘",
+        "passed": false,
+        "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"chair\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":1, \"size\":\"standard\",\"depth\":\"deep\",\"height\":\"tall\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"\"}",
+        "draft": {
+          "type": "chair",
+          "dims": [
+            48,
+            82,
+            65
+          ],
+          "sources": [
+            "유형 기본값",
+            "유형 기본값",
+            "AI 단서 · 유형별 추정"
+          ]
+        },
+        "reply": "의자 초안은 48 × 65 × 82cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요.",
+        "failure": "초안 가구 종류\n+ actual - expected\n\n+ 'chair'\n- 'armchair'\n"
+      },
+      {
+        "id": "use-computer",
+        "text": "노트북 펼쳐서 공부할 만한 가구 하나 보여줘",
+        "passed": true,
+        "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"desk\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":2, \"size\":\"standard\",\"depth\":\"deep\",\"height\":\"tall\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"\"}",
+        "draft": {
+          "type": "desk",
+          "dims": [
+            120,
+            74,
+            60
+          ],
+          "sources": [
+            "유형 기본값",
+            "유형 기본값",
+            "유형 기본값"
+          ]
+        },
+        "reply": "책상 초안은 120 × 60 × 74cm예요. 방에 놓기 전에 아래에서 규격을 비교해 보세요."
+      },
+      {
+        "id": "use-dining",
+        "text": "여럿이 둘러앉아 같이 밥 먹을 만한 가구 하나 추천해줘",
+        "passed": false,
+        "raw": "{\"intent\":\"furniture\",\"action\":\"none\",\"furniture\":\"sofa\",\"room_type\":\"none\",\"space\":\"none\",\"seats\":2,\"size\":\"large\",\"depth\":\"deep\",\"height\":\"tall\",\"color\":\"none\",\"wall\":\"none\",\"floor\":\"none\",\"ui\":\"none\",\"reply\":\"\"}",
+        "draft": null,
+        "reply": "여럿은 아직 가구 목록에 없어요. 지금은 가구 40종만 놓을 수 있어요. 비슷한 크기의 가구로 자리를 가늠해 보세요.",
+        "failure": "초안 가구 종류\n+ actual - expected\n\n+ undefined\n- 'dining'\n"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "sleep",
+      "text": "한 사람이 누워서 잘 가구 하나가 필요해",
+      "expected": {
+        "draft": [
+          "bed"
+        ]
+      }
+    },
+    {
+      "id": "read",
+      "text": "혼자 푹 기대 앉아서 책을 읽을 가구를 추천해 줘",
+      "expected": {
+        "unchanged": true,
+        "options": [
+          "armchair",
+          "sofa"
+        ],
+        "choose": "armchair"
+      }
+    },
+    {
+      "id": "study",
+      "text": "노트북 펼쳐서 공부할 만한 가구 하나 보여줘",
+      "expected": {
+        "draft": [
+          "desk"
+        ]
+      }
+    },
+    {
+      "id": "meal",
+      "text": "여럿이 둘러앉아 같이 밥 먹을 만한 가구 하나 추천해줘",
+      "expected": {
+        "draft": [
+          "dining"
+        ]
+      }
+    },
+    {
+      "id": "study-width",
+      "text": "과제랑 필기를 할 가구가 필요해. 폭 950mm",
+      "expected": {
+        "draft": [
+          "desk",
+          95
+        ]
+      }
+    },
+    {
+      "id": "read-width",
+      "text": "퇴근하면 독서하고 싶어. 가로 92cm, 네이비로",
+      "expected": {
+        "unchanged": true,
+        "options": [
+          "armchair",
+          "sofa"
+        ],
+        "choose": "sofa",
+        "width": 92
+      }
+    },
+    {
+      "id": "coats",
+      "text": "외출하고 돌아오면 외투를 걸어둘 게 필요해",
+      "expected": {
+        "unchanged": true,
+        "options": [
+          "hanger",
+          "wardrobe"
+        ],
+        "choose": "wardrobe"
+      }
+    },
+    {
+      "id": "shoes",
+      "text": "현관에서 신발을 정리할 가구를 추천해줘",
+      "expected": {
+        "draft": [
+          "shoe_cabinet"
+        ]
+      }
+    },
+    {
+      "id": "laundry",
+      "text": "젖은 옷을 말릴 가구가 필요해",
+      "expected": {
+        "unchanged": true,
+        "options": [
+          "dryer",
+          "drying_rack"
+        ],
+        "choose": "drying_rack"
+      }
+    },
+    {
+      "id": "storage",
+      "text": "자잘한 소품을 정리할 가구가 필요해",
+      "expected": {
+        "unchanged": true,
+        "options": [
+          "shelf",
+          "cabinet",
+          "dresser"
+        ],
+        "choose": "shelf"
+      }
+    },
+    {
+      "id": "cat",
+      "text": "고양이가 높은 곳에 올라 쉴 가구가 필요해",
+      "expected": {
+        "draft": [
+          "cat_tower"
+        ]
+      }
+    },
+    {
+      "id": "exclude",
+      "text": "소파 말고 기대 앉아서 독서할 가구를 추천해줘",
+      "expected": {
+        "draft": [
+          "armchair"
+        ]
+      }
+    },
+    {
+      "id": "reference",
+      "text": "침대 옆에 안경을 놓을 가구가 필요해",
+      "expected": {
+        "draft": [
+          "side"
+        ]
+      }
+    },
+    {
+      "id": "unclear",
+      "text": "가구를 추천해줘",
+      "expected": {
+        "unchanged": true,
+        "ask": "어디에 쓰고"
+      }
+    },
+    {
+      "id": "no-match",
+      "text": "달까지 날아갈 때 탈 가구가 필요해",
+      "expected": {
+        "unchanged": true,
+        "noOptions": true,
+        "ask": "어디에 쓰고"
+      }
+    },
+    {
+      "id": "shelf-heldout",
+      "text": "책들을 꽂아 놓을 가구를 찾고 있어",
+      "expected": {
+        "draft": [
+          "shelf"
+        ]
+      }
+    },
+    {
+      "id": "negated-last",
+      "text": "겨울 외투를 걸 자리가 필요해. 행거는 빼고",
+      "expected": {
+        "draft": [
+          "wardrobe"
+        ]
+      }
+    },
+    {
+      "id": "window",
+      "text": "창문 옆에서 독서할 가구를 추천해줘",
+      "expected": {
+        "unchanged": true,
+        "options": [
+          "armchair",
+          "sofa"
+        ],
+        "choose": "sofa"
+      }
+    },
+    {
+      "id": "heldout-console",
+      "text": "게임기 받칠 가구가 필요해",
+      "expected": {
+        "draft": [
+          "tvstand"
+        ]
+      }
+    },
+    {
+      "id": "semantic-work",
+      "text": "종이 원고를 펼쳐서 매일 교정할 가구가 필요해",
+      "expected": {
+        "draft": [
+          "desk"
+        ]
+      }
+    },
+    {
+      "id": "instrument",
+      "text": "건반을 연습할 가구가 필요해",
+      "expected": {
+        "draft": [
+          "piano"
+        ]
+      }
+    },
+    {
+      "id": "novel",
+      "text": "매일 아침 얼굴에 화장을 하고 분첩을 올려둘 가구가 필요해",
+      "expected": {
+        "draft": [
+          "vanity"
+        ]
+      }
+    }
+  ],
+  "models": {
+    "large": {
+      "environment": {
+        "ai": "ready",
+        "id": "gemma-4-E2B-it-q4f16_1-MLC",
+        "error": "",
+        "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.0.0 Safari/537.36",
+        "gpu": "apple",
+        "f16": true
+      },
+      "prepareMs": 5847,
+      "medianTurnMs": 705.0,
+      "pageErrors": [],
+      "turns": [
+        {
+          "id": "sleep",
+          "ms": 1920,
+          "engine": "gemma",
+          "raw": "{\"first\":\"bed\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "bed",
+            "dims": [
+              150,
+              55,
+              200
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "침대를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "read",
+          "ms": 701,
+          "engine": "gemma",
+          "raw": "{\"first\":\"armchair\",\"second\":\"none\",\"third\":\"none\"}",
+          "options": [
+            "armchair",
+            "sofa"
+          ],
+          "chosen": {
+            "type": "armchair",
+            "dims": [
+              80,
+              85,
+              80
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "study",
+          "ms": 644,
+          "engine": "gemma",
+          "raw": "{\"first\":\"desk\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "desk",
+            "dims": [
+              120,
+              74,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책상을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "meal",
+          "ms": 686,
+          "engine": "gemma",
+          "raw": "{\"first\":\"dining\",\"second\":\"dining\",\"third\":\"dining\"}",
+          "draft": {
+            "type": "dining",
+            "dims": [
+              140,
+              74,
+              80
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "식탁을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "study-width",
+          "ms": 645,
+          "engine": "gemma",
+          "raw": "{\"first\":\"desk\",\"second\":\"desk\",\"third\":\"desk\"}",
+          "draft": {
+            "type": "desk",
+            "dims": [
+              95,
+              74,
+              60
+            ],
+            "sources": [
+              "사용자 설정",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책상을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "read-width",
+          "ms": 727,
+          "engine": "gemma",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "options": [
+            "armchair",
+            "sofa"
+          ],
+          "chosen": {
+            "type": "sofa",
+            "dims": [
+              92,
+              82,
+              90
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "coats",
+          "ms": 711,
+          "engine": "gemma",
+          "raw": "{\"first\":\"wardrobe\",\"second\":\"hanger\",\"third\":\"none\"}",
+          "options": [
+            "wardrobe",
+            "hanger"
+          ],
+          "chosen": {
+            "type": "wardrobe",
+            "dims": [
+              100,
+              200,
+              60
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "shoes",
+          "ms": 709,
+          "engine": "gemma",
+          "raw": "{\"first\":\"shoe_cabinet\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "shoe_cabinet",
+            "dims": [
+              80,
+              120,
+              35
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "신발장을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "laundry",
+          "ms": 757,
+          "engine": "gemma",
+          "raw": "{\"first\":\"dryer\",\"second\":\"drying_rack\",\"third\":\"none\"}",
+          "options": [
+            "dryer",
+            "drying_rack"
+          ],
+          "chosen": {
+            "type": "drying_rack",
+            "dims": [
+              140,
+              110,
+              60
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "storage",
+          "ms": 729,
+          "engine": "gemma",
+          "raw": "{\"first\":\"shelf\",\"second\":\"cabinet\",\"third\":\"none\"}",
+          "options": [
+            "shelf",
+            "cabinet",
+            "dresser"
+          ],
+          "chosen": {
+            "type": "shelf",
+            "dims": [
+              90,
+              160,
+              35
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "cat",
+          "ms": 712,
+          "engine": "gemma",
+          "raw": "{\"first\":\"cat_tower\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "cat_tower",
+            "dims": [
+              60,
+              150,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "캣타워를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "exclude",
+          "ms": 685,
+          "engine": "gemma",
+          "raw": "{\"first\":\"armchair\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "armchair",
+            "dims": [
+              80,
+              85,
+              80
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "라운지체어를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "reference",
+          "ms": 695,
+          "engine": "gemma",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "side",
+            "dims": [
+              45,
+              50,
+              40
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "협탁을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "unclear",
+          "ms": 718,
+          "engine": "gemma",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\",\"activity\":\"책상에서 공부하거나 일하기\"}",
+          "draft": null,
+          "reply": "어디에 쓰고 싶으세요? “혼자 기대서 책을 읽고 싶어”처럼 말해 주세요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "no-match",
+          "ms": 899,
+          "engine": "gemma",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\",\"activity\":\"해당 없음\"}",
+          "draft": null,
+          "reply": "어디에 쓰고 싶으세요? “혼자 기대서 책을 읽고 싶어”처럼 말해 주세요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "shelf-heldout",
+          "ms": 689,
+          "engine": "gemma",
+          "raw": "{\"first\":\"shelf\",\"second\":\"shelf\",\"third\":\"shelf\"}",
+          "draft": {
+            "type": "shelf",
+            "dims": [
+              90,
+              160,
+              35
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책장·선반을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "negated-last",
+          "ms": 701,
+          "engine": "gemma",
+          "raw": "{\"first\":\"wardrobe\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "wardrobe",
+            "dims": [
+              100,
+              200,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "옷장을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "window",
+          "ms": 748,
+          "engine": "gemma",
+          "raw": "{\"first\":\"armchair\",\"second\":\"sofa\",\"third\":\"none\"}",
+          "options": [
+            "armchair",
+            "sofa"
+          ],
+          "chosen": {
+            "type": "sofa",
+            "dims": [
+              180,
+              82,
+              90
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "heldout-console",
+          "ms": 699,
+          "engine": "gemma",
+          "raw": "{\"first\":\"tvstand\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "tvstand",
+            "dims": [
+              160,
+              45,
+              40
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "TV장을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "semantic-work",
+          "ms": 683,
+          "engine": "gemma",
+          "raw": "{\"first\":\"desk\",\"second\":\"desk\",\"third\":\"desk\"}",
+          "draft": {
+            "type": "desk",
+            "dims": [
+              120,
+              74,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책상을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "instrument",
+          "ms": 691,
+          "engine": "gemma",
+          "raw": "{\"first\":\"piano\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "piano",
+            "dims": [
+              140,
+              85,
+              45
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "디지털 피아노를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "novel",
+          "ms": 724,
+          "engine": "gemma",
+          "raw": "{\"first\":\"vanity\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "vanity",
+            "dims": [
+              90,
+              140,
+              45
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "화장대를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        }
+      ]
+    },
+    "light": {
+      "environment": {
+        "ai": "ready",
+        "id": "gemma3-1b-it-q4f16_1-MLC",
+        "error": "",
+        "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.0.0 Safari/537.36",
+        "gpu": "apple",
+        "f16": true
+      },
+      "prepareMs": 2889,
+      "medianTurnMs": 357.0,
+      "pageErrors": [],
+      "turns": [
+        {
+          "id": "sleep",
+          "ms": 1113,
+          "engine": "gemma",
+          "raw": "{\"first\":\"bed\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "bed",
+            "dims": [
+              150,
+              55,
+              200
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "침대를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "read",
+          "ms": 356,
+          "engine": "gemma",
+          "raw": "{\"first\":\"armchair\",\"second\":\"sofa\",\"third\":\"none\"}",
+          "options": [
+            "armchair",
+            "sofa"
+          ],
+          "chosen": {
+            "type": "armchair",
+            "dims": [
+              80,
+              85,
+              80
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "study",
+          "ms": 358,
+          "engine": "gemma",
+          "raw": "{\"first\":\"desk\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "desk",
+            "dims": [
+              120,
+              74,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책상을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "meal",
+          "ms": 324,
+          "engine": "gemma",
+          "raw": "{\"first\":\"dining\",\"second\":\"dining\",\"third\":\"dining\"}",
+          "draft": {
+            "type": "dining",
+            "dims": [
+              140,
+              74,
+              80
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "식탁을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "study-width",
+          "ms": 321,
+          "engine": "gemma",
+          "raw": "{\"first\":\"desk\",\"second\":\"desk\",\"third\":\"desk\"}",
+          "draft": {
+            "type": "desk",
+            "dims": [
+              95,
+              74,
+              60
+            ],
+            "sources": [
+              "사용자 설정",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책상을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "read-width",
+          "ms": 391,
+          "engine": "gemma",
+          "raw": "{\"first\":\"armchair\",\"second\":\"sofa\",\"third\":\"armchair\"}",
+          "options": [
+            "armchair",
+            "sofa"
+          ],
+          "chosen": {
+            "type": "sofa",
+            "dims": [
+              92,
+              82,
+              90
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "coats",
+          "ms": 353,
+          "engine": "gemma",
+          "raw": "{\"first\":\"hanger\",\"second\":\"wardrobe\",\"third\":\"hanger\"}",
+          "options": [
+            "hanger",
+            "wardrobe"
+          ],
+          "chosen": {
+            "type": "wardrobe",
+            "dims": [
+              100,
+              200,
+              60
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "shoes",
+          "ms": 404,
+          "engine": "gemma",
+          "raw": "{\"first\":\"shoe_cabinet\",\"second\":\"shoe_cabinet\",\"third\":\"shoe_cabinet\"}",
+          "draft": {
+            "type": "shoe_cabinet",
+            "dims": [
+              80,
+              120,
+              35
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "신발장을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "laundry",
+          "ms": 358,
+          "engine": "gemma",
+          "raw": "{\"first\":\"drying_rack\",\"second\":\"dryer\",\"third\":\"none\"}",
+          "options": [
+            "drying_rack",
+            "dryer"
+          ],
+          "chosen": {
+            "type": "drying_rack",
+            "dims": [
+              140,
+              110,
+              60
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "storage",
+          "ms": 326,
+          "engine": "gemma",
+          "raw": "{\"first\":\"cabinet\",\"second\":\"dresser\",\"third\":\"none\"}",
+          "options": [
+            "cabinet",
+            "dresser",
+            "shelf"
+          ],
+          "chosen": {
+            "type": "shelf",
+            "dims": [
+              90,
+              160,
+              35
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "cat",
+          "ms": 456,
+          "engine": "gemma",
+          "raw": "{\"first\":\"cat_tower\",\"second\":\"cat_tower\",\"third\":\"cat_tower\"}",
+          "draft": {
+            "type": "cat_tower",
+            "dims": [
+              60,
+              150,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "캣타워를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "exclude",
+          "ms": 380,
+          "engine": "gemma",
+          "raw": "{\"first\":\"armchair\",\"second\":\"armchair\",\"third\":\"armchair\"}",
+          "draft": {
+            "type": "armchair",
+            "dims": [
+              80,
+              85,
+              80
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "라운지체어를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "reference",
+          "ms": 315,
+          "engine": "gemma",
+          "raw": "{\"first\":\"side\",\"second\":\"side\",\"third\":\"side\"}",
+          "draft": {
+            "type": "side",
+            "dims": [
+              45,
+              50,
+              40
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "협탁을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "unclear",
+          "ms": 205,
+          "engine": "gemma",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\",\"activity\":\"잠자기\"}",
+          "draft": null,
+          "reply": "어디에 쓰고 싶으세요? “혼자 기대서 책을 읽고 싶어”처럼 말해 주세요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "no-match",
+          "ms": 606,
+          "engine": "gemma",
+          "raw": "{\"first\":\"bed\",\"second\":\"bed\",\"third\":\"bed\",\"activity\":\"잠자기\"}",
+          "draft": null,
+          "reply": "어디에 쓰고 싶으세요? 아래 용도가 맞으면 눌러 주세요. 다른 쓰임이라면 한마디 더 알려 주세요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "shelf-heldout",
+          "ms": 335,
+          "engine": "gemma",
+          "raw": "{\"first\":\"shelf\",\"second\":\"shelf\",\"third\":\"shelf\"}",
+          "draft": {
+            "type": "shelf",
+            "dims": [
+              90,
+              160,
+              35
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책장·선반을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "negated-last",
+          "ms": 383,
+          "engine": "gemma",
+          "raw": "{\"first\":\"wardrobe\",\"second\":\"wardrobe\",\"third\":\"wardrobe\"}",
+          "draft": {
+            "type": "wardrobe",
+            "dims": [
+              100,
+              200,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "옷장을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "window",
+          "ms": 355,
+          "engine": "gemma",
+          "raw": "{\"first\":\"armchair\",\"second\":\"sofa\",\"third\":\"none\"}",
+          "options": [
+            "armchair",
+            "sofa"
+          ],
+          "chosen": {
+            "type": "sofa",
+            "dims": [
+              180,
+              82,
+              90
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "heldout-console",
+          "ms": 379,
+          "engine": "gemma",
+          "raw": "{\"first\":\"tvstand\",\"second\":\"tvstand\",\"third\":\"tvstand\"}",
+          "draft": {
+            "type": "tvstand",
+            "dims": [
+              160,
+              45,
+              40
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "TV장을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "semantic-work",
+          "ms": 308,
+          "engine": "gemma",
+          "raw": "{\"first\":\"desk\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "desk",
+            "dims": [
+              120,
+              74,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책상을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "instrument",
+          "ms": 320,
+          "engine": "gemma",
+          "raw": "{\"first\":\"piano\",\"second\":\"piano\",\"third\":\"piano\"}",
+          "draft": {
+            "type": "piano",
+            "dims": [
+              140,
+              85,
+              45
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "디지털 피아노를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "novel",
+          "ms": 379,
+          "engine": "gemma",
+          "raw": "{\"first\":\"vanity\",\"second\":\"vanity\",\"third\":\"vanity\"}",
+          "draft": {
+            "type": "vanity",
+            "dims": [
+              90,
+              140,
+              45
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "화장대를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        }
+      ]
+    },
+    "qwen": {
+      "environment": {
+        "ai": "ready",
+        "id": "Qwen3-0.6B-q4f16_1-MLC",
+        "error": "",
+        "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.0.0 Safari/537.36",
+        "gpu": "apple",
+        "f16": true
+      },
+      "prepareMs": 1353,
+      "medianTurnMs": 205.5,
+      "pageErrors": [],
+      "turns": [
+        {
+          "id": "sleep",
+          "ms": 879,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "bed",
+            "dims": [
+              150,
+              55,
+              200
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "침대를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "read",
+          "ms": 212,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "options": [
+            "armchair",
+            "sofa"
+          ],
+          "chosen": {
+            "type": "armchair",
+            "dims": [
+              80,
+              85,
+              80
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "study",
+          "ms": 206,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "desk",
+            "dims": [
+              120,
+              74,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책상을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "meal",
+          "ms": 236,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "dining",
+            "dims": [
+              140,
+              74,
+              80
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "식탁을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "study-width",
+          "ms": 189,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "desk",
+            "dims": [
+              95,
+              74,
+              60
+            ],
+            "sources": [
+              "사용자 설정",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책상을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "read-width",
+          "ms": 205,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "options": [
+            "armchair",
+            "sofa"
+          ],
+          "chosen": {
+            "type": "sofa",
+            "dims": [
+              92,
+              82,
+              90
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "coats",
+          "ms": 176,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "options": [
+            "hanger",
+            "wardrobe"
+          ],
+          "chosen": {
+            "type": "wardrobe",
+            "dims": [
+              100,
+              200,
+              60
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "shoes",
+          "ms": 232,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "shoe_cabinet",
+            "dims": [
+              80,
+              120,
+              35
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "신발장을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "laundry",
+          "ms": 193,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "options": [
+            "drying_rack",
+            "dryer"
+          ],
+          "chosen": {
+            "type": "drying_rack",
+            "dims": [
+              140,
+              110,
+              60
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "storage",
+          "ms": 194,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "options": [
+            "cabinet",
+            "shelf",
+            "dresser"
+          ],
+          "chosen": {
+            "type": "shelf",
+            "dims": [
+              90,
+              160,
+              35
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "cat",
+          "ms": 247,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "cat_tower",
+            "dims": [
+              60,
+              150,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "캣타워를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "exclude",
+          "ms": 189,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "armchair",
+            "dims": [
+              80,
+              85,
+              80
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "라운지체어를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "reference",
+          "ms": 192,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "side",
+            "dims": [
+              45,
+              50,
+              40
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "협탁을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "unclear",
+          "ms": 210,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\",\"activity\":\"그릇 씻기\"}",
+          "draft": null,
+          "reply": "어디에 쓰고 싶으세요? “혼자 기대서 책을 읽고 싶어”처럼 말해 주세요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "no-match",
+          "ms": 447,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\",\"activity\":\"그릇 씻기\"}",
+          "draft": null,
+          "reply": "어디에 쓰고 싶으세요? “혼자 기대서 책을 읽고 싶어”처럼 말해 주세요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "shelf-heldout",
+          "ms": 211,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "shelf",
+            "dims": [
+              90,
+              160,
+              35
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책장·선반을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "negated-last",
+          "ms": 209,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "wardrobe",
+            "dims": [
+              100,
+              200,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "옷장을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "window",
+          "ms": 183,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "options": [
+            "armchair",
+            "sofa"
+          ],
+          "chosen": {
+            "type": "sofa",
+            "dims": [
+              180,
+              82,
+              90
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "heldout-console",
+          "ms": 190,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "tvstand",
+            "dims": [
+              160,
+              45,
+              40
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "TV장을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "semantic-work",
+          "ms": 191,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "desk",
+            "dims": [
+              120,
+              74,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책상을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "instrument",
+          "ms": 202,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "piano",
+            "dims": [
+              140,
+              85,
+              45
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "디지털 피아노를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "novel",
+          "ms": 213,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "vanity",
+            "dims": [
+              90,
+              140,
+              45
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "화장대를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        }
+      ]
+    },
+    "balanced": {
+      "environment": {
+        "ai": "ready",
+        "id": "Qwen3-1.7B-q4f16_1-MLC",
+        "error": "",
+        "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.0.0 Safari/537.36",
+        "gpu": "apple",
+        "f16": true
+      },
+      "prepareMs": 1906,
+      "medianTurnMs": 329.5,
+      "pageErrors": [],
+      "turns": [
+        {
+          "id": "sleep",
+          "ms": 923,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "bed",
+            "dims": [
+              150,
+              55,
+              200
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "침대를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "read",
+          "ms": 364,
+          "engine": "qwen",
+          "raw": "{\"first\":\"sofa\",\"second\":\"armchair\",\"third\":\"none\"}",
+          "options": [
+            "sofa",
+            "armchair"
+          ],
+          "chosen": {
+            "type": "armchair",
+            "dims": [
+              80,
+              85,
+              80
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "study",
+          "ms": 302,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "desk",
+            "dims": [
+              120,
+              74,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책상을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "meal",
+          "ms": 316,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "dining",
+            "dims": [
+              140,
+              74,
+              80
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "식탁을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "study-width",
+          "ms": 309,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "desk",
+            "dims": [
+              95,
+              74,
+              60
+            ],
+            "sources": [
+              "사용자 설정",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책상을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "read-width",
+          "ms": 363,
+          "engine": "qwen",
+          "raw": "{\"first\":\"sofa\",\"second\":\"armchair\",\"third\":\"none\"}",
+          "options": [
+            "sofa",
+            "armchair"
+          ],
+          "chosen": {
+            "type": "sofa",
+            "dims": [
+              92,
+              82,
+              90
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "coats",
+          "ms": 325,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "options": [
+            "hanger",
+            "wardrobe"
+          ],
+          "chosen": {
+            "type": "wardrobe",
+            "dims": [
+              100,
+              200,
+              60
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "shoes",
+          "ms": 313,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "shoe_cabinet",
+            "dims": [
+              80,
+              120,
+              35
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "신발장을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "laundry",
+          "ms": 320,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"dryer\"}",
+          "options": [
+            "dryer",
+            "drying_rack"
+          ],
+          "chosen": {
+            "type": "drying_rack",
+            "dims": [
+              140,
+              110,
+              60
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "storage",
+          "ms": 400,
+          "engine": "qwen",
+          "raw": "{\"first\":\"shelf\",\"second\":\"dresser\",\"third\":\"cabinet\"}",
+          "options": [
+            "shelf",
+            "dresser",
+            "cabinet"
+          ],
+          "chosen": {
+            "type": "shelf",
+            "dims": [
+              90,
+              160,
+              35
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "cat",
+          "ms": 355,
+          "engine": "qwen",
+          "raw": "{\"first\":\"cat_tower\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "cat_tower",
+            "dims": [
+              60,
+              150,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "캣타워를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "exclude",
+          "ms": 341,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "armchair",
+            "dims": [
+              80,
+              85,
+              80
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "라운지체어를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "reference",
+          "ms": 319,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "side",
+            "dims": [
+              45,
+              50,
+              40
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "협탁을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "unclear",
+          "ms": 329,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\",\"activity\":\"책상에서 공부하거나 일하기\"}",
+          "draft": null,
+          "reply": "어디에 쓰고 싶으세요? “혼자 기대서 책을 읽고 싶어”처럼 말해 주세요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "no-match",
+          "ms": 778,
+          "engine": "qwen",
+          "raw": "{\"first\":\"dresser\",\"second\":\"hanger\",\"third\":\"wardrobe\",\"activity\":\"의류 정리\"}",
+          "draft": null,
+          "reply": "어디에 쓰고 싶으세요? 아래 용도가 맞으면 눌러 주세요. 다른 쓰임이라면 한마디 더 알려 주세요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "shelf-heldout",
+          "ms": 384,
+          "engine": "qwen",
+          "raw": "{\"first\":\"shelf\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "shelf",
+            "dims": [
+              90,
+              160,
+              35
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책장·선반을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "negated-last",
+          "ms": 340,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "wardrobe",
+            "dims": [
+              100,
+              200,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "옷장을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "window",
+          "ms": 344,
+          "engine": "qwen",
+          "raw": "{\"first\":\"sofa\",\"second\":\"armchair\",\"third\":\"none\"}",
+          "options": [
+            "sofa",
+            "armchair"
+          ],
+          "chosen": {
+            "type": "sofa",
+            "dims": [
+              180,
+              82,
+              90
+            ]
+          },
+          "draft": null,
+          "reply": "어느 쪽이 더 어울릴까요? 하나 고르면 방에서 크기를 볼 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "heldout-console",
+          "ms": 316,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"tvstand\"}",
+          "draft": {
+            "type": "tvstand",
+            "dims": [
+              160,
+              45,
+              40
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "TV장을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [],
+          "passed": true
+        },
+        {
+          "id": "semantic-work",
+          "ms": 310,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "desk",
+            "dims": [
+              120,
+              74,
+              60
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "책상을 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "instrument",
+          "ms": 330,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "piano",
+            "dims": [
+              140,
+              85,
+              45
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "디지털 피아노를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        },
+        {
+          "id": "novel",
+          "ms": 327,
+          "engine": "qwen",
+          "raw": "{\"first\":\"none\",\"second\":\"none\",\"third\":\"none\"}",
+          "draft": {
+            "type": "vanity",
+            "dims": [
+              90,
+              140,
+              45
+            ],
+            "sources": [
+              "유형 기본값",
+              "유형 기본값",
+              "유형 기본값"
+            ]
+          },
+          "reply": "화장대를 초안으로 준비했어요. 방에 놓기 전에 크기를 바꿀 수 있어요.",
+          "fixes": [
+            "카탈로그 용도와 대조해 선택지를 정리"
+          ],
+          "passed": true
+        }
+      ]
+    }
+  },
+  "photo": {
+    "device": "webgpu",
+    "analyzed": true,
+    "vision": "ready",
+    "error": "",
+    "candidates": [
+      {
+        "type": "bed",
+        "p": 0.9760454956901639
+      },
+      {
+        "type": "side",
+        "p": 0.009643862528840178
+      },
+      {
+        "type": "sofa",
+        "p": 0.0040994505034556775
+      }
+    ],
+    "type": "bed",
+    "dims": [
+      150,
+      55,
+      210
+    ],
+    "sources": [
+      "사용자 설정",
+      "사용자 설정",
+      "사용자 설정"
+    ]
+  },
+  "existingConsultation": {
+    "existing-large": {
+      "model": "gemma-4-E2B-it-q4f16_1-MLC",
+      "cases": [
+        {
+          "id": "mixed-units",
+          "text": "침대 깊이 2050mm, 높이 0.52m에 가로 158.5센치로 해죠",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "decimal-compound",
+          "text": "방 세로 4.2m 가로 520cm로 바꾸고, 책상 하나 깊이 0.65m 가로 125.5cm로 추가해줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "negative-room-and-followup",
+          "text": "안방 침대 말고 작은방 침대 가로 180cm로 해줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "negative-room-and-followup",
+          "text": "아니, 180 말고 160",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "negative-room-and-followup",
+          "text": "아까 그거 10cm만 줄여줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "duplicate-target",
+          "text": "안방 침대 너비 155cm로 바꿔줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "room-switch",
+          "text": "작은방으로 이동해줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "room-switch",
+          "text": "침대 높이는 61로 해줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "preserve-and-count",
+          "text": "소파는 그대로 두고 책상 두 개만 추가해줘",
+          "passed": true,
+          "engine": "gemma",
+          "placement": true
+        },
+        {
+          "id": "clear-plus-ambiguous",
+          "text": "바닥은 월넛으로 하고 좀 더 아늑하게 해줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "clear-plus-ambiguous",
+          "text": "침대 옆을 넓게",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "area",
+          "text": "방 5.5평쯤 되게 해줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "conflicting-units",
+          "text": "안방 침대 가로 160cm, 같은 가로 1.8m",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "impossible-batch",
+          "text": "책상 두 개만 추가해줘",
+          "passed": true,
+          "engine": "gemma",
+          "placement": true
+        },
+        {
+          "id": "reordered",
+          "text": "쇼파 높이 740밀리미터 세로 0.92미터 너비 181.5 cm면 돼",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "equivalent-units",
+          "text": "안방 침대 가로 1.65미터, 너비 1650mm 맞춰주라",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "cross-target",
+          "text": "작은방 침대 말구 안방 침대 세로를 2200mm로",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "cross-target",
+          "text": "앗 2200 말고 2150이야",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "keep-protected",
+          "text": "소파 건들지 말고 의자 3개만 들여줘",
+          "passed": true,
+          "engine": "gemma",
+          "placement": true
+        },
+        {
+          "id": "ambiguous-axis",
+          "text": "안방 침대 5cm만 줄여줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "ambiguous-layout",
+          "text": "침대 옆 좀 널찍했으면 좋겠어",
+          "passed": true,
+          "engine": "gemma"
+        }
+      ]
+    },
+    "existing-light": {
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "cases": [
+        {
+          "id": "mixed-units",
+          "text": "침대 깊이 2050mm, 높이 0.52m에 가로 158.5센치로 해죠",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "decimal-compound",
+          "text": "방 세로 4.2m 가로 520cm로 바꾸고, 책상 하나 깊이 0.65m 가로 125.5cm로 추가해줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "negative-room-and-followup",
+          "text": "안방 침대 말고 작은방 침대 가로 180cm로 해줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "negative-room-and-followup",
+          "text": "아니, 180 말고 160",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "negative-room-and-followup",
+          "text": "아까 그거 10cm만 줄여줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "duplicate-target",
+          "text": "안방 침대 너비 155cm로 바꿔줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "room-switch",
+          "text": "작은방으로 이동해줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "room-switch",
+          "text": "침대 높이는 61로 해줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "preserve-and-count",
+          "text": "소파는 그대로 두고 책상 두 개만 추가해줘",
+          "passed": true,
+          "engine": "gemma",
+          "placement": true
+        },
+        {
+          "id": "clear-plus-ambiguous",
+          "text": "바닥은 월넛으로 하고 좀 더 아늑하게 해줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "clear-plus-ambiguous",
+          "text": "침대 옆을 넓게",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "area",
+          "text": "방 5.5평쯤 되게 해줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "conflicting-units",
+          "text": "안방 침대 가로 160cm, 같은 가로 1.8m",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "impossible-batch",
+          "text": "책상 두 개만 추가해줘",
+          "passed": true,
+          "engine": "gemma",
+          "placement": true
+        },
+        {
+          "id": "reordered",
+          "text": "쇼파 높이 740밀리미터 세로 0.92미터 너비 181.5 cm면 돼",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "equivalent-units",
+          "text": "안방 침대 가로 1.65미터, 너비 1650mm 맞춰주라",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "cross-target",
+          "text": "작은방 침대 말구 안방 침대 세로를 2200mm로",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "cross-target",
+          "text": "앗 2200 말고 2150이야",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "keep-protected",
+          "text": "소파 건들지 말고 의자 3개만 들여줘",
+          "passed": true,
+          "engine": "gemma",
+          "placement": true
+        },
+        {
+          "id": "ambiguous-axis",
+          "text": "안방 침대 5cm만 줄여줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "ambiguous-layout",
+          "text": "침대 옆 좀 널찍했으면 좋겠어",
+          "passed": true,
+          "engine": "gemma"
+        }
+      ]
+    },
+    "named-light": {
+      "model": "gemma3-1b-it-q4f16_1-MLC",
+      "cases": [
+        {
+          "id": "transfer-side",
+          "text": "소파 옆엔 폭 44센티인 협탁 하나면 좋겠어",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "transfer-dresser",
+          "text": "침대 맞은편에 가로 0.9미터 서랍장 하나",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "transfer-shoes",
+          "text": "현관 쪽에 높이 1120mm 신발장으로 해줘",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "transfer-dining",
+          "text": "아일랜드 옆에 너비 1.35m 식탁을 더 두자",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "transfer-fridge",
+          "text": "싱크대 옆에 폭 72센티 냉장고 하나 둘래",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "transfer-hanger",
+          "text": "거울 옆에 가로 110cm 옷걸이가 필요해",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "transfer-vanity",
+          "text": "서랍장 뒤쪽에 폭 78cm 화장대를 둘래",
+          "passed": true,
+          "engine": "gemma"
+        },
+        {
+          "id": "transfer-cat",
+          "text": "소파 바로 옆에 높이 1.44m 캣 타워 하나 두고 싶어",
+          "passed": true,
+          "engine": "gemma"
+        }
+      ]
+    }
+  }
+}

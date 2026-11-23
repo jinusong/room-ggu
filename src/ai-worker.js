@@ -10,6 +10,8 @@ import { prepareTextModel } from './app/model-download.js';
 import { designSchema, designPrompt } from './app/design.js';
 import { compactConsultationGrammar, furnitureNameEvidence } from './app/model-furniture.js';
 
+import { purposeRequest, purposePrompt, purposeGroups } from './app/purpose.js';
+
 let engine = null,
   textId = null,
   textChoice = null,
@@ -140,11 +142,61 @@ const oneLineExample = (neutral) =>
     reply: '',
   });
 
+async function purposeAnswer(prompt, slots, choices) {
+  const value = { type: 'string', enum: choices };
+  const schema = {
+    type: 'object',
+    properties: Object.fromEntries(slots.map((k) => [k, value])),
+    required: slots,
+    additionalProperties: false,
+  };
+  const r = await engine.chat.completions.create({
+    messages: [{ role: 'user', content: prompt + '\nJSON keys: ' + slots.join(', ') }],
+    response_format: { type: 'grammar', grammar: compactConsultationGrammar(schema) },
+    temperature: 0,
+    max_tokens: 96,
+    ...(textId.startsWith('Qwen3') ? { enable_thinking: false } : {}),
+  });
+  if (r.choices[0]?.finish_reason === 'length') throw Error('가구 후보를 끝까지 읽지 못했어요.');
+  return JSON.parse(r.choices[0]?.message?.content || '');
+}
+
+async function rankPurposes(text, request) {
+  let pool = request.matched.length ? request.matched : request.evidence;
+  let activity;
+  if (!pool.length) {
+    const options = ['해당 없음', ...Object.keys(purposeGroups)];
+    const prompt =
+      '실내 가구로 직접 해결할 수 있는 용도 하나를 고르세요. 목록 밖이거나 사용 목적이 없으면 해당 없음. 예: 주식 시세 확인 → 해당 없음, 접은 셔츠 정리 → 의류 정리.\n용도: ' +
+      options.join(' / ') +
+      '\n요청: ' +
+      text;
+    ({ activity } = await purposeAnswer(prompt, ['activity'], options));
+    if (request.hasActivity && Object.hasOwn(purposeGroups, activity)) {
+      const verify =
+        'Does the text actually request "' +
+        activity +
+        '"? Answer yes only when the activity follows from the text. An unrelated or impossible use is no.\nText: ' +
+        text;
+      const { supports } = await purposeAnswer(verify, ['supports'], ['no', 'yes']);
+      if (supports !== 'yes') activity = '해당 없음';
+    }
+    pool = (purposeGroups[activity] ?? []).filter((k) => !request.excluded.includes(k));
+  }
+  if (!request.hasActivity || !pool.length)
+    return JSON.stringify({ first: 'none', second: 'none', third: 'none', activity });
+  const { prompt } = purposePrompt(text, pool);
+  const answer = await purposeAnswer(prompt, ['first', 'second', 'third'], [...pool, 'none']);
+  return JSON.stringify({ ...answer, activity });
+}
+
 async function interpret(payload) {
   await loadText();
   const compact = textId.startsWith('Qwen3-0.6B');
   const isGemma3 = textId.startsWith('gemma3-1b-');
   const text = String(payload.text || '').slice(0, 1500);
+  const purpose = purposeRequest(text);
+  if (purpose) return rankPurposes(text, purpose);
   const furniture = isGemma3 ? furnitureNameEvidence(text) : null;
   const c = payload.context || {};
   const spaces = (c.spaces || []).filter((s) => typeof s === 'string' && s).slice(0, 12);

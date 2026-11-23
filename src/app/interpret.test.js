@@ -50,16 +50,14 @@ test('모델이 가구와 크기 느낌을 정하면 그대로 초안을 만든�
   assert.equal(p.reply, '둘이 쓰기 좋은 낮은 소파예요. 팔걸이가 있나요?');
 });
 
-test('문장에 이름이 없으면 모델이 고른 가구를 쓴다', () => {
+test('기대 앉아 읽을 자리에는 모델이 고른 순서로 선택지를 제안한다', () => {
   const p = planFromModel(
-    model({
-      furniture: 'armchair',
-      reply: '혼자 기대기 좋은 라운지체어로 잡았어요. 색은 어떤가요?',
-    }),
+    JSON.stringify({ first: 'armchair', second: 'sofa', third: 'none' }),
     '책 읽을 때 푹 기대 앉을 거 하나',
     { state: freshState(), target: room },
   );
-  assert.equal(p.changes.draft.type, 'armchair');
+  assert.deepEqual(p.recommendation.types, ['armchair', 'sofa']);
+  assert.equal(p.changes, undefined);
   assert.deepEqual(p.fixes, []);
 });
 

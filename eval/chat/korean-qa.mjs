@@ -8,8 +8,8 @@ import { spaces } from '../../src/data.js';
 import { cases, seed, furnitureHoldout } from './korean-cases.mjs';
 import {
   namedFurniture,
-  unnamedFurniture,
   transferFurniture,
+  purposeCases,
 } from './furniture-generalization.mjs';
 
 const [base = 'http://127.0.0.1:4187/', out = '/tmp/room-ggu-korean-eval.json'] =
@@ -21,7 +21,8 @@ const sets = {
   ...cases,
   all,
   'new-furniture': namedFurniture,
-  'implicit-furniture': unnamedFurniture,
+  'implicit-furniture': purposeCases.slice(0, 4),
+  purpose: purposeCases,
   'transfer-furniture': transferFurniture,
   placement: all.filter((c) => c.turns.some((t) => t.place)),
   grid: all.filter((c) => ['negative-room-and-followup', 'equivalent-units'].includes(c.id)),
@@ -126,6 +127,8 @@ function check(expect, prior, next) {
       expect.queue,
       '대기 가구',
     );
+  if (expect.noOptions)
+    ok(!turn.recommendation?.types.length, '미지원 용도에 무관한 가구를 권하지 않음');
   if (expect.ask) ok(new RegExp(expect.ask).test(turn.text), '범위를 좁혀 되묻기');
 }
 async function read() {
@@ -337,6 +340,27 @@ try {
       };
       try {
         check(t.expect, prior, next);
+        if (set === 'purpose' && model !== 'off') {
+          ok(
+            raw && calls.length === 1 && !turn.fallback && ['gemma', 'qwen'].includes(turn.engine),
+            '실제 추론 1회',
+          );
+        }
+        if (t.expect.options) {
+          const options = turn.recommendation?.types || [];
+          r.options = options;
+          deepEqual([...options].sort(), [...t.expect.options].sort(), '고를 수 있는 가구');
+          const chosen = t.expect.choose;
+          await page
+            .locator('[data-choice="' + chosen + '"]')
+            .last()
+            .click();
+          const result = await read();
+          equal(result.draft?.type, chosen);
+          deepEqual(layout(result.state), layout(prior.state));
+          if (t.expect.width) equal(result.draft.dims[0], t.expect.width);
+          r.chosen = { type: result.draft.type, dims: result.draft.dims };
+        }
         r.passed = true;
       } catch (e) {
         r.failure = e.message;
@@ -373,6 +397,10 @@ try {
       save();
       console.log(scenario.id, t.text, r.passed, r.ms, r.engine, r.fallback || '', r.failure || '');
     }
+  }
+  if (report.pageErrors.length || report.cases.some(r => !r.passed || r.placement === false)) {
+    process.exitCode = 1;
+    console.error('검증 실패: 케이스별 결과와 페이지 오류를 확인하세요.');
   }
 } catch (e) {
   report.error = e.message;

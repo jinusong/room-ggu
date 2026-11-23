@@ -5,6 +5,10 @@
 [사이트 열기](https://jinusong.github.io/room-ggu/) · [한국어 상담·성능 QA 보고서](https://jinusong.github.io/room-ggu/review/) · [v5.12 사진 검증](https://jinusong.github.io/room-ggu/review/photo/) · [v5.10 개선 리뷰](https://room-ggu-review-20261117.divine-angel-0926.chatgpt.site) · [기획](docs/product-plan.md) ([HTML](docs/product-plan.html)) · [디자인 방향](docs/design-direction.md) · [검증 기록](docs/verification.md)
 
 
+## v5.15 용도로 가구 찾기
+
+“노트북 펼쳐서 공부할 가구가 필요해”처럼 말하면 치수 초안이 나옵니다. “혼자 기대서 책 읽고 싶어”처럼 여러 가구가 어울리면 용도를 비교해 하나를 고르세요. 단추를 누르거나 “두 번째”라고 답하면 처음 말한 치수와 색을 반영합니다. 가구 목록에서도 ‘독서’, ‘식사’ 같은 용도로 찾아볼 수 있습니다.
+
 ## v5.14.2 Gemma 3 가구 이름 해석
 
 Gemma 3 1B가 읽는 요청에 가구 이름과 카탈로그 ID의 대응을 붙입니다. “침대 옆 협탁”에서 침대는 위치 기준으로, 협탁은 놓을 대상으로 표시합니다. 용도로만 설명한 요청은 전체 가구 목록을 참고합니다.
@@ -131,7 +135,7 @@ GPU 미지원 판정 뒤에도 모델 카드의 초점을 지키고 설명을 �
 
 ## 생성형 UI
 
-Google Cloud의 분류로 보면 미리 만든 구성요소 중에서 고르는 정적 방식에 가깝습니다. 앱이 렌더링하는 컴포넌트는 `src/ui-schema.js`의 `SURFACE_KINDS` 18가지입니다. 모델은 다음에 보여줄 도구(방 3가지·가구 3가지)와 동작(가구 고르기·공간 목록·저장 등 열기)을 허용 목록의 문자열로 고르고, 앱이 검증해 `src/ui/surfaces.jsx`의 자체 컴포넌트에 실제 상태를 연결합니다. 키 비교와 집 전체 도면은 직접 여는 앱 도구입니다. 모델이 만든 HTML·CSS·JavaScript는 실행하지 않습니다.
+Google Cloud의 분류로 보면 미리 만든 구성요소 중에서 고르는 정적 방식에 가깝습니다. 앱이 렌더링하는 컴포넌트는 `src/ui-schema.js`의 `SURFACE_KINDS` 19가지입니다. 모델은 다음에 보여줄 도구(방 3가지·가구 3가지)와 동작(가구 고르기·공간 목록·저장 등 열기)을 허용 목록의 문자열로 고르고, 앱이 검증해 `src/ui/surfaces.jsx`의 자체 컴포넌트에 실제 상태를 연결합니다. 키 비교와 집 전체 도면은 직접 여는 앱 도구입니다. 모델이 만든 HTML·CSS·JavaScript는 실행하지 않습니다.
 
 문장에 “벽”, “색”, “가로 120cm”처럼 도구를 정하는 단어가 분명한데 모델이 다른 도구를 고르면 앱이 그 단어에 맞는 도구로 바꾸고 바로잡은 내용에 남깁니다.
 

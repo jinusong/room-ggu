@@ -10,11 +10,11 @@ const spec = (kind = 'room-size', target = { type: 'room', roomId: 'room-1' }) =
   target,
 });
 
-test('공식 A2UI 코어가 18개 카탈로그 컴포넌트를 1.0 메시지로 검증·해석한다', () => {
+test('공식 A2UI 코어가 19개 카탈로그 컴포넌트를 1.0 메시지로 검증·해석한다', () => {
   assert.deepEqual(toolCatalog.toJson(), TOOL_CATALOG);
   assert.equal(toolCatalog.id, CATALOG_ID);
   assert.equal(toolCatalog.protocolVersion, A2UI_VERSION);
-  assert.equal(toolCatalog.components.size, 18);
+  assert.equal(toolCatalog.components.size, 19);
   for (const kind of Object.keys(SURFACE_KINDS)) {
     const session = new ToolSession(spec(kind));
     try {

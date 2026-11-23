@@ -66,6 +66,7 @@ export const SURFACE_KINDS = {
     icon: 'ruler',
   },
   'furniture-color': { scope: 'furniture', model: 'colors', title: '가구 색상', icon: 'palette' },
+  recommendations: { scope: 'app', title: '용도에 맞는 가구', icon: 'armchair' },
   catalog: { scope: 'app', title: '가구 고르기', icon: 'armchair' },
   impact: { scope: 'app', title: '배치 확인', icon: 'triangle-alert' },
   spaces: { scope: 'app', title: '내 공간', icon: 'layers' },

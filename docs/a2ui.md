@@ -5,7 +5,7 @@
 ## 처리 순서
 
 1. 기존 상담 모델이 간결한 의도·조건·도구 JSON을 만든다. 앱의 이름·숫자·출처 검증을 거친다.
-2. `src/a2ui-catalog.js`가 `SURFACE_KINDS`에서 18개 커스텀 컴포넌트의 계약을 만든다. 같은 문서를 `a2ui/catalog.json`으로 배포한다.
+2. `src/a2ui-catalog.js`가 `SURFACE_KINDS`에서 19개 커스텀 컴포넌트의 계약을 만든다. 같은 문서를 `a2ui/catalog.json`으로 배포한다.
 3. `ToolSession`이 카드마다 `createSurface`를 보내고 `updateComponents`로 도구·대상을, `updateDataModel`로 펼침 상태·요약을 전달한다.
 4. 공식 `MessageProcessor`·`NodeResolver`가 카탈로그와 `@path` 바인딩을 해석한다. `A2uiSurface`는 해석된 컴포넌트만 기존 `NativeTool`로 렌더링한다.
 5. 접힌 카드의 다시 열기는 SDK의 action closure를 거쳐 출처·시간·도구 ID를 포함한 `action`이 된다. 삭제 시 resolver와 surface를 해제한다.

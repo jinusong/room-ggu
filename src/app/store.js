@@ -13,7 +13,8 @@ import {
 import { validateSurfaceSpec, SURFACE_KINDS } from '../ui-schema.js';
 import { runAI, stopAI, interruptAI, onAIStatus, imageData } from '../ai.js';
 import * as ops from './ops.js';
-import { planTurn } from './planner.js';
+import { purposeGroups } from './purpose.js';
+import { offerFurniture, purposeDraft, planTurn } from './planner.js';
 import {
   appliedSize,
   followupSize,
@@ -52,6 +53,7 @@ const ACTIONS = new Set([
   'tool',
   'relocate',
   'clear-target',
+  'confirm-use',
   'draft',
 ]);
 const FALLBACKS = [
@@ -239,6 +241,21 @@ function sanitizeTurn(t) {
         primary: !!s?.primary,
       }))
       .filter((s) => s.label && (s.text || s.action));
+    const rec = t.confirmation || t.recommendation;
+    if (rec && Array.isArray(rec.types) && typeof rec.text === 'string') {
+      const types = [
+        ...new Set(rec.types.filter((k) => typeof k === 'string' && Object.hasOwn(TYPES, k))),
+      ].slice(0, 3);
+      if (types.length) {
+        const saved = { types, text: cleanText(rec.text, 1500) };
+        if (!t.confirmation) turn.recommendation = saved;
+        else if (
+          Object.hasOwn(purposeGroups, rec.activity) &&
+          types.every((k) => purposeGroups[rec.activity].includes(k))
+        )
+          turn.confirmation = { ...saved, activity: rec.activity };
+      }
+    }
     turn.status = 'done';
   }
   return turn;
@@ -639,7 +656,12 @@ function applyPlan(plan, turn) {
   const remote =
     plan.destination &&
     plan.destination !== s.roomId &&
-    (c.room || c.item || c.draft || plan.ask === 'item');
+    (c.room ||
+      c.item ||
+      c.draft ||
+      plan.ask === 'item' ||
+      plan.recommendation ||
+      plan.confirmation);
   const staged = remote ? structuredClone(s) : null;
   if (staged) ops.switchSpace(staged, plan.destination);
   let roomRows, itemRows;
@@ -652,7 +674,7 @@ function applyPlan(plan, turn) {
     Object.assign(s, staged);
     app.selected = null;
     app.target = { type: 'room' };
-    if (plan.ask !== 'item') {
+    if (plan.ask !== 'item' && !plan.recommendation && !plan.confirmation) {
       app.draft = null;
       app.queue = [];
     }
@@ -791,6 +813,8 @@ function finishTurn(turn, plan, meta) {
     status: 'done',
     ...meta,
   });
+  if (plan.recommendation) turn.recommendation = plan.recommendation;
+  if (plan.confirmation) turn.confirmation = plan.confirmation;
   if (plan.note) turn.note = plan.note;
   try {
     if (!plan.error) {
@@ -817,6 +841,33 @@ export async function send(raw) {
     .slice(0, 1500);
   const pendingPhoto = app.photo && !app.photo.sent ? app.photo : null;
   if ((!text && !pendingPhoto) || app.busy || app.photoLoading || app.fileLoading) return;
+  const last = app.thread.at(-1);
+  if (!pendingPhoto && last?.confirmation && /^(?:네|응|그래|맞아(?:요)?)[.!]?$/.test(text))
+    return confirmFurnitureUse(last);
+  const recSurface = last?.surfaces?.find((s) => s.kind === 'recommendations');
+  if (recSurface && !pendingPhoto) {
+    const rec = recommendationFor(recSurface.id);
+    const ordinal = text.match(
+      /^(첫|두|세|[123])\s*(?:번째|번|째)(?:로|로 할게|로 해줘|요)?[.!]?$/,
+    );
+    const index = ordinal && { 첫: 0, 두: 1, 세: 2, 1: 0, 2: 1, 3: 2 }[ordinal[1]];
+    const choice =
+      rec?.active && (ordinal ? rec.types[index] : rec.types.find((k) => text === TYPES[k].name));
+    if (choice) return chooseRecommendation(recSurface.id, choice);
+    if (rec?.active && ordinal) {
+      push({ role: 'user', text });
+      finishTurn(
+        push({ role: 'assistant', text: '' }),
+        {
+          reply: `후보가 ${rec.types.length}개예요. 아래에서 하나 골라 주세요.`,
+          recommendation: { types: rec.types, text: rec.text },
+          surfaces: [{ kind: 'recommendations', target: { type: 'room' } }],
+        },
+        { engine: 'app' },
+      );
+      return;
+    }
+  }
   const history = historyForModel();
   push({ role: 'user', text, ...(pendingPhoto ? { photo: pendingPhoto.data } : {}) });
   const turn = push({ role: 'assistant', text: '' });
@@ -868,7 +919,10 @@ async function respondToText(text, turn, history, extra = []) {
     );
     return;
   }
-  if (/창문|창호/.test(text)) {
+  if (
+    /창문|창호/.test(text) &&
+    !/(?:창문|창호)\s*(?:바로\s*)?(?:옆|앞|아래|밑|맞은편|근처)/.test(text)
+  ) {
     finishTurn(
       turn,
       {
@@ -1209,6 +1263,7 @@ export function cancelModel() {
 
 // ---------- 직접 연 도구와 버튼 동작 ----------
 const TOOL_TEXT = {
+  recommendations: '가구를 어디에 쓸지 알려 주세요.',
   design: '집 전체 면적과 원하는 테마를 말해 주세요. 예: 100평 집 전체를 재팬디로 꾸며줘.',
   avatar:
     '키를 알려주면 가구와 같은 축척의 아바타를 세워요. 의자·소파·침대에는 앉히거나 눕혀 볼 수 있어요.',
@@ -1449,7 +1504,27 @@ export function attachBathroom() {
   }
 }
 
+function confirmFurnitureUse(turn) {
+  if (
+    !turn?.confirmation ||
+    turn !== app.thread.at(-1) ||
+    turn.roomId !== app.state.roomId ||
+    app.busy ||
+    app.fileLoading ||
+    app.photoLoading
+  )
+    return;
+  const { types, text, activity } = turn.confirmation;
+  push({ role: 'user', text: activity + ' 용도예요', action: true });
+  finishTurn(push({ role: 'assistant', text: '' }), offerFurniture(text, types), { engine: 'app' });
+}
+
 export function runSuggestion(sug) {
+  if (sug.action === 'confirm-use') {
+    const last = app.thread.at(-1);
+    if (last?.suggestions?.includes(sug)) return confirmFurnitureUse(last);
+    return;
+  }
   if (sug.action === 'draft' && (!sug.photoId || sug.photoId !== app.photo?.surfaceId)) {
     toast('이전 사진의 후보예요. 지금 사진에서 종류를 골라 주세요.');
     return;
@@ -1462,6 +1537,29 @@ export function runSuggestion(sug) {
   if (sug.action === 'photo') return pickPhoto();
   if (sug.action === 'relocate') return relocate();
   if (sug.action === 'draft' && sug.arg) return createDraft(sug.arg, { via: 'photo' });
+}
+
+export function recommendationFor(surfaceId) {
+  const turn = app.thread.findLast((t) =>
+    t.surfaces?.some((s) => s.id === surfaceId && s.kind === 'recommendations'),
+  );
+  if (!turn?.recommendation) return null;
+  const active =
+    app.thread.at(-1) === turn &&
+    app.state.roomId === turn.roomId &&
+    !app.busy &&
+    !app.fileLoading &&
+    !app.photoLoading;
+  return { ...turn.recommendation, active };
+}
+
+export function chooseRecommendation(surfaceId, type) {
+  const rec = recommendationFor(surfaceId);
+  if (!rec?.active || !rec.types.includes(type)) return;
+  push({ role: 'user', action: true, text: TYPES[type].name + ' 고르기' });
+  finishTurn(push({ role: 'assistant', text: '' }), purposeDraft(rec.text, type), {
+    engine: 'app',
+  });
 }
 
 export function placeDraft(label = '방에 놓기', action = 'place') {

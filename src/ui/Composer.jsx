@@ -79,7 +79,7 @@ function placeholder() {
   const s = store.subject();
   if (app.target.type === 'item' && s) return `${josa(s.name, '을/를')} 어떻게 바꿀까요?`;
   if (app.target.type === 'draft' && s) return `${TYPES[s.type].name} 크기를 말해 주세요`;
-  return '방이나 가구를 말해 주세요';
+  return '방 크기나 가구 용도를 말해 주세요';
 }
 
 export function Composer({ onFocusChange, mobile }) {
