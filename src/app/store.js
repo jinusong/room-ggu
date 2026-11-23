@@ -335,23 +335,72 @@ function restore(json) {
   }
   if (roomBefore !== app.state.roomId) spaceEvent();
 }
-export function undo() {
+// 되돌리기 전후를 비교해 무엇이 바뀌었는지 한두 마디로 말한다. "방금 바꾼 내용"만으로는 무엇이 사라졌는지 알기 어렵다.
+export function describeRestore(before, after) {
+  const rooms = (st) => new Map(spaces(st).map((r) => [r.roomId, r])),
+    was = rooms(before),
+    now = rooms(after),
+    names = (list) => {
+      const out = list.slice(0, 2).join(', ');
+      return list.length > 2 ? `${out} 외 ${list.length - 2}개` : out;
+    },
+    gone = [],
+    back = [],
+    changed = [],
+    lines = [];
+  for (const [id, r] of was) if (!now.has(id)) lines.push(`${josa(r.name, '이/가')} 없어졌어요.`);
+  for (const [id, r] of now)
+    if (!was.has(id)) lines.push(`${josa(r.name, '이/가')} 다시 생겼어요.`);
+  for (const [id, r] of now) {
+    const old = was.get(id);
+    if (!old) continue;
+    const a = old.room,
+      b = r.room;
+    if (a.type !== b.type || a.w !== b.w || a.d !== b.d || a.h !== b.h)
+      lines.push(`${r.name} 크기와 유형을 ${a.w} × ${a.d}m에서 ${b.w} × ${b.d}m로 되돌렸어요.`);
+    else if (a.wallColor !== b.wallColor || a.floorColor !== b.floorColor)
+      lines.push(`${r.name} 벽과 바닥 색을 되돌렸어요.`);
+    // 저장 형식의 키 순서는 되살릴 때 달라질 수 있어 보이는 값만 비교한다.
+    const look = (i) => JSON.stringify([i.type, i.name, i.dims, i.x, i.z, i.angle, i.color]),
+      items = new Map(old.items.map((i) => [i.id, i]));
+    for (const i of r.items) {
+      const o = items.get(i.id);
+      if (!o) back.push(nameOf(i));
+      else if (look(o) !== look(i)) changed.push(nameOf(i));
+      items.delete(i.id);
+    }
+    for (const o of items.values()) gone.push(nameOf(o));
+  }
+  if (gone.length) lines.push(`${josa(names(gone), '이/가')} 빠졌어요.`);
+  if (back.length) lines.push(`${josa(names(back), '이/가')} 다시 놓였어요.`);
+  if (changed.length) lines.push(`${names(changed)} 크기와 자리를 되돌렸어요.`);
+  return lines.slice(0, 3).join(' ');
+}
+// opts.quiet: 대화에서 부른 되돌리기는 답 문장에 결과를 쓰므로 알림을 띄우지 않는다.
+// 단추의 onClick으로 불리면 첫 인자가 이벤트라 quiet가 아니다.
+export function undo(opts) {
   if (finishWindowGesture(true)) return true;
   if (!app.history.length) return false;
+  const before = structuredClone(app.state);
   app.future.push(JSON.stringify(app.state));
   restore(app.history.pop());
+  const said = describeRestore(before, app.state) || '바뀐 내용이 없어요.';
+  if (opts?.quiet !== true) toast(`되돌렸어요. ${said}`);
   persist();
   emit();
-  return true;
+  return said;
 }
-export function redo() {
+export function redo(opts) {
   if (finishWindowGesture(true)) return true;
   if (!app.future.length) return false;
+  const before = structuredClone(app.state);
   app.history.push(JSON.stringify(app.state));
   restore(app.future.pop());
+  const said = describeRestore(before, app.state) || '바뀐 내용이 없어요.';
+  if (opts?.quiet !== true) toast(`다시 적용했어요. ${said}`);
   persist();
   emit();
-  return true;
+  return said;
 }
 
 // ---------- 대화 ----------
@@ -527,12 +576,24 @@ function runAction(action, arg, turn) {
   // 문장에 적은 가구(arg.id)가 있으면 그 가구, 아니면 고른 가구에 한다.
   const item = (arg?.id && s.items.find((a) => a.id === arg.id)) || subject();
   switch (action) {
-    case 'undo':
-      if (!undo()) turn.text = '되돌릴 내용이 없어요.';
+    case 'undo': {
+      const said = undo({ quiet: true });
+      turn.text = !said
+        ? '되돌릴 내용이 없어요.'
+        : typeof said === 'string'
+          ? `되돌렸어요. ${said}`
+          : turn.text;
       break;
-    case 'redo':
-      if (!redo()) turn.text = '다시 적용할 내용이 없어요.';
+    }
+    case 'redo': {
+      const said = redo({ quiet: true });
+      turn.text = !said
+        ? '다시 적용할 내용이 없어요.'
+        : typeof said === 'string'
+          ? `다시 적용했어요. ${said}`
+          : turn.text;
       break;
+    }
     case 'focus-item': {
       const room = spaces(s).find((r) => r.roomId === arg.roomId);
       const item = room?.items.find((i) => i.id === arg.id);
