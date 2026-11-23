@@ -225,4 +225,4 @@ node .agents/skills/answer-me-with-html/scripts/am.mjs render docs/product-plan.
 
 ## 배포
 
-`main`에 푸시하면 GitHub Actions가 검증과 브라우저 테스트 후 GitHub Pages에 배포합니다. `base: './'`로 `/room-ggu/` 하위 경로를 지원하고, 배포 버전은 `version.json`의 커밋으로 확인합니다. 비밀키, 백엔드, 회원가입은 필요하지 않습니다.
+`main`에 푸시하면 GitHub Actions가 단위 테스트와 빌드를 통과한 뒤 바로 GitHub Pages에 배포합니다. 브라우저 테스트는 같은 실행에서 따로 돌고, 실패하면 Actions에 실패로 표시되지만 이미 배포한 사이트는 되돌리지 않습니다. 제출이나 시연 전에는 Actions의 e2e 작업이 통과했는지 확인하세요. `base: './'`로 `/room-ggu/` 하위 경로를 지원하고, 배포 버전은 `version.json`의 커밋으로 확인합니다. 비밀키, 백엔드, 회원가입은 필요하지 않습니다.
