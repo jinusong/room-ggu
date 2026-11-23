@@ -68,7 +68,7 @@ export function buildDesign(state, spec) {
         i.color = theme.colors[n % theme.colors.length];
       });
     }
-    return { state: validateState(next), omitted: [] };
+    return { state: validateState(next), omitted: [], skipped: [] };
   }
   const next = freshState(),
     omitted = [],
@@ -76,8 +76,21 @@ export function buildDesign(state, spec) {
   if (spec.rooms.length < 2 || spec.rooms.length > 12)
     throw Error('공간 구성을 다시 요청해 주세요.');
   // 방 크기와 자리, 열어 둘 문은 house-layout이 문 규칙을 지키는 배치 가운데에서 고른다.
-  const rooms = [...spec.rooms].sort((a, b) => b.weight - a.weight),
-    layout = layoutHouse(rooms, spec.areaM2);
+  let rooms = [...spec.rooms].sort((a, b) => b.weight - a.weight),
+    layout = null;
+  const skipped = [];
+  // 배치가 나오지 않으면 직접 말하지 않은 드레스룸, 다용도실, 현관을 가벼운 것부터 하나씩 빼고 다시 나눈다.
+  for (;;) {
+    try {
+      layout = layoutHouse(rooms, spec.areaM2);
+      break;
+    } catch (e) {
+      const drop = rooms.findLast((r) => r.optional);
+      if (!drop) throw e;
+      rooms = rooms.filter((r) => r !== drop);
+      skipped.unshift(drop.name);
+    }
+  }
   for (const [i, r] of rooms.entries()) {
     const { w, d, x, z } = layout.rooms[i],
       room = makeRoom(r.type),
@@ -192,7 +205,7 @@ export function buildDesign(state, spec) {
     }
     r.items.push(...local.items.slice(keepouts.length));
   }
-  return { state: validateState(next), omitted };
+  return { state: validateState(next), omitted, skipped };
 }
 
 export const round2 = (n) => Math.round(n * 100) / 100;

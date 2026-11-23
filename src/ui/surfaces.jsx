@@ -1493,6 +1493,12 @@ function Design({ spec }) {
           </li>
         ))}
       </ul>
+      {!!d.skipped?.length && (
+        <p class="warn-text" role="status">
+          면적이 모자라 뺀 공간: {d.skipped.join(', ')}. 면적을 늘리거나 침실 수를 줄이면 넣을 수
+          있어요.
+        </p>
+      )}
       {!!d.omitted.length && (
         <p class="warn-text" role="status">
           빈자리가 없어 남겨 둔 가구: {d.omitted.join(', ')}. 공간을 넓히거나 가구를 직접 더해

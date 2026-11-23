@@ -297,6 +297,9 @@ try {
         omitted: Array.isArray(raw.design.omitted)
           ? raw.design.omitted.slice(0, 120).map((x) => cleanText(x, 100))
           : [],
+        skipped: Array.isArray(raw.design.skipped)
+          ? raw.design.skipped.slice(0, 12).map((x) => cleanText(x, 40))
+          : [],
       };
     }
   } catch {

@@ -102,8 +102,13 @@ export function designSlots(request) {
   const offices = count('서재', large ? 1 : 0);
   for (let i = 0; i < offices; i++) slots.push(['office', i === 0 ? '서재' : `서재 ${i + 1}`]);
   for (let i = 0; i < baths; i++) slots.push(['bathroom', i === 0 ? '공용 욕실' : `욕실 ${i + 1}`]);
-  slots.push(['studio', '드레스룸'], ['studio', '다용도실']);
-  if (large) slots.push(['studio', '현관']);
+  // 드레스룸, 다용도실, 현관은 직접 말하지 않았으면 면적이 모자랄 때 뺄 수 있다(optional).
+  const said = (re) => re.test(request.text);
+  slots.push(
+    ['studio', '드레스룸', !said(/드레스|옷방|수납/)],
+    ['studio', '다용도실', !said(/다용도|세탁/)],
+  );
+  if (large) slots.push(['studio', '현관', !said(/현관|입구/)]);
   const kids = count(
     '아이\\s*방',
     large && slots.length < 12 && !/침실\s*(?:\d+|한|두|세|네)/.test(request.text) ? 1 : 0,
@@ -111,7 +116,12 @@ export function designSlots(request) {
   for (let i = 0; i < kids; i++) slots.push(['kids', i === 0 ? '아이 방' : `아이 방 ${i + 1}`]);
   if (slots.length > 12 || beds < 1 || baths < 1)
     throw Error('집 전체는 최대 12개 공간이에요. 침실과 욕실 개수를 줄여 다시 말해 주세요.');
-  return slots.map(([type, name], i) => ({ key: `room${i + 1}`, type, name }));
+  return slots.map(([type, name, optional], i) => ({
+    key: `room${i + 1}`,
+    type,
+    name,
+    ...(optional ? { optional: true } : {}),
+  }));
 }
 export function roomEssentials(type, name = '') {
   return (
@@ -154,7 +164,7 @@ export function packageRoom(slot, choice = 'standard') {
   const weight =
     { living: 22, kitchen: 12, dining: 10, bedroom: 12, kids: 9, office: 8, bathroom: 5 }[type] ||
     4;
-  return { type, name, weight, items };
+  return { type, name, weight, items, ...(slot.optional ? { optional: true } : {}) };
 }
 export function designSchema(request) {
   const properties = { theme: THEME_SCHEMA };
@@ -174,7 +184,7 @@ Themes: ${Object.entries(THEMES)
     .map(([k, v]) => `${k}=${v.name}`)
     .join(', ')}. Prefer ${request.theme || 'user preference, otherwise natural'}.
 Task: ${request.mode}. For theme task return theme only.
-For house task select a furniture package for EVERY room key: ${JSON.stringify(request.mode === 'house' ? designSlots(request) : [])}.
+For house task select a furniture package for EVERY room key: ${JSON.stringify(request.mode === 'house' ? designSlots(request).map(({ key, type, name }) => ({ key, type, name })) : [])}.
 Packages: compact = essential furniture only; standard = essential furniture plus rug/lighting/storage appropriate to room; family = extra seating/storage; reading = reading chair and shelf in living/bedroom/office. Choose from the user's lifestyle. Default standard. Every package includes essential furniture for that room. App distributes exactly ${request.areaM2 || 0} square metres, reserves doors, and computes collision-free positions. Do not generate dimensions, quantities, coordinates or prose.
 Korean preferences: "책 읽기 좋은" or "독서 공간" means choose reading for room1 (living) and the office; "가족이 모이는" means family for room1; "가구를 최소" means compact. A specific preference overrides the standard default. For "가족들이 책 읽기 좋은 집", room1 MUST be reading, not standard.
 USER: ${JSON.stringify(request.text.slice(0, 1500))}`;
@@ -234,7 +244,13 @@ export function readDesign(raw, request) {
       n = 2;
     while (names.has(name)) name = `${r.name.trim()} ${n++}`;
     names.add(name);
-    return { type: r.type, name, weight: r.weight, items: [...r.items] };
+    return {
+      type: r.type,
+      name,
+      weight: r.weight,
+      items: [...r.items],
+      ...(r.optional === true ? { optional: true } : {}),
+    };
   });
   for (const type of ['living', 'kitchen', 'bedroom', 'bathroom'])
     if (!rooms.some((r) => r.type === type))
