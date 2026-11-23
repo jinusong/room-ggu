@@ -138,11 +138,13 @@ test('선택한 가구는 입력창의 대상이 되고, 다른 가구 이름은
 });
 
 test('주방·반려동물·식물을 포함한 가구 93종을 고르고 규격을 비교해 배치한다', async ({ page }) => {
+  test.slow();
   await page.goto('/?model=off');
   await ready(page);
   await openTool(page, '가구 고르기');
   await expect(page.locator('.catalog-card')).toHaveCount(93);
-  await expect(page.locator('.catalog-card img')).toHaveCount(93);
+  // CI의 소프트웨어 WebGL은 카드 93개의 썸네일을 모두 렌더링한 뒤 이미지를 붙인다.
+  await expect(page.locator('.catalog-card img')).toHaveCount(93, { timeout: 30_000 });
   await expect(page.locator('.catalog-card[data-type=toilet]')).toContainText('변기');
   await page.getByRole('button', { name: '반려동물', exact: true }).click();
   await expect(page.locator('.catalog-card')).toHaveCount(11);
