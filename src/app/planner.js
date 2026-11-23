@@ -26,6 +26,8 @@ import {
   roomMentions,
   assertedType,
   wantsNewSpace,
+  roomLabel,
+  unsupportedSpace,
 } from '../room-consult.js';
 import { sizeFields } from '../dimensions.js';
 import { roomNameSpan } from './consult-context.js';
@@ -340,7 +342,12 @@ export function planRoom(t, ctx) {
     area: r.area,
     changed: r.changed || r.add,
     changes: r.add
-      ? { addSpace: r.room.type, room: r.room, near: refSpace(t, state) }
+      ? {
+          addSpace: r.room.type,
+          room: r.room,
+          near: refSpace(t, state),
+          label: roomLabel(t, r.room.type),
+        }
       : r.changed
         ? { room: r.room }
         : {},
@@ -727,6 +734,21 @@ function unlistedReply(o) {
   };
 }
 
+// 현관, 베란다처럼 아직 없는 공간 종류를 만들어 달라고 하면 가구가 아니라 공간 종류에 없다고 답한다.
+function unsupportedSpacePlan(name) {
+  const kinds = Object.values(ROOM_TYPES).map((r) => r.name);
+  return {
+    intent: 'chat',
+    scope: null,
+    unlisted: [name],
+    reply: `${josa(name, '은/는')} 아직 만들 수 있는 공간 종류에 없어요. 지금은 ${josa(kinds.join(', '), '을/를')} 만들 수 있어요.`,
+    surfaces: [],
+    suggestions: ['living', 'bedroom', 'office', 'kitchen'].map((k) =>
+      say(`${ROOM_TYPES[k].name} 추가`, `${ROOM_TYPES[k].name} 추가해줘`),
+    ),
+  };
+}
+
 // 목록의 가구와 함께 말한 목록에 없는 물건은 빼고 처리했다고 덧붙인다.
 export function noteUnlisted(plan, t) {
   const o = objectsOf(t);
@@ -902,6 +924,8 @@ export function planTurn(text, ctx, request = splitRequest(text), ranked = null)
       ? { ...clear, ask: 'mood', reply: `마감을 바꿨어요. ${mood}` }
       : { intent: 'chat', ask: 'mood', reply: mood, surfaces: [], suggestions: [] };
   }
+  const space = unsupportedSpace(t);
+  if (space) return unsupportedSpacePlan(space);
   const meta = planMeta(t, ctx, item);
   // 목록에 없는 물건 찾기는 동사 앞 낱말을 물건으로 읽는다. 방을 만들거나 고쳐 달라는 말("방하나 추가하자",
   // "왜 화장실로 만들어")을 물건 이름으로 읽지 않도록, 방 이야기가 분명하면 건너뛴다.

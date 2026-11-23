@@ -24,6 +24,7 @@ import {
   assertedType,
   parseRoomDimensions,
   roomEvidence,
+  roomLabel,
 } from '../room-consult.js';
 import {
   chooseSurface,
@@ -418,7 +419,8 @@ function pickRoomType(modelType, t, fixes) {
 }
 
 function newSpacePlan(type, t, v, ctx) {
-  const room = makeRoom(type);
+  const room = makeRoom(type),
+    label = roomLabel(t, type);
   for (const [k, n] of Object.entries(parseRoomDimensions(t))) {
     room[k] = n;
     room.sources[k] = '사용자 설정 · 대화';
@@ -427,8 +429,8 @@ function newSpacePlan(type, t, v, ctx) {
     intent: 'room',
     scope: 'room',
     // 답은 실제로 붙은 공간과 벽, 크기를 넣어 store가 쓴다(applyPlan). 모델 답은 어디에 붙었는지 모른다.
-    reply: `${josa(ROOM_TYPES[type].name, '을/를')} 새 공간으로 만들었어요. 가로·세로를 알려주면 바로 맞출게요.`,
-    changes: { addSpace: type, room, near: refSpace(t, ctx.state) },
+    reply: `${josa(label || ROOM_TYPES[type].name, '을/를')} 새 공간으로 만들었어요. 가로·세로를 알려주면 바로 맞출게요.`,
+    changes: { addSpace: type, room, near: refSpace(t, ctx.state), label },
     surfaces: [{ kind: 'room-size', target: { type: 'room' } }],
     suggestions: [
       { label: '크기 알려주기', text: '가로 4m 세로 3m' },

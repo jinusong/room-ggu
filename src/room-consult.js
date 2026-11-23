@@ -7,12 +7,24 @@ const roomAliases = {
   studio: /원룸|스튜디오/,
   bathroom: /화장실|욕실/,
   living: /거실(?!장)|리빙룸/,
-  bedroom: /침실|안방/,
-  office: /서재|작업실|홈\s*오피스/,
+  bedroom: /침실|안방|손님\s*방|게스트\s*(?:룸|방)|드레스\s*룸|옷\s*방/,
+  office: /서재|작업실|홈\s*오피스|공부\s*방/,
   dining: /다이닝룸|식사\s*공간/,
   kitchen: /주방|부엌/,
   kids: /아이\s*방|어린이\s*방/,
 };
+// 따로 유형이 없는 공간은 가까운 유형으로 만들고 이름만 그대로 붙인다.
+const ROOM_LABELS = [
+  [/공부\s*방/, '공부방'],
+  [/손님\s*방|게스트\s*(?:룸|방)/, '손님방'],
+  [/드레스\s*룸/, '드레스룸'],
+  [/옷\s*방/, '옷방'],
+];
+// 자리를 가리킨 이름("공부방 옆에")이 아니라 새로 만들 그 유형의 이름에서만 고른다.
+export function roomLabel(text, type) {
+  const said = roomMentions(text).find((m) => m.role === 'new' && m.type === type)?.name;
+  return (said && ROOM_LABELS.find(([re]) => re.test(said))?.[1]) || null;
+}
 // 이름 없이 용도로만 말했을 때 그 유형으로 읽을 근거. 모델이 고른 유형은 이 말이 문장에 있을 때만 쓴다.
 const ROOM_EVIDENCE = {
   studio: /혼자\s*(?:살|사는|지낼)|자취/,
@@ -25,6 +37,12 @@ const ROOM_EVIDENCE = {
   kids: /아이|어린이|아기|애기|유아/,
 };
 export const roomEvidence = (type, text) => !!ROOM_EVIDENCE[type]?.test(text);
+// 아직 만들 수 없는 공간. 만들어 달라고 하면 가구 목록이 아니라 공간 종류에 없다고 답한다.
+const UNSUPPORTED_SPACE =
+  /(현관|베란다|발코니|다용도실|팬트리|복도|창고|테라스)\s*(?:을|를|도|좀|하나|한\s*개)?\s*(?:더\s*)?(?:만들|추가|붙여|붙이|생성|넣어|있었으면|필요)/;
+export function unsupportedSpace(text) {
+  return String(text).match(UNSUPPORTED_SPACE)?.[1] || null;
+}
 // 문장에 나온 공간 이름은 같은 낱말이어도 하는 일이 다르다.
 // - ref: "화장실 옆에"처럼 자리를 가리킨다. 새로 만들거나 바꿀 유형이 아니다.
 // - neg: "화장실 말고", "왜 화장실로 만들어"처럼 아니라고 한 유형이다.
@@ -62,6 +80,7 @@ export function roomMentions(text) {
         role = 'neg';
       found.push({
         type,
+        name: m[0],
         index: m.index,
         role,
         strong: role === 'new' && STRONG_AFTER.test(after),

@@ -690,6 +690,7 @@ function applyPlan(plan, turn) {
       room: c.room,
       anchor: near?.roomId || null,
       strict: false,
+      label: c.label || null,
     });
     app.selected = null;
     app.target = app.draft ? { type: 'draft' } : { type: 'room' };

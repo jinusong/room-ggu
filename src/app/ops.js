@@ -368,8 +368,8 @@ const AUTO_NAME = new RegExp(
     .join('|')})(?: \\d+)?$`,
 );
 // 유형 이름을 딴 기본 이름. 같은 이름이 있으면 뒤에 번호를 붙인다.
-export function autoSpaceName(state, type, exceptId = null) {
-  const base = `나의 ${ROOM_TYPES[type].name}`,
+export function autoSpaceName(state, type, exceptId = null, label = null) {
+  const base = `나의 ${label || ROOM_TYPES[type].name}`,
     taken = new Set(
       spaces(state)
         .filter((r) => r.roomId !== exceptId)
@@ -720,7 +720,7 @@ export function addSpace(
   state,
   type = 'studio',
   side = null,
-  { room = null, anchor = null, strict = true } = {},
+  { room = null, anchor = null, strict = true, label = null } = {},
 ) {
   const original = state;
   state = structuredClone(state);
@@ -739,7 +739,8 @@ export function addSpace(
   slot ||= adjacentSlot(state, size, 'start', anchorId);
   const id = addRoom(state, type);
   if (room) state.room = { ...structuredClone(room), type };
-  state.name = autoSpaceName(state, type, id);
+  // 공부방, 드레스룸처럼 따로 유형이 없는 공간은 가까운 유형으로 만들고 말한 이름을 쓴다.
+  state.name = autoSpaceName(state, type, id, label);
   if (slot) state.floorplan.positions[id] = slot;
   // 붙일 벽이 모두 막혔으면 맨 오른쪽 기본 자리에 놓인다. 크기가 달라 겹치면 밀어낸다.
   else separateSpaces(state);
