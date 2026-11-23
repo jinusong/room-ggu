@@ -8,6 +8,9 @@ import { PHOTO_MODEL, PHOTO_LABELS } from './app/photo.js';
 import { textModel, modelCached } from './app/models.js';
 import { prepareTextModel } from './app/model-download.js';
 import { designSchema, designPrompt } from './app/design.js';
+import { compactConsultationGrammar, furnitureNameEvidence } from './app/model-furniture.js';
+
+import { purposeRequest, purposePrompt, purposeGroups } from './app/purpose.js';
 
 let engine = null,
   textId = null,
@@ -115,67 +118,138 @@ function interpretSchema(spaces, compact = false) {
     additionalProperties: false,
   };
 }
-const example = (v) =>
-  JSON.stringify({
-    intent: 'furniture',
-    action: 'none',
-    furniture: 'none',
-    room_type: 'none',
-    space: 'none',
-    seats: null,
-    size: 'unknown',
-    depth: 'unknown',
-    height: 'unknown',
-    color: 'none',
-    wall: 'none',
-    floor: 'none',
-    ui: 'none',
-    ...v,
-  });
 const typeList = (obj) =>
   Object.entries(obj)
     .map(([k, v]) => `${k} ${v.name}`)
     .join(', ');
 
+// 작은 Gemma는 형식 예시의 가구를 답에 옮기기 쉬워 종류가 비어 있는 예시를 쓴다.
+const oneLineExample = (neutral) =>
+  JSON.stringify({
+    intent: 'furniture',
+    action: 'none',
+    furniture: neutral ? 'none' : 'sofa',
+    room_type: 'none',
+    space: 'none',
+    seats: neutral ? null : 2,
+    size: 'unknown',
+    depth: 'unknown',
+    height: neutral ? 'unknown' : 'low',
+    color: 'none',
+    wall: 'none',
+    floor: 'none',
+    ui: neutral ? 'none' : 'furniture_sizes',
+    reply: '',
+  });
+
+async function purposeAnswer(prompt, slots, choices) {
+  const value = { type: 'string', enum: choices };
+  const schema = {
+    type: 'object',
+    properties: Object.fromEntries(slots.map((k) => [k, value])),
+    required: slots,
+    additionalProperties: false,
+  };
+  const r = await engine.chat.completions.create({
+    messages: [{ role: 'user', content: prompt + '\nJSON keys: ' + slots.join(', ') }],
+    response_format: { type: 'grammar', grammar: compactConsultationGrammar(schema) },
+    temperature: 0,
+    max_tokens: 96,
+    ...(textId.startsWith('Qwen3') ? { enable_thinking: false } : {}),
+  });
+  if (r.choices[0]?.finish_reason === 'length') throw Error('가구 후보를 끝까지 읽지 못했어요.');
+  return JSON.parse(r.choices[0]?.message?.content || '');
+}
+
+async function rankPurposes(text, request) {
+  let pool = request.matched.length ? request.matched : request.evidence;
+  let activity;
+  if (!pool.length) {
+    const options = ['해당 없음', ...Object.keys(purposeGroups)];
+    const prompt =
+      '실내 가구로 직접 해결할 수 있는 용도 하나를 고르세요. 목록 밖이거나 사용 목적이 없으면 해당 없음. 예: 주식 시세 확인 → 해당 없음, 접은 셔츠 정리 → 의류 정리.\n용도: ' +
+      options.join(' / ') +
+      '\n요청: ' +
+      text;
+    ({ activity } = await purposeAnswer(prompt, ['activity'], options));
+    if (request.hasActivity && Object.hasOwn(purposeGroups, activity)) {
+      const verify =
+        'Does the text actually request "' +
+        activity +
+        '"? Answer yes only when the activity follows from the text. An unrelated or impossible use is no.\nText: ' +
+        text;
+      const { supports } = await purposeAnswer(verify, ['supports'], ['no', 'yes']);
+      if (supports !== 'yes') activity = '해당 없음';
+    }
+    pool = (purposeGroups[activity] ?? []).filter((k) => !request.excluded.includes(k));
+  }
+  if (!request.hasActivity || !pool.length)
+    return JSON.stringify({ first: 'none', second: 'none', third: 'none', activity });
+  const { prompt } = purposePrompt(text, pool);
+  const answer = await purposeAnswer(prompt, ['first', 'second', 'third'], [...pool, 'none']);
+  return JSON.stringify({ ...answer, activity });
+}
+
 async function interpret(payload) {
   await loadText();
   const compact = textId.startsWith('Qwen3-0.6B');
+  const isGemma3 = textId.startsWith('gemma3-1b-');
+  const text = String(payload.text || '').slice(0, 1500);
+  const purpose = purposeRequest(text);
+  if (purpose) return rankPurposes(text, purpose);
+  const furniture = isGemma3 ? furnitureNameEvidence(text) : null;
   const c = payload.context || {};
   const spaces = (c.spaces || []).filter((s) => typeof s === 'string' && s).slice(0, 12);
-  const prompt = `방 꾸미기 앱의 해석기입니다. 사용자 문장을 읽고 앱이 할 일을 JSON으로 정하세요.
-intent: 가구 이야기는 furniture, 방 크기·유형·벽·바닥 이야기는 room, 아래 동작 요청은 action, 그 밖의 질문이나 인사는 chat.
-action: place 초안을 방에 놓기, undo 되돌리기, redo 다시 실행, rotate 선택한 가구 돌리기, duplicate 선택한 가구 복제, delete 선택한 가구 빼기, relocate 겹친 가구를 빈자리로, clear 가구 모두 비우기, example 예시 방, catalog 가구 고르기 열기, spaces 공간 목록, items 놓인 가구 목록, files 저장·불러오기, help 사용법, ai 모델 설정, new_space 새 공간 추가, switch_space 다른 공간으로 이동. 해당 없으면 none.
-furniture: ${typeList(TYPES)}. 가구 이야기가 아니면 none.
-room_type: ${typeList(ROOM_TYPES)}. 방 유형이나 용도를 말했을 때만 고르고 아니면 none. "화장실 옆에 거실 추가"의 화장실처럼 자리를 가리키는 이름이 아니라 새로 만들거나 바꿀 공간을 고르세요. "A 말고 B", "B라니까"는 B입니다.
-space: 이동할 공간 이름. 없으면 none.
-seats: 소파에 앉는 사람 수 1~4, 모르면 null. size: compact 작게, standard 보통, large 크게, 모르면 unknown. depth: shallow 얕게, deep 깊게. height: low 낮게, tall 높게.
-color: 가구 색 ${names(FURNITURE_COLORS).join(', ')}. wall: 벽 색 ${names(WALL_COLORS).join(', ')}. floor: 바닥 ${names(FLOOR_COLORS).join(', ')}. 색을 말하지 않았으면 none.
-ui: 다음에 보여줄 도구. room_size 방 치수, room_type 공간 유형, finishes 벽·바닥, furniture_sizes 가구 규격 비교, furniture_dims 가구 치수 입력, furniture_color 가구 색, 필요 없으면 none.
-reply: ${compact ? '반드시 빈 문자열. 앱이 실제 변경 결과를 바탕으로 답 문장을 씁니다.' : '한국어 한두 문장. 숫자와 단위를 쓰지 말고, 사용자 문장을 되풀이하지 말고, 다음에 정할 것 하나를 물어보세요.'}
-숫자 치수는 앱이 문장에서 직접 읽습니다. 사용자가 말하지 않은 속성은 none이나 unknown으로 두세요.
-예시) 대상: 방 / 사용자: 두 명이 앉는 낮은 소파
-${example({ furniture: 'sofa', seats: 2, height: 'low', ui: 'furniture_sizes', reply: '둘이 앉는 낮은 소파로 잡았어요. 앉는 깊이도 중요한가요?' })}
-예시) 대상: 방 / 사용자: 벽은 따뜻한 느낌으로 하고 바닥은 어둡게
-${example({ intent: 'room', wall: '샌드', floor: '월넛', ui: 'finishes', reply: '벽은 따뜻한 샌드, 바닥은 짙은 월넛으로 맞췄어요. 가구 색도 맞춰 볼까요?' })}
-예시) 대상: 선택한 가구 의자 / 사용자: 이거 빼줘
-${example({ intent: 'action', action: 'delete', furniture: 'chair', reply: '의자를 뺐어요.' })}
-지금 대상: ${c.target || '방'}
-지금 공간: ${c.room || '알 수 없음'}
-사진 정보: ${c.photo || '없음'}. 사진이 있더라도 분류 후보만 전달받으며, 이미지를 직접 보거나 치수를 측정했다고 말하지 마세요.
-다른 공간: ${spaces.join(', ') || '없음'}
-직전 대화: ${JSON.stringify((payload.history || []).slice(-4))}
-사용자: ${String(payload.text || '').slice(0, 1500)}
-JSON:`;
+  const prompt = `룸꾸 상담. 요청을 JSON으로 해석하세요.
+intent: furniture 가구, room 방 유형·치수·마감, action 동작, chat 질문·인사.
+action: place 초안 놓기, undo 되돌리기, redo 다시 실행, rotate 회전, duplicate 복제, delete 삭제, relocate 겹침 정리, clear 비우기, example 예시, catalog 가구 고르기, spaces 공간 목록, items 놓인 가구 목록, files 저장·불러오기, help 사용법, ai 모델 설정, new_space 공간 추가, switch_space 공간 이동.
+furniture: ${furniture ? '요청에서 새로 놓거나 고칠 가구의 ID' : typeList(TYPES)}.
+room_type: ${typeList(ROOM_TYPES)}. space는 가려는 방 이름. “A 옆에 B 추가”, “A 말고 B”에서 A는 변경 대상이 아닙니다.
+seats: 소파 인원. size compact/standard/large, depth shallow/deep, height low/tall.
+color 가구: ${names(FURNITURE_COLORS).join(', ')}. wall 벽: ${names(WALL_COLORS).join(', ')}. floor 바닥: ${names(FLOOR_COLORS).join(', ')}.
+ui: room_size 치수, room_type 방 유형, finishes 마감, furniture_sizes 규격, furniture_dims 가구 치수, furniture_color 가구 색.
+앱이 숫자를 읽습니다. 새 가구나 치수 편집은 action none. place는 떠 있는 초안을 그대로 놓을 때만. 요청에 있는 속성만 고르세요. “두 명이 앉는 낮은 소파” → sofa, seats 2, height low. “따뜻한 벽, 짙은 원목 바닥” → 샌드, 월넛.
+reply: ${compact ? '빈 문자열.' : '편집 요청은 빈 문자열. 질문에는 한국어 한 문장.'} 사진을 봤거나 치수를 쟀다고 말하지 마세요.
+공간: ${c.room || '방'}. 대상: ${c.target || '방'}.
+${c.furniture?.length ? `놓인 종류: ${c.furniture.join(', ')}. ` : ''}${spaces.length ? `다른 방: ${spaces.join(', ')}. ` : ''}${c.photo || ''}
+한 줄 예시: ${oneLineExample(isGemma3)}
+최근 사용자 요청: ${(payload.history || [])
+    .filter((t) => t.role === 'user')
+    .slice(-2)
+    .map((t) => t.content.slice(0, 160))
+    .join(' / ')}
+요청: ${text}
+${
+  furniture
+    ? [
+        furniture.references.length &&
+          `위치 기준물(변경하지 않음): ${furniture.references.join(', ')}.`,
+        `요청한 가구의 furniture 값 후보: ${furniture.targets.join(', ')}. 대상에 맞는 ID 문자열을 쓰세요.`,
+      ]
+        .filter(Boolean)
+        .join('\n') + '\n'
+    : ''
+}JSON(한 줄):`;
+  const schema = interpretSchema(spaces, compact);
   const r = await engine.chat.completions.create({
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 384,
     temperature: 0.1,
-    response_format: {
-      type: 'json_object',
-      schema: JSON.stringify(interpretSchema(spaces, compact)),
-    },
+    response_format: furniture
+      ? { type: 'grammar', grammar: compactConsultationGrammar(schema) }
+      : { type: 'json_object', schema: JSON.stringify(schema) },
     ...(textId.startsWith('Qwen3') ? { enable_thinking: false } : {}),
   });
+  if (import.meta.env.MODE === 'benchmark' && payload.qa) {
+    self.postMessage({
+      qa: {
+        contract: furniture ? 'named-furniture' : 'one-line',
+        promptChars: prompt.length,
+        ...r.usage,
+        finish: r.choices[0]?.finish_reason,
+      },
+    });
+  }
   if (r.choices[0]?.finish_reason === 'length') throw Error('모델 답이 길어져 중단했어요.');
   return r.choices[0]?.message?.content || '';
 }

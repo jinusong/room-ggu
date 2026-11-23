@@ -1,5 +1,15 @@
+import {
+  MODEL_USAGE,
+  modelEvidence,
+  MODEL_EVIDENCE_CONTEXT,
+  modelCoverage,
+  modelCaution,
+} from '../app/model-capabilities.js';
+import { uses, activityTypes } from '../app/purpose.js';
+import { catalogMatches } from '../estimator.js';
+import { WINDOW_WALLS, MAX_WINDOWS } from '../windows.js';
 // 대화 안에 나타나는 생성형 UI 컴포넌트. 모델은 이름만 고르고, 값과 동작은 모두 앱 상태에 연결된다.
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   TYPES,
   ROOM_TYPES,
@@ -459,6 +469,149 @@ function RoomType() {
   );
 }
 
+function WindowEditor({ window: w, index }) {
+  const [values, setValues] = useState(w);
+  const [error, setError] = useState('');
+  useLayoutEffect(() => {
+    setValues(w);
+    setError('');
+  }, [w]);
+  const update = (key, value) => {
+    setValues({ ...values, [key]: value });
+    setError('');
+  };
+  return (
+    <form
+      class="window-editor"
+      data-window={w.id}
+      onSubmit={(e) => {
+        e.preventDefault();
+        const patch = Object.fromEntries(
+          ['offset', 'width', 'height', 'sill'].map((k) => [k, Number(values[k])]),
+        );
+        patch.wall = values.wall;
+        setError(store.setWindow(w.id, patch) || '');
+      }}
+    >
+      <div class="window-head">
+        <strong>창문 {index + 1}</strong>
+        <Tape source="사용자 설정">직접 설정</Tape>
+        <button
+          class="icon-btn"
+          type="button"
+          aria-label={`창문 ${index + 1} 삭제`}
+          onClick={() => store.removeWindow(w.id)}
+        >
+          <Icon name="trash-2" size={16} />
+        </button>
+      </div>
+      <label class="window-wall">
+        벽 방향
+        <select
+          aria-label={`창문 ${index + 1} 벽 방향`}
+          value={values.wall}
+          onChange={(e) => update('wall', e.currentTarget.value)}
+        >
+          {Object.entries(WINDOW_WALLS).map(([key, label]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div class="window-fields">
+        {[
+          ['width', '폭', 30],
+          ['height', '높이', 30],
+          ['offset', '벽 끝에서', 5],
+          ['sill', '바닥에서', 10],
+        ].map(([key, label, min]) => (
+          <label key={key}>
+            {label}
+            <span>
+              <input
+                aria-label={`창문 ${index + 1} ${label}`}
+                type="number"
+                min={min}
+                max={1500}
+                step="1"
+                required
+                value={
+                  values[key] === '' ? '' : Math.round(Number(values[key]) * 100 * 1000) / 1000
+                }
+                onInput={(e) =>
+                  update(
+                    key,
+                    e.currentTarget.value === '' ? '' : Number(e.currentTarget.value) / 100,
+                  )
+                }
+              />
+              <small>cm</small>
+            </span>
+          </label>
+        ))}
+      </div>
+      <p class="surface-hint">벽 끝은 정면 벽의 왼쪽 끝, 옆벽의 위쪽 끝이에요.</p>
+      <div class="window-error" role="alert">
+        {error}
+      </div>
+      <button class="btn" type="submit">
+        창문 변경 적용
+      </button>
+    </form>
+  );
+}
+function Windows() {
+  const windows = app.state.room.windows || [];
+  const [wall, setWall] = useState('back');
+  const [error, setError] = useState('');
+  return (
+    <>
+      <Head icon="grid-2x2" title="창문 설정" meta={`${windows.length} / ${MAX_WINDOWS}`} />
+      {!windows.length && (
+        <p class="surface-empty">설정한 창문이 없어요. 벽을 고르고 첫 창문을 추가해 보세요.</p>
+      )}
+      {windows.map((w, i) => (
+        <WindowEditor key={w.id} window={w} index={i} />
+      ))}
+      <div class="window-add">
+        <label>
+          추가할 벽
+          <select
+            aria-label="새 창문 벽 방향"
+            value={wall}
+            onChange={(e) => {
+              setWall(e.currentTarget.value);
+              setError('');
+            }}
+          >
+            {Object.entries(WINDOW_WALLS).map(([k, l]) => (
+              <option key={k} value={k}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          class="btn primary"
+          disabled={windows.length >= MAX_WINDOWS}
+          onClick={() => setError(store.addWindow(wall) || '')}
+        >
+          <Icon name="plus" size={16} />
+          창문 추가
+        </button>
+      </div>
+      <div class="window-error" role="alert">
+        {error}
+      </div>
+      <p class="surface-hint">
+        2D·3D와 배치 파일에 저장해요. 앞쪽·오른쪽 벽은 낮춰 보여도 창은 실제 높이에 남아요. 자동
+        문은 창문을 피해 옮겨질 수 있어요. 햇빛·채광은 계산하지 않아요.
+      </p>
+    </>
+  );
+}
+
 function Finishes() {
   const r = app.state.room;
   const [hover, setHover] = useState(null);
@@ -525,6 +678,12 @@ function Finishes() {
       </div>
       {row('wallColor', '벽', WALL_COLORS, wallName)}
       {row('floorColor', '바닥', FLOOR_COLORS, floorName)}
+      <footer class="surface-foot">
+        <span class="foot-note">창문도 벽에 맞춰 설정해요</span>
+        <button class="btn" onClick={() => store.openTool('windows')}>
+          창문 설정
+        </button>
+      </footer>
     </>
   );
 }
@@ -756,29 +915,96 @@ function FurnitureColor({ target }) {
   );
 }
 
-let previewPromise = null;
-function useThumbnails() {
+function useThumbnails(types) {
+  const key = types?.join(',') ?? '*';
   const [map, setMap] = useState(null);
   useEffect(() => {
     let live = true;
     const id = setTimeout(() => {
-      previewPromise ||= import('../catalog-renderer.js').then((m) => m.furniturePreviews());
-      previewPromise.then((m) => live && setMap(m)).catch(() => {});
+      import('../catalog-renderer.js')
+        .then((m) => {
+          if (live) setMap(m.furniturePreviews(key === '*' ? undefined : key.split(',')));
+        })
+        .catch(() => {});
     }, 60);
     return () => {
       live = false;
       clearTimeout(id);
     };
-  }, []);
+  }, [key]);
   return map;
 }
 
+function Recommendations({ spec }) {
+  const rec = store.recommendationFor(spec.id);
+  const thumbs = useThumbnails(rec?.types || []);
+  const listRef = useRef(null);
+  useEffect(() => {
+    if (!rec?.active || !matchMedia('(max-width: 899px)').matches) return;
+    const list = listRef.current;
+    const frame = requestAnimationFrame(() =>
+      list?.scrollIntoView({ block: 'nearest', behavior: 'instant' }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [spec.id, rec?.active]);
+  if (!rec) return <p class="surface-hint">원하는 용도를 말하면 여기에 후보가 나와요.</p>;
+  return (
+    <>
+      <Head icon="armchair" title="용도에 맞는 가구" meta={rec.types.length + '가지'} />
+      <div
+        ref={listRef}
+        class="purpose-list"
+        data-count={rec.types.length}
+        role="group"
+        aria-label="추천 가구"
+      >
+        {rec.types.map((k) => (
+          <button
+            key={k}
+            type="button"
+            class="purpose-option"
+            data-choice={k}
+            disabled={!rec.active}
+            onClick={() => {
+              store.chooseRecommendation(spec.id, k);
+              requestAnimationFrame(() =>
+                [...document.querySelectorAll('.suggestions .is-primary')]
+                  .at(-1)
+                  ?.focus({ preventScroll: true }),
+              );
+            }}
+          >
+            <span class="purpose-preview">
+              {thumbs?.get(k) ? (
+                <img src={thumbs.get(k)} alt="" />
+              ) : (
+                <Icon name={TYPES[k].icon} size={24} />
+              )}
+            </span>
+            <span>
+              <strong>{TYPES[k].name}</strong>
+              <small>{uses[k]}</small>
+            </span>
+            {rec.active && <Icon name="chevron-right" size={16} />}
+          </button>
+        ))}
+      </div>
+      {!rec.active && (
+        <p class="surface-hint">지난 추천이에요. 다른 후보를 보려면 용도를 다시 말해 주세요.</p>
+      )}
+    </>
+  );
+}
+
 function Catalog() {
+  const inputRef = useRef(null);
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('all');
   const thumbs = useThumbnails();
+  const matchingUses = activityTypes(q.trim());
   const list = Object.entries(TYPES).filter(
-    ([, t]) => (cat === 'all' || t.category === cat) && t.name.includes(q.trim()),
+    ([k, t]) =>
+      (cat === 'all' || t.category === cat) && (catalogMatches(k, q) || matchingUses.includes(k)),
   );
   const total = Object.values(TYPES).reduce((n, t) => n + t.presets.length, 0);
   return (
@@ -788,16 +1014,29 @@ function Catalog() {
         title="가구 고르기"
         meta={`${Object.keys(TYPES).length}종 · ${total}가지 크기`}
       />
-      <label class="search">
+      <div class="search catalog-search">
         <Icon name="search" size={16} />
         <input
+          ref={inputRef}
           aria-label="가구 검색"
-          placeholder="소파, 식탁, 책장"
+          placeholder="이름이나 용도 검색 (예: 식탁, 독서)"
           value={q}
           onInput={(e) => setQ(e.currentTarget.value)}
         />
-      </label>
-      <div class="chips-row is-scroll" role="group" aria-label="가구 분류">
+        {q && (
+          <button
+            type="button"
+            aria-label="검색어 지우기"
+            onClick={() => {
+              setQ('');
+              inputRef.current?.focus();
+            }}
+          >
+            <Icon name="x" size={16} />
+          </button>
+        )}
+      </div>
+      <div class="chips-row is-scroll catalog-filters" role="group" aria-label="가구 분류">
         {Object.entries(CATEGORIES).map(([k, v]) => (
           <button
             key={k}
@@ -809,6 +1048,9 @@ function Catalog() {
           </button>
         ))}
       </div>
+      <p class="surface-hint" role="status">
+        {CATEGORIES[cat]} · {list.length}종
+      </p>
       {list.length ? (
         <div class="catalog-grid">
           {list.map(([k, t]) => (
@@ -821,12 +1063,23 @@ function Catalog() {
                 )}
               </span>
               <strong>{t.name}</strong>
-              <span class="mono">{t.presets.length}가지</span>
+              <span class="catalog-size">기본 폭 {t.dims[0]}cm</span>
             </button>
           ))}
         </div>
       ) : (
-        <p class="surface-empty">찾는 가구가 없어요. 다른 이름으로 찾아보세요.</p>
+        <div class="surface-empty">
+          <p>“{q || CATEGORIES[cat]}”에 맞는 가구가 없어요.</p>
+          <button
+            class="btn"
+            onClick={() => {
+              setQ('');
+              setCat('all');
+            }}
+          >
+            검색·분류 초기화
+          </button>
+        </div>
       )}
     </>
   );
@@ -886,7 +1139,9 @@ function Impact() {
                       ? '방보다 크거나 벽을 넘어요'
                       : warn.blockedDoors.has(a.id)
                         ? '문 앞 통로를 막고 있어요'
-                        : '다른 가구와 겹쳐요'}
+                        : warn.blockedWindows.has(a.id)
+                          ? '창 앞 20cm를 가리고 있어요'
+                          : '다른 가구와 겹쳐요'}
                   </small>
                 </span>
                 <Icon name="chevron-right" size={16} />
@@ -898,7 +1153,7 @@ function Impact() {
         !rooms.length && (
           <p class="surface-ok">
             <Icon name="check" size={16} />
-            겹친 공간도, 겹치거나 벽을 넘은 가구도 없어요.
+            겹침·벽 넘침이나 문·창 앞을 가리는 가구가 없어요.
           </p>
         )
       )}
@@ -1056,6 +1311,8 @@ function Items() {
 }
 
 function Photo({ spec }) {
+  const [allKinds, setAllKinds] = useState(false);
+  const [query, setQuery] = useState('');
   const p = app.photo;
   if (!p || p.surfaceId !== spec.id)
     return (
@@ -1071,6 +1328,9 @@ function Photo({ spec }) {
   return (
     <>
       <Head icon="image" title="가구 사진" meta={p.analyzed ? '판별함' : '판별 전'} />
+      <p class="surface-hint">
+        가구 하나가 잘 보이는 사진을 올려 주세요. JPG·PNG·WebP, 최대 20MB예요.
+      </p>
       <div class="photo-surface">
         <img src={p.data} alt="첨부한 가구 사진" />
         <div class="photo-side">
@@ -1103,6 +1363,9 @@ function Photo({ spec }) {
               <p class="surface-hint">
                 SigLIP · {p.device === 'wasm' ? 'CPU' : 'GPU'}에서 실행. 사진만으로는 cm를 잴 수
                 없어 크기는 유형 기본값이에요.
+              </p>
+              <p class="surface-hint">
+                %는 후보 간 상대 점수예요. 정답 확률이나 치수 정확도가 아니에요.
               </p>
             </>
           ) : (
@@ -1145,6 +1408,11 @@ function Photo({ spec }) {
           )}
         </div>
       </div>
+      {p.error && !p.analyzed && (
+        <p class="photo-error" role="alert">
+          {p.error} CPU 호환으로 바꿔 다시 시도하거나 종류를 직접 골라 주세요.
+        </p>
+      )}
       <div class="chips-row is-wrap" aria-label="직접 종류 고르기">
         {['sofa', 'bed', 'desk', 'dining', 'chair', 'wardrobe', 'shelf', 'cabinet'].map((k) => (
           <button key={k} class="chip" onClick={() => store.createDraft(k, { via: 'photo' })}>
@@ -1152,10 +1420,37 @@ function Photo({ spec }) {
             {TYPES[k].name}
           </button>
         ))}
-        <button class="chip" onClick={() => store.openTool('catalog')}>
+        <button class="chip" aria-expanded={allKinds} onClick={() => setAllKinds(!allKinds)}>
           다른 종류
         </button>
       </div>
+      {allKinds && (
+        <div class="photo-kind-picker">
+          <label class="search">
+            <Icon name="search" size={16} />
+            <input
+              aria-label="사진의 가구 종류 검색"
+              placeholder="가구 이름으로 검색"
+              value={query}
+              onInput={(e) => setQuery(e.currentTarget.value)}
+            />
+          </label>
+          <div class="photo-kind-grid" aria-label="사진의 전체 가구 종류">
+            {Object.entries(TYPES)
+              .filter(([k]) => catalogMatches(k, query))
+              .map(([k, t]) => (
+                <button class="chip" key={k} onClick={() => store.createDraft(k, { via: 'photo' })}>
+                  {t.name}
+                </button>
+              ))}
+          </div>
+          {!Object.keys(TYPES).some((k) => catalogMatches(k, query)) && (
+            <p class="surface-hint" role="status">
+              맞는 종류가 없어요. 검색어를 바꿔 주세요.
+            </p>
+          )}
+        </div>
+      )}
     </>
   );
 }
@@ -1284,12 +1579,15 @@ function AIPanel() {
             key={m.key}
             role="radio"
             aria-label={m.name}
+            aria-describedby={`model-cap-${m.key}`}
             aria-checked={ai.choice === m.key}
             tabIndex={ai.choice === m.key ? 0 : -1}
             data-model={m.key}
             class={`model-choice ${ai.choice === m.key ? 'is-active' : ''}`}
-            disabled={ai.text === 'unsupported'}
-            onClick={() => store.setModelChoice(m.key)}
+            aria-disabled={ai.text === 'unsupported' ? 'true' : undefined}
+            onClick={() => {
+              if (ai.text !== 'unsupported') store.setModelChoice(m.key);
+            }}
             onKeyDown={(e) => {
               const keys = Object.keys(TEXT_MODELS),
                 at = keys.indexOf(m.key);
@@ -1305,12 +1603,18 @@ function AIPanel() {
                         : null;
               if (next === null) return;
               e.preventDefault();
-              store.setModelChoice(keys[next]);
+              if (ai.text !== 'unsupported') store.setModelChoice(keys[next]);
               e.currentTarget.parentElement.querySelector(`[data-model="${keys[next]}"]`)?.focus();
             }}
           >
             <strong>{m.name}</strong>
             <small>{m.note}</small>
+            <span class="model-capability" id={`model-cap-${m.key}`}>
+              {MODEL_USAGE[m.key]}
+            </span>
+            <small class="model-evidence">{modelCoverage(m.key)}</small>
+            <small class="model-evidence">{modelEvidence(m.key)}</small>
+            {modelCaution(m.key) && <small>{modelCaution(m.key)}</small>}
             <span class="mono">내려받기 약 {sizeText(m.downloadMB)}</span>
             <span class="mono">
               GPU 약 {(m.vramMB / 1000).toFixed(1)}~{(m.vramF32MB / 1000).toFixed(1)}GB
@@ -1319,6 +1623,12 @@ function AIPanel() {
           </button>
         ))}
       </div>
+      <p class="surface-hint model-evidence-context">{MODEL_EVIDENCE_CONTEXT}</p>
+      <p class="surface-hint">
+        네 모델 모두 같은 편집 도구를 써요. 집 전체는 모델이 공간별 가구 구성을 고르고 앱이
+        치수·충돌을 검사한 초안이에요. 사진 판별은 별도 SigLIP 모델이 20종만 다루며 실제 cm
+        치수·채광·시공 도면은 계산하지 않아요.
+      </p>
       <p class="surface-hint model-note">
         기본은 Gemma 4 E2B예요. 다운로드를 줄이려면 Qwen3 0.6B, GPU 메모리를 아끼려면 Gemma 3 1B를
         골라 보세요. 모델에 따라 상담 결과와 속도가 달라요. 고르면 새 모델을 한 번 받아요.
@@ -1374,6 +1684,10 @@ function Files() {
       <p class="surface-hint">
         자동 저장은 이 브라우저에만 남아요. 사진과 대화는 배치 파일에 넣지 않아요.
       </p>
+      <p class="surface-hint">
+        불러오면 현재 배치와 미배치 초안을 바꿔요. 기존 배치는 실행 취소로 복구해요.
+      </p>
+      {app.fileError && <p class="field-error">{app.fileError}</p>}
     </>
   );
 }
@@ -1417,6 +1731,9 @@ function Help() {
         </li>
       </ol>
       <p class="surface-hint">치수는 배치를 위한 초안이에요. 구매·설치 전에는 실제로 재 주세요.</p>
+      <a class="link" href="./review/" target="_blank" rel="noopener noreferrer">
+        업데이트와 사진 검증 결과
+      </a>
     </>
   );
 }
@@ -1441,10 +1758,12 @@ const BODIES = {
   floorplan: Floorplan,
   'room-size': RoomSize,
   'room-type': RoomType,
+  windows: Windows,
   finishes: Finishes,
   'furniture-size': FurnitureSize,
   'furniture-dims': FurnitureDims,
   'furniture-color': FurnitureColor,
+  recommendations: Recommendations,
   catalog: Catalog,
   impact: Impact,
   spaces: Spaces,
@@ -1483,8 +1802,17 @@ export function surfaceSummary(spec) {
       const n = layoutWarnings(s).all.size + floorplanWarnings(spaces(s), s.floorplan).size;
       return n ? `확인 필요 ${n}개` : '문제 없음';
     }
+    case 'recommendations':
+      return (
+        store
+          .recommendationFor(spec.id)
+          ?.types.map((k) => TYPES[k].name)
+          .join(' · ') || ''
+      );
     case 'spaces':
       return `${spaces(s).length}개`;
+    case 'windows':
+      return `${s.room.windows?.length || 0}개`;
     case 'items':
       return `${s.items.length}개`;
     default:

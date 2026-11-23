@@ -1,0 +1,80 @@
+{
+  "date": "2026-11-17",
+  "precision": "f16",
+  "source": "eval/chat/results/capabilities-v5.11.json",
+  "criteria": "앱 보정 뒤 결과. 분위기는 샌드 벽·월넛 바닥 기준.",
+  "models": {
+    "large": {
+      "total": 6,
+      "passed": 5,
+      "corrected": 4,
+      "medianSeconds": 7,
+      "basic": {
+        "passed": 4,
+        "total": 4
+      },
+      "atmosphere": {
+        "passed": 0,
+        "total": 1
+      },
+      "house": {
+        "passed": 1,
+        "total": 1
+      }
+    },
+    "light": {
+      "total": 6,
+      "passed": 6,
+      "corrected": 4,
+      "medianSeconds": 2.1,
+      "basic": {
+        "passed": 4,
+        "total": 4
+      },
+      "atmosphere": {
+        "passed": 1,
+        "total": 1
+      },
+      "house": {
+        "passed": 1,
+        "total": 1
+      }
+    },
+    "qwen": {
+      "total": 6,
+      "passed": 5,
+      "corrected": 3,
+      "medianSeconds": 1.7,
+      "basic": {
+        "passed": 4,
+        "total": 4
+      },
+      "atmosphere": {
+        "passed": 0,
+        "total": 1
+      },
+      "house": {
+        "passed": 1,
+        "total": 1
+      }
+    },
+    "balanced": {
+      "total": 6,
+      "passed": 6,
+      "corrected": 4,
+      "medianSeconds": 3.2,
+      "basic": {
+        "passed": 4,
+        "total": 4
+      },
+      "atmosphere": {
+        "passed": 1,
+        "total": 1
+      },
+      "house": {
+        "passed": 1,
+        "total": 1
+      }
+    }
+  }
+}

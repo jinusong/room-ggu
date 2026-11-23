@@ -1,10 +1,10 @@
 import * as T from 'three';
 import { TYPES, makeItem } from './data.js';
 import { furniture, disposeGroup } from './furniture.js';
-let previews;
-export function furniturePreviews() {
-  if (previews) return previews;
-  previews = new Map();
+const previews = new Map();
+export function furniturePreviews(types = Object.keys(TYPES)) {
+  const missing = types.filter((k) => Object.hasOwn(TYPES, k) && !previews.has(k));
+  if (!missing.length) return previews;
   const renderer = new T.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setSize(280, 210);
   renderer.setPixelRatio(1);
@@ -19,23 +19,25 @@ export function furniturePreviews() {
     light.position.set(3, 5, 4);
     scene.add(light);
     const camera = new T.PerspectiveCamera(34, 4 / 3, 0.01, 50);
-    for (const [type, definition] of Object.entries(TYPES)) {
+    for (const type of missing) {
+      const definition = TYPES[type];
       const item = makeItem(type);
-      item.color = {
-        living: '#a5af8e',
-        bedroom: '#b8a48b',
-        work: '#a6ac95',
-        dining: '#b5a084',
-        storage: '#aaa184',
-        decor: '#a3b084',
-        appliance: '#bbc2bd',
-        bath: '#efede7',
-        kitchen: '#e5ddcc',
-        plant: '#bc8065',
-        pet: '#b8a48b',
-        kids: '#c3b48f',
-        fitness: '#8495a5',
-      }[definition.category];
+      item.color =
+        {
+          living: '#a5af8e',
+          bedroom: '#b8a48b',
+          work: '#a6ac95',
+          dining: '#b5a084',
+          storage: '#aaa184',
+          decor: '#a3b084',
+          appliance: '#bbc2bd',
+          bath: '#efede7',
+          kitchen: '#e5ddcc',
+          plant: '#bc8065',
+          pet: '#b8a48b',
+          kids: '#c3b48f',
+          fitness: '#8495a5',
+        }[definition.category] ?? item.color;
       const mesh = furniture(item);
       scene.add(mesh);
       const size = new T.Vector3(),

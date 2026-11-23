@@ -50,16 +50,14 @@ test('모델이 가구와 크기 느낌을 정하면 그대로 초안을 만든�
   assert.equal(p.reply, '둘이 쓰기 좋은 낮은 소파예요. 팔걸이가 있나요?');
 });
 
-test('문장에 이름이 없으면 모델이 고른 가구를 쓴다', () => {
+test('기대 앉아 읽을 자리에는 모델이 고른 순서로 선택지를 제안한다', () => {
   const p = planFromModel(
-    model({
-      furniture: 'armchair',
-      reply: '혼자 기대기 좋은 라운지체어로 잡았어요. 색은 어떤가요?',
-    }),
+    JSON.stringify({ first: 'armchair', second: 'sofa', third: 'none' }),
     '책 읽을 때 푹 기대 앉을 거 하나',
     { state: freshState(), target: room },
   );
-  assert.equal(p.changes.draft.type, 'armchair');
+  assert.deepEqual(p.recommendation.types, ['armchair', 'sofa']);
+  assert.equal(p.changes, undefined);
   assert.deepEqual(p.fixes, []);
 });
 
@@ -175,10 +173,29 @@ test('문장에 명령이 분명하면 모델 선택 대신 명령을 따르고,
 
 test('형식이 틀린 모델 답은 예외로 넘기고, 허용 목록 밖 값은 버린다', () => {
   assert.throws(() => readModel('모르겠어요'));
-  const v = readModel(model({ furniture: 'rocket', ui: 'html', color: '보라' }));
+  const v = readModel(model({ furniture: 'trampoline', ui: 'html', color: '보라' }));
   assert.equal(v.furniture, null);
   assert.equal(v.ui, null);
   assert.equal(v.color, null);
+});
+
+test('새 가구의 놓기 요청은 모델이 place라고 골라도 초안을 먼저 만들며 치수 축을 물건 이름으로 자르지 않는다', () => {
+  const ctx = { state: freshState(), target: { type: 'room' } };
+  const desk = planFromModel(
+    model({ intent: 'action', action: 'place', furniture: 'desk' }),
+    '책상 가로 140cm 깊이 70cm 하나 놓아줘',
+    ctx,
+  );
+  assert.equal(desk.changes.draft.type, 'desk');
+  assert.equal(desk.changes.draft.dims[0], 140);
+  assert.equal(desk.changes.draft.dims[2], 70);
+  const vanity = planFromModel(
+    model({ intent: 'furniture', action: 'place', furniture: 'vanity' }),
+    '화장대 하나 놓아줘',
+    ctx,
+  );
+  assert.equal(vanity.changes.draft.type, 'vanity');
+  assert.equal(vanity.action, undefined);
 });
 
 test('사진 점수는 확률로 바꿔 상위 3개만 남긴다', () => {
@@ -567,4 +584,65 @@ test('실제 Qwen의 가구 높이 오분류: 방 높이 검증이 실패해도 
   assert.deepEqual(p.changes.item.next.dims, [180, 60, 200]);
   assert.equal(s.room.h, 2.4);
   assert.ok(p.fixes.length);
+});
+
+test('모델이 공간 도구를 골라도 문장에 있는 치수 편집을 처리한다', () => {
+  const state = exampleState();
+  const p = planFromModel(
+    model({ intent: 'room', action: 'spaces', furniture: 'bed' }),
+    '침대 깊이 2050mm로',
+    { state, target: room },
+  );
+  assert.equal(p.changes.item.next.dims[2], 205);
+  assert.equal(p.changes.room, undefined);
+  assert.ok(p.fixes.length);
+});
+
+test('선택한 가구의 치수를 방으로 오해한 결과를 고친다', () => {
+  const state = exampleState();
+  const bed = state.items.find((i) => i.type === 'bed');
+  const p = planFromModel(model({ intent: 'room', furniture: 'sofa' }), '너비 162cm로 바꿔줘', {
+    state,
+    target: { type: 'item', id: bed.id },
+  });
+  assert.equal(p.changes.item.id, bed.id);
+  assert.equal(p.changes.item.next.dims[0], 162);
+  assert.equal(p.changes.room, undefined);
+});
+
+test('방 이름이 명확하면 모델 JSON에서 이름을 빠뜨려도 지정한 방을 연다', () => {
+  const state = exampleState();
+  state.otherRooms = [{ roomId: 'small', name: '작은방', room: makeRoom('bedroom'), items: [] }];
+  const p = planFromModel(model({ intent: 'room', action: 'switch_space' }), '작은 방으로 가자', {
+    state,
+    target: room,
+  });
+  assert.equal(p.action, 'switch');
+  assert.deepEqual(p.arg, { id: 'small' });
+  assert.ok(p.fixes.includes('문장에 나온 방으로 이동'));
+});
+
+test('치수를 적용할 가구를 위치 참조와 구별한다', () => {
+  const text = '침대 옆에는 폭 40cm 협탁을 둘래';
+  const ctx = { state: freshState(), target: room };
+  for (const p of [planFromModel(model({ furniture: 'bed' }), text, ctx), planTurn(text, ctx)]) {
+    assert.equal(p.changes.draft.type, 'side');
+    assert.equal(p.changes.draft.dims[0], 40);
+  }
+});
+
+test('가구 용도를 설명하는 동사가 추가 요청을 가로채지 않는다', () => {
+  const ctx = { state: freshState(), target: room };
+  const p = planFromModel(model({ furniture: 'desk' }), '컴퓨터 놓을 책상, 깊이는 68cm면 돼', ctx);
+  assert.equal(p.changes.draft.type, 'desk');
+  assert.equal(p.changes.draft.dims[2], 68);
+});
+
+test('띄어 쓴 여러 단어의 가구 이름도 목록의 가구로 처리한다', () => {
+  const ctx = { state: freshState(), target: room };
+  const t = '소파 바로 옆에 높이 1.44m 캣 타워 하나 두고 싶어';
+  for (const p of [planFromModel(model({ furniture: 'cat_tower' }), t, ctx), planTurn(t, ctx)]) {
+    assert.equal(p.changes.draft.type, 'cat_tower');
+    assert.equal(p.changes.draft.dims[1], 144);
+  }
 });

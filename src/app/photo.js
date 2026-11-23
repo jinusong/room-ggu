@@ -1,6 +1,5 @@
 // 사진 속 가구 종류는 SigLIP이 사진과 20가지 가구 이름을 비교해 고른다.
 // 앱은 모델 점수를 확률로 바꾸고, 확신이 낮으면 초안을 만들지 않고 후보만 보여준다.
-import { TYPES } from '../catalog.js';
 
 export const PHOTO_MODEL = 'Xenova/siglip-base-patch16-224';
 export const PHOTO_LABELS = [
@@ -30,9 +29,22 @@ export const PHOTO_CONFIDENT = 0.7;
 
 // SigLIP은 이름마다 따로 시그모이드 점수를 낸다. 서로 비교할 수 있게 로짓으로 되돌려 softmax한다.
 export function photoCandidates(raw) {
-  const rows = (Array.isArray(raw) ? raw : []).filter(
-    (r) => r && Object.hasOwn(TYPES, r.type) && Number.isFinite(r.score),
-  );
+  const seen = new Set();
+  const rows = (Array.isArray(raw) ? raw : []).filter((r) => {
+    if (
+      !r ||
+      !PHOTO_LABELS.some(([type]) => type === r.type) ||
+      !Number.isFinite(r.score) ||
+      r.score < 0 ||
+      r.score > 1 ||
+      seen.has(r.type)
+    )
+      return false;
+    seen.add(r.type);
+    return true;
+  });
+  // 한 종류만 남은 잘못된 응답을 100% 확신으로 표시하지 않는다.
+  if (rows.length < 2) return [];
   if (!rows.length) return [];
   const logits = rows.map((r) => {
     const p = Math.min(1 - 1e-9, Math.max(1e-9, r.score));

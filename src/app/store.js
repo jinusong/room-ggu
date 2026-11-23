@@ -13,7 +13,16 @@ import {
 import { validateSurfaceSpec, SURFACE_KINDS } from '../ui-schema.js';
 import { runAI, stopAI, interruptAI, onAIStatus, imageData } from '../ai.js';
 import * as ops from './ops.js';
-import { planTurn } from './planner.js';
+import { purposeGroups } from './purpose.js';
+import { offerFurniture, purposeDraft, planTurn } from './planner.js';
+import {
+  appliedSize,
+  followupSize,
+  namedEdit,
+  photoCaption,
+  requestedText,
+} from './consult-context.js';
+import { furnitureMentions } from '../estimator.js';
 import { planFromModel } from './interpret.js';
 import { photoCandidates, PHOTO_CONFIDENT } from './photo.js';
 import { josa, dimsText } from './text.js';
@@ -44,6 +53,7 @@ const ACTIONS = new Set([
   'tool',
   'relocate',
   'clear-target',
+  'confirm-use',
   'draft',
 ]);
 const FALLBACKS = [
@@ -83,6 +93,10 @@ export const app = {
   selected: null,
   target: { type: 'room' },
   photo: null,
+  photoLoading: false,
+  photoError: '',
+  fileLoading: false,
+  fileError: '',
   ai: {
     // text: off | loading | ready | error | unsupported. 기본은 켜짐이며 bootModel()이 자동으로 준비한다.
     text: 'off',
@@ -223,9 +237,25 @@ function sanitizeTurn(t) {
         text: cleanText(s?.text, 200) || undefined,
         action: ACTIONS.has(s?.action) ? s.action : undefined,
         arg: typeof s?.arg === 'string' ? s.arg.slice(0, 40) : undefined,
+        photoId: cleanText(s?.photoId, 40) || undefined,
         primary: !!s?.primary,
       }))
       .filter((s) => s.label && (s.text || s.action));
+    const rec = t.confirmation || t.recommendation;
+    if (rec && Array.isArray(rec.types) && typeof rec.text === 'string') {
+      const types = [
+        ...new Set(rec.types.filter((k) => typeof k === 'string' && Object.hasOwn(TYPES, k))),
+      ].slice(0, 3);
+      if (types.length) {
+        const saved = { types, text: cleanText(rec.text, 1500) };
+        if (!t.confirmation) turn.recommendation = saved;
+        else if (
+          Object.hasOwn(purposeGroups, rec.activity) &&
+          types.every((k) => purposeGroups[rec.activity].includes(k))
+        )
+          turn.confirmation = { ...saved, activity: rec.activity };
+      }
+    }
     turn.status = 'done';
   }
   return turn;
@@ -303,6 +333,7 @@ function restore(json) {
   if (roomBefore !== app.state.roomId) spaceEvent();
 }
 export function undo() {
+  if (finishWindowGesture(true)) return true;
   if (!app.history.length) return false;
   app.future.push(JSON.stringify(app.state));
   restore(app.history.pop());
@@ -311,6 +342,7 @@ export function undo() {
   return true;
 }
 export function redo() {
+  if (finishWindowGesture(true)) return true;
   if (!app.future.length) return false;
   app.history.push(JSON.stringify(app.state));
   restore(app.future.pop());
@@ -340,7 +372,9 @@ function push(turn) {
 function event(text) {
   return push({ role: 'event', text });
 }
+let roomEpoch = 0;
 function spaceEvent() {
+  roomEpoch++;
   const r = app.state.room;
   event(`${app.state.name} · ${ROOM_TYPES[r.type].name} ${r.w} × ${r.d}m`);
 }
@@ -351,11 +385,18 @@ export function clearThread() {
     interruptAI();
   }
   if (app.busy?.kind === 'model') app.busy = null;
+  if (app.busy?.kind === 'vision') cancelModel();
   app.thread = [];
   app.design = null;
   app.draft = null;
   app.queue = [];
   app.photo = null;
+  photoReadSeq++;
+  app.photoLoading = false;
+  app.photoError = '';
+  fileReadSeq++;
+  app.fileLoading = false;
+  app.fileError = '';
   app.target = app.selected ? { type: 'item', id: app.selected } : { type: 'room' };
   persist();
   emit();
@@ -434,8 +475,11 @@ function placeDraftInto(turn) {
 }
 // 초안 하나를 방에 놓고, 그 초안을 다루던 도구가 놓인 가구를 계속 다루게 한다.
 function placeOne(d) {
-  const placed = ops.placeItem(app.state, d),
-    { item } = placed;
+  const placed = ops.placeItem(app.state, d);
+  linkPlacedDraft(d, placed.item);
+  return placed;
+}
+function linkPlacedDraft(d, item) {
   if (app.draft?.id === d.id) app.draft = null;
   for (const t of app.thread)
     for (const s of t.surfaces || [])
@@ -443,7 +487,6 @@ function placeOne(d) {
         s.target = { type: 'item', id: item.id };
   app.selected = item.id;
   app.target = { type: 'item', id: item.id };
-  return placed;
 }
 // 지금 초안과 기다리는 초안을 한꺼번에 놓는다. 되돌리기 한 번으로 모두 물린다.
 function placeAllInto(turn) {
@@ -451,23 +494,25 @@ function placeAllInto(turn) {
   if (!list.length) return placeDraftInto(turn);
   if (app.state.items.length + list.length > ops.MAX_ITEMS)
     throw Error('한 방에 가구 100개까지 놓을 수 있어요. 가구를 빼거나 나눠 놓아 주세요.');
-  list.forEach(ops.sanitizeItem);
+  const staged = { ...app.state, items: [...app.state.items] };
+  const placed = list.map((d) => ops.placeItem(staged, d));
+  const blocked = placed.filter(({ free }) => !free).length;
+  if (blocked)
+    throw Error(
+      `${blocked}개가 들어갈 빈자리가 없어요. 크기를 줄이거나 들어가는 가구만 하나씩 놓아 주세요.`,
+    );
   snapshot();
+  app.state.items = staged.items;
   const names = [];
-  let crowded = 0;
-  for (const d of list) {
-    const { item, free } = placeOne(d);
+  for (const [i, { item }] of placed.entries()) {
+    linkPlacedDraft(list[i], item);
     names.push(item.name);
-    if (!free) crowded++;
     turn.receipt.push({ label: '배치', to: `${item.name} · ${dimsText(item.dims)}cm` });
   }
   app.draft = null;
   app.queue = [];
   const all = names.map((n, i) => (i < names.length - 1 ? josa(n, '과/와') : n)).join(' ');
-  turn.text = crowded
-    ? `${josa(all, '을/를')} 놓았지만 ${crowded}개는 빈자리가 없어 다른 가구와 겹쳐요. 크기를 줄이거나 위치를 옮겨 주세요.`
-    : `${josa(all, '을/를')} 방에 놓았어요. 도면에서 끌어 옮기거나 회전할 수 있어요.`;
-  if (crowded) turn.surfaces.push({ kind: 'impact', target: roomTarget() });
+  turn.text = `${josa(all, '을/를')} 방에 놓았어요. 도면에서 끌어 옮기거나 회전할 수 있어요.`;
   turn.suggestions = [
     { label: '가구 목록', action: 'tool', arg: 'items' },
     { label: '다른 가구', action: 'catalog' },
@@ -485,6 +530,19 @@ function runAction(action, arg, turn) {
     case 'redo':
       if (!redo()) turn.text = '다시 적용할 내용이 없어요.';
       break;
+    case 'focus-item': {
+      const room = spaces(s).find((r) => r.roomId === arg.roomId);
+      const item = room?.items.find((i) => i.id === arg.id);
+      if (!item) throw Error('그 가구를 찾지 못했어요.');
+      if (s.roomId !== room.roomId) switchSpace(room.roomId);
+      s.scope = 'room';
+      app.selected = item.id;
+      app.target = { type: 'item', id: item.id };
+      turn.roomId = s.roomId;
+      turn.text = `${room.name}에서 ${josa(nameOf(item), '을/를')} 골랐어요. 바꿀 치수를 말해 주세요.`;
+      turn.surfaces.push({ kind: 'furniture-dims', target: { type: 'item', id: item.id } });
+      break;
+    }
     case 'switch':
       snapshot();
       ops.switchSpace(s, arg.id);
@@ -513,7 +571,8 @@ function runAction(action, arg, turn) {
         );
       else if (r.remaining)
         lines.push('옮길 빈자리가 없어요. 가구 크기를 줄이거나 방을 넓혀 주세요.');
-      else if (!sp.overlapped.length) lines.push('겹친 공간도, 겹치거나 벽을 넘은 가구도 없어요.');
+      else if (!sp.overlapped.length)
+        lines.push('겹침·벽 넘침이나 문·창 앞을 가리는 가구가 없어요.');
       turn.text = lines.join(' ');
       if (sp.moved.length)
         turn.receipt.push({ label: '집 배치', to: `${sp.moved.length}개 공간 이동` });
@@ -594,6 +653,35 @@ function applyPlan(plan, turn) {
   if (plan.action) return runAction(plan.action, plan.arg, turn);
   const c = plan.changes || {};
   const s = app.state;
+  const remote =
+    plan.destination &&
+    plan.destination !== s.roomId &&
+    (c.room ||
+      c.item ||
+      c.draft ||
+      plan.ask === 'item' ||
+      plan.recommendation ||
+      plan.confirmation);
+  const staged = remote ? structuredClone(s) : null;
+  if (staged) ops.switchSpace(staged, plan.destination);
+  let roomRows, itemRows;
+  // 방 이동과 편집을 함께 검증하고 성공한 배치에만 한 번의 실행 취소를 남긴다.
+  if (staged) {
+    if (c.room && !c.addSpace) roomRows = ops.setRoom(staged, c.room);
+    if (c.item) itemRows = ops.updateItem(staged, c.item.id, c.item.next);
+    if (c.draft) ops.sanitizeItem(c.draft);
+    snapshot();
+    Object.assign(s, staged);
+    app.selected = null;
+    app.target = { type: 'room' };
+    if (plan.ask !== 'item' && !plan.recommendation && !plan.confirmation) {
+      app.draft = null;
+      app.queue = [];
+    }
+    s.scope = 'room';
+    turn.roomId = s.roomId;
+    turn.receipt.push({ label: '대상 공간', to: s.name });
+  }
   if (c.addSpace) {
     snapshot();
     // "화장실 옆에"처럼 기준 공간을 말했으면 그 공간의 벽에, 아니면 지금 방의 벽에 붙인다.
@@ -626,17 +714,19 @@ function applyPlan(plan, turn) {
       turn.text = lines.join(' ');
     }
   } else if (c.room) {
-    snapshot();
-    if (c.room.wallColor !== s.room.wallColor || c.room.floorColor !== s.room.floorColor)
-      rememberFinish(s.room);
-    turn.receipt.push(...ops.setRoom(s, c.room));
+    if (!staged) {
+      snapshot();
+      if (c.room.wallColor !== s.room.wallColor || c.room.floorColor !== s.room.floorColor)
+        rememberFinish(s.room);
+    }
+    turn.receipt.push(...(roomRows || ops.setRoom(s, c.room)));
   }
   if (c.item) {
-    snapshot();
-    turn.receipt.push(...ops.updateItem(s, c.item.id, c.item.next));
+    if (!staged) snapshot();
+    turn.receipt.push(...(itemRows || ops.updateItem(s, c.item.id, c.item.next)));
     // 이름으로 고친 가구를 다음 말의 대상으로 이어 준다. 답을 기다리며 새로 고른 대상은 유지한다.
     const sameTarget = (a, b) => a?.type === b?.type && a?.id === b?.id && a?.roomId === b?.roomId;
-    if (!plan.sourceTarget || sameTarget(app.target, plan.sourceTarget)) {
+    if (staged || !plan.sourceTarget || sameTarget(app.target, plan.sourceTarget)) {
       app.selected = c.item.id;
       app.target = { type: 'item', id: c.item.id };
     }
@@ -680,27 +770,29 @@ function context() {
     .map((t) => t.text);
   return { state: app.state, target: app.target, draft: app.draft, queue: app.queue, said };
 }
-function modelContext() {
-  const s = subject();
-  const r = app.state.room;
+function modelContext(ctx) {
+  const { state, target: selected, draft } = ctx;
+  const s = selected.type === 'item' ? state.items.find((i) => i.id === selected.id) : draft;
+  const r = state.room;
   const target =
-    app.target.type === 'item' && s
+    selected.type === 'item' && s
       ? `선택한 가구 ${s.name}(${s.type})`
-      : app.target.type === 'draft' && s
+      : selected.type === 'draft' && s
         ? `방에 놓기 전 초안 ${s.name}(${s.type})`
         : '방';
   return {
-    target,
-    room: `${app.state.name} · ${ROOM_TYPES[r.type].name} 가로 ${r.w}m 세로 ${r.d}m 천장 ${r.h}m · 놓인 가구 ${app.state.items.length}개${app.draft ? ` · 초안 ${app.draft.name}` : ''}`,
+    target: s && selected.type !== 'room' ? `${target} ${dimsText(s.dims)}cm` : target,
+    furniture: [...new Set(state.items.map((i) => TYPES[i.type].name))].slice(0, 12),
+    room: `${state.name} · ${ROOM_TYPES[r.type].name} 가로 ${r.w}m 세로 ${r.d}m 천장 ${r.h}m · 놓인 가구 ${state.items.length}개${draft ? ` · 초안 ${draft.name}` : ''}`,
     photo:
       app.photo?.analyzed &&
-      app.photo.roomId === app.state.roomId &&
-      app.target.type === 'draft' &&
-      app.photo.draftId === app.draft?.id
-        ? `사진 분류 후보: ${(app.photo.candidates || []).map((c) => TYPES[c.type].name).join(', ')}. 현재 고른 초안: ${app.draft?.name || '없음'}. 사진 자체나 실제 치수는 제공되지 않음.`
+      app.photo.roomId === state.roomId &&
+      selected.type === 'draft' &&
+      app.photo.draftId === draft?.id
+        ? `사진 분류 후보: ${(app.photo.candidates || []).map((c) => TYPES[c.type].name).join(', ')}. 현재 고른 초안: ${draft?.name || '없음'}. 사진 자체나 실제 치수는 제공되지 않음.`
         : undefined,
-    spaces: spaces(app.state)
-      .filter((x) => x.roomId !== app.state.roomId)
+    spaces: spaces(state)
+      .filter((x) => x.roomId !== state.roomId)
       .map((x) => x.name),
   };
 }
@@ -712,6 +804,7 @@ function fallbackReason() {
 const withPhoto = (plan, extra) =>
   extra.length ? { ...plan, surfaces: [...extra, ...(plan.surfaces || [])] } : plan;
 
+const measurements = new WeakMap();
 function finishTurn(turn, plan, meta) {
   Object.assign(turn, {
     text: [turn.photoIntro, plan.reply].filter(Boolean).join(' '),
@@ -720,10 +813,15 @@ function finishTurn(turn, plan, meta) {
     status: 'done',
     ...meta,
   });
+  if (plan.recommendation) turn.recommendation = plan.recommendation;
+  if (plan.confirmation) turn.confirmation = plan.confirmation;
   if (plan.note) turn.note = plan.note;
   try {
-    if (!plan.error) applyPlan(plan, turn);
-    else turn.tone = 'error';
+    if (!plan.error) {
+      applyPlan(plan, turn);
+      const m = plan.measureText && appliedSize(plan.measureText, plan, app);
+      if (m) measurements.set(turn, m);
+    } else turn.tone = 'error';
   } catch (e) {
     turn.text = e.message;
     turn.tone = 'error';
@@ -742,7 +840,34 @@ export async function send(raw) {
     .trim()
     .slice(0, 1500);
   const pendingPhoto = app.photo && !app.photo.sent ? app.photo : null;
-  if ((!text && !pendingPhoto) || app.busy) return;
+  if ((!text && !pendingPhoto) || app.busy || app.photoLoading || app.fileLoading) return;
+  const last = app.thread.at(-1);
+  if (!pendingPhoto && last?.confirmation && /^(?:네|응|그래|맞아(?:요)?)[.!]?$/.test(text))
+    return confirmFurnitureUse(last);
+  const recSurface = last?.surfaces?.find((s) => s.kind === 'recommendations');
+  if (recSurface && !pendingPhoto) {
+    const rec = recommendationFor(recSurface.id);
+    const ordinal = text.match(
+      /^(첫|두|세|[123])\s*(?:번째|번|째)(?:로|로 할게|로 해줘|요)?[.!]?$/,
+    );
+    const index = ordinal && { 첫: 0, 두: 1, 세: 2, 1: 0, 2: 1, 3: 2 }[ordinal[1]];
+    const choice =
+      rec?.active && (ordinal ? rec.types[index] : rec.types.find((k) => text === TYPES[k].name));
+    if (choice) return chooseRecommendation(recSurface.id, choice);
+    if (rec?.active && ordinal) {
+      push({ role: 'user', text });
+      finishTurn(
+        push({ role: 'assistant', text: '' }),
+        {
+          reply: `후보가 ${rec.types.length}개예요. 아래에서 하나 골라 주세요.`,
+          recommendation: { types: rec.types, text: rec.text },
+          surfaces: [{ kind: 'recommendations', target: { type: 'room' } }],
+        },
+        { engine: 'app' },
+      );
+      return;
+    }
+  }
   const history = historyForModel();
   push({ role: 'user', text, ...(pendingPhoto ? { photo: pendingPhoto.data } : {}) });
   const turn = push({ role: 'assistant', text: '' });
@@ -794,35 +919,22 @@ async function respondToText(text, turn, history, extra = []) {
     );
     return;
   }
+  if (
+    /창문|창호/.test(text) &&
+    !/(?:창문|창호)\s*(?:바로\s*)?(?:옆|앞|아래|밑|맞은편|근처)/.test(text)
+  ) {
+    finishTurn(
+      turn,
+      {
+        reply: '창문은 아래 도구에서 벽과 치수·위치를 정해 주세요.',
+        surfaces: [{ kind: 'windows', target: roomTarget() }],
+      },
+      { engine: 'app' },
+    );
+    return;
+  }
   const design = designRequest(text);
   if (design) return respondToDesign(design, turn);
-  // “안방 침대 가로 180cm로 바꿔줘”는 공간 이동만 하고 끝내지 않고 그 방의 가구에 이어서 적용한다.
-  if (!/추가|새로|붙여|붙이/.test(text) && /가로|세로|높이|너비|깊이|색|벽|바닥/.test(text)) {
-    const hit = spaces(app.state)
-      .filter((r) => r.name.length >= 2)
-      .sort((a, b) => b.name.length - a.name.length)
-      .find((r) => {
-        const at = text.indexOf(r.name);
-        return at >= 0 && !/^\s*(?:옆|앞|뒤|말고|처럼)/.test(text.slice(at + r.name.length));
-      });
-    if (hit) {
-      if (hit.roomId !== app.state.roomId) {
-        snapshot();
-        ops.switchSpace(app.state, hit.roomId);
-        app.selected = null;
-        app.target = { type: 'room' };
-        app.draft = null;
-        app.queue = [];
-        app.state.scope = 'room';
-        turn.roomId = hit.roomId;
-        turn.receipt.push({ label: '대상 공간', to: hit.name });
-      }
-      text = text
-        .replace(hit.name, '')
-        .replace(/^\s*(?:의|에서|은|는)(?:\s+|$)/, '')
-        .trim();
-    }
-  }
   const comparison = parseComparisonCommand(text, { avatarOn: !!avatarLayout(app.state) });
   if (comparison) {
     let reply;
@@ -861,36 +973,75 @@ async function respondToText(text, turn, history, extra = []) {
     );
     return;
   }
-  if (app.ai.text !== 'ready') {
-    finishTurn(
-      turn,
-      withPhoto({ ...planTurn(text, context()), sourceTarget: structuredClone(app.target) }, extra),
+  const original = text;
+  text = requestedText(text, app.state);
+  const named = namedEdit(text, app.state);
+  if (named?.focusType) {
+    const hits = named.room.items.filter((i) => i.type === named.focusType);
+    const plan =
+      hits.length === 1
+        ? { action: 'focus-item', arg: { roomId: named.room.roomId, id: hits[0].id }, surfaces: [] }
+        : {
+            reply: hits.length
+              ? `${named.room.name}에 ${josa(TYPES[named.focusType].name, '이/가')} ${hits.length}개 있어요. 그 방의 도면에서 하나를 골라 주세요.`
+              : `${named.room.name}에 ${josa(TYPES[named.focusType].name, '이/가')} 없어요.`,
+            surfaces: [],
+          };
+    finishTurn(turn, plan, { engine: 'app' });
+    return;
+  }
+  const ctx = context();
+  if (named?.room) {
+    text = named.text;
+    if (named.room.roomId !== app.state.roomId) {
+      ctx.state = structuredClone(app.state);
+      ops.switchSpace(ctx.state, named.room.roomId);
+      Object.assign(ctx, { target: { type: 'room' }, draft: null, queue: [] });
+    } else if (ctx.target.type === 'draft') {
+      Object.assign(ctx, { target: { type: 'room' }, draft: null, queue: [] });
+    }
+  }
+  const previous = app.thread.findLast(
+    (t) => t !== turn && t.role === 'assistant' && t.status === 'done',
+  );
+  const followup = followupSize(text, ctx, named?.room ? null : measurements.get(previous));
+  text = followup.text;
+  ctx.guard = named?.guard || followup.guard;
+  const wrap = (plan) =>
+    withPhoto(
       {
-        engine: 'rule',
-        fallback: fallbackReason(),
+        ...plan,
+        sourceTarget: app.target,
+        destination: named?.room?.roomId,
+        measureText: text,
       },
+      extra,
     );
+  if (app.ai.text !== 'ready') {
+    finishTurn(turn, wrap(planTurn(text, ctx)), { engine: 'rule', fallback: fallbackReason() });
     return;
   }
   const version = ++app.modelSeq;
-  const turnContext = structuredClone(context()),
-    base = designBase(),
-    draftBase = JSON.stringify(app.draft);
-  const stale = () => base !== designBase() || draftBase !== JSON.stringify(app.draft);
+  const turnContext = structuredClone(ctx);
+  const submittedTarget = structuredClone(app.target);
+  const base = consultationBase(),
+    epoch = roomEpoch;
+  const stale = () => epoch !== roomEpoch || base !== consultationBase();
   turn.status = 'thinking';
   turn.engine = engineName();
   app.busy = { kind: 'model', turnId: turn.id };
-  pending = { version, turn, text, extra, ctx: turnContext, base, draftBase };
+  pending = { version, turn };
   emit();
-  let plan, meta;
+  let plan, meta, timer;
   try {
     const raw = await Promise.race([
-      runAI('interpret', { text, history, context: modelContext() }),
-      new Promise((_, reject) =>
-        setTimeout(
-          () => reject(Object.assign(Error('모델 답이 늦어요.'), { timeout: true })),
-          MODEL_TIMEOUT,
-        ),
+      runAI('interpret', { text, history, context: modelContext(turnContext) }),
+      new Promise(
+        (_, reject) =>
+          (timer = setTimeout(
+            () => reject(Object.assign(Error('모델 답이 늦어요.'), { timeout: true })),
+            MODEL_TIMEOUT,
+          )),
       ),
     ]);
     if (version !== app.modelSeq) return;
@@ -902,7 +1053,11 @@ async function respondToText(text, turn, history, extra = []) {
     if (plan.fallback) {
       meta = { engine: 'rule', fallback: plan.fallback };
       plan = planTurn(text, turnContext);
-    } else meta = { engine: engineName(), fixes: plan.fixes };
+    } else {
+      const fixes = plan.fixes || [];
+      if (text !== original) fixes.unshift('문장에서 지정한 대상과 직전 치수를 반영');
+      meta = { engine: engineName(), fixes };
+    }
   } catch (e) {
     if (version !== app.modelSeq) return;
     if (e.timeout) interruptAI();
@@ -920,11 +1075,19 @@ async function respondToText(text, turn, history, extra = []) {
       };
       plan = planTurn(text, turnContext);
     }
+  } finally {
+    clearTimeout(timer);
   }
   pending = null;
   app.busy = null;
-  finishTurn(turn, withPhoto({ ...plan, sourceTarget: turnContext.target }, extra), meta);
+  finishTurn(turn, { ...wrap(plan), sourceTarget: submittedTarget }, meta);
 }
+
+// 보기 옵션이나 선택 표시가 달라져도 요청 당시의 가구를 다룬다. 방 전환과 배치 편집은 만료시킨다.
+const consultationBase = () => {
+  const { roomId, room, items, otherRooms, floorplan, avatar } = app.state;
+  return JSON.stringify([roomId, room, items, otherRooms, floorplan, avatar, app.draft, app.queue]);
+};
 
 // 보기 전환은 초안을 만료시키지 않는다. 방·가구·문을 실제로 편집했을 때만 다시 상담한다.
 const canonical = (v) =>
@@ -1071,26 +1234,18 @@ function fixRoomTargets(turn) {
   }
 }
 
-// 해석 중인 답을 멈추고 그 문장은 규칙으로 처리한다. 모델은 메모리에 그대로 둔다.
+// 진행 중인 생성만 멈춘다. 이미 준비된 모델은 그대로 둔다.
 export function interruptModel() {
   if (!pending) return;
-  const { turn, text, extra, design, ctx, base, draftBase } = pending;
+  const { turn, design } = pending;
   pending = null;
   app.modelSeq++;
   interruptAI();
   app.busy = null;
-  const stale = ctx && (base !== designBase() || draftBase !== JSON.stringify(app.draft));
   finishTurn(
     turn,
-    design
-      ? { reply: '집 전체 초안 만들기를 멈췄어요. 배치는 그대로예요.', surfaces: [] }
-      : stale
-        ? { reply: '상담을 멈췄어요. 직접 바꾼 배치는 그대로예요.', surfaces: [] }
-        : withPhoto({ ...planTurn(text, ctx || context()), sourceTarget: ctx?.target }, extra),
-    {
-      engine: 'rule',
-      fallback: 'cancelled',
-    },
+    { reply: design ? '집 전체 초안 만들기를 멈췄어요.' : '상담을 멈췄어요.', surfaces: [] },
+    { engine: 'app' },
   );
 }
 
@@ -1108,12 +1263,15 @@ export function cancelModel() {
 
 // ---------- 직접 연 도구와 버튼 동작 ----------
 const TOOL_TEXT = {
+  recommendations: '가구를 어디에 쓸지 알려 주세요.',
   design: '집 전체 면적과 원하는 테마를 말해 주세요. 예: 100평 집 전체를 재팬디로 꾸며줘.',
   avatar:
     '키를 알려주면 가구와 같은 축척의 아바타를 세워요. 의자·소파·침대에는 앉히거나 눕혀 볼 수 있어요.',
   floorplan: '방과 화장실을 2D·3D로 함께 보세요. 공간 위치는 2D에서 끌어 맞출 수 있어요.',
   'room-size': '방 크기를 정해 볼까요? 숫자를 바로 고치거나 “가로 4m 세로 3m”처럼 말해도 돼요.',
   'room-type': '어떤 공간인가요? 유형을 바꾸면 직접 정한 치수는 그대로 두고 나머지만 바꿔요.',
+  windows:
+    '벽을 고르고 창 크기와 위치를 cm로 입력해 주세요. 집 전체와 배치 파일에도 함께 반영해요.',
   finishes: '벽과 바닥을 골라 보세요. 바꾸기 전과 후를 나란히 보여드려요.',
   catalog: '놓고 싶은 가구를 골라 주세요. 고르면 크기 초안이 방 안에 먼저 나타나요.',
   spaces: '공간마다 크기와 가구를 따로 저장해요. 최대 12개까지 만들 수 있어요.',
@@ -1240,6 +1398,7 @@ export function closeAvatarBar() {
   emit();
 }
 export function setScope(scope) {
+  finishWindowGesture(true);
   app.state.scope = scope === 'house' ? 'house' : 'room';
   app.selected = null;
   app.target = { type: 'room' };
@@ -1345,7 +1504,31 @@ export function attachBathroom() {
   }
 }
 
+function confirmFurnitureUse(turn) {
+  if (
+    !turn?.confirmation ||
+    turn !== app.thread.at(-1) ||
+    turn.roomId !== app.state.roomId ||
+    app.busy ||
+    app.fileLoading ||
+    app.photoLoading
+  )
+    return;
+  const { types, text, activity } = turn.confirmation;
+  push({ role: 'user', text: activity + ' 용도예요', action: true });
+  finishTurn(push({ role: 'assistant', text: '' }), offerFurniture(text, types), { engine: 'app' });
+}
+
 export function runSuggestion(sug) {
+  if (sug.action === 'confirm-use') {
+    const last = app.thread.at(-1);
+    if (last?.suggestions?.includes(sug)) return confirmFurnitureUse(last);
+    return;
+  }
+  if (sug.action === 'draft' && (!sug.photoId || sug.photoId !== app.photo?.surfaceId)) {
+    toast('이전 사진의 후보예요. 지금 사진에서 종류를 골라 주세요.');
+    return;
+  }
   if (sug.text) return send(sug.text);
   if (sug.action === 'place') return placeDraft(sug.label);
   if (sug.action === 'place-all') return placeDraft(sug.label, 'place-all');
@@ -1354,6 +1537,29 @@ export function runSuggestion(sug) {
   if (sug.action === 'photo') return pickPhoto();
   if (sug.action === 'relocate') return relocate();
   if (sug.action === 'draft' && sug.arg) return createDraft(sug.arg, { via: 'photo' });
+}
+
+export function recommendationFor(surfaceId) {
+  const turn = app.thread.findLast((t) =>
+    t.surfaces?.some((s) => s.id === surfaceId && s.kind === 'recommendations'),
+  );
+  if (!turn?.recommendation) return null;
+  const active =
+    app.thread.at(-1) === turn &&
+    app.state.roomId === turn.roomId &&
+    !app.busy &&
+    !app.fileLoading &&
+    !app.photoLoading;
+  return { ...turn.recommendation, active };
+}
+
+export function chooseRecommendation(surfaceId, type) {
+  const rec = recommendationFor(surfaceId);
+  if (!rec?.active || !rec.types.includes(type)) return;
+  push({ role: 'user', action: true, text: TYPES[type].name + ' 고르기' });
+  finishTurn(push({ role: 'assistant', text: '' }), purposeDraft(rec.text, type), {
+    engine: 'app',
+  });
 }
 
 export function placeDraft(label = '방에 놓기', action = 'place') {
@@ -1448,28 +1654,96 @@ function commit({ silent = false } = {}) {
   if (!silent) emit();
 }
 
-export function setRoomDim(key, value, { live = false } = {}) {
-  if (!live) snapshot();
-  ops.setRoom(app.state, ops.roomWithDims(app.state.room, { [key]: value }));
-  commit();
+// 실패한 방 크기 변경은 배치와 실행 취소 기록을 건드리지 않는다.
+function editRoom(make, { live = false } = {}) {
+  try {
+    const next = structuredClone(app.state);
+    ops.setRoom(next, make(next.room));
+    if (!live) snapshot();
+    Object.assign(app.state, next);
+    commit();
+  } catch (e) {
+    toast(e.message);
+    return e.message;
+  }
+}
+export function setRoomDim(key, value, opts = {}) {
+  return editRoom((room) => ops.roomWithDims(room, { [key]: value }), opts);
 }
 export function setRoomPreset(index) {
-  snapshot();
-  ops.setRoom(app.state, ops.roomWithPreset(app.state.room, index));
-  commit();
+  return editRoom((room) => ops.roomWithPreset(room, index));
 }
 export function setRoomType(type) {
-  snapshot();
-  ops.setRoom(app.state, ops.roomWithType(app.state.room, type));
-  commit();
+  return editRoom((room) => ops.roomWithType(room, type));
 }
 export function setFinish(key, color) {
-  const before = app.state.room[key];
-  if (before === color) return;
-  snapshot();
-  rememberFinish(app.state.room);
-  ops.setRoom(app.state, ops.roomWithFinish(app.state.room, key, color));
-  commit();
+  if (app.state.room[key] === color) return;
+  const before = app.state.room;
+  const error = editRoom((room) => ops.roomWithFinish(room, key, color));
+  if (!error) rememberFinish(before);
+}
+function editWindow(change) {
+  try {
+    const next = structuredClone(app.state);
+    change(next);
+    snapshot();
+    Object.assign(app.state, next);
+    commit();
+  } catch (e) {
+    toast(e.message);
+    return e.message;
+  }
+}
+export const addWindow = (wall) => editWindow((s) => ops.addWindow(s, wall));
+export const setWindow = (id, patch) => editWindow((s) => ops.setWindow(s, id, patch));
+export const removeWindow = (id) => editWindow((s) => ops.removeWindow(s, id));
+// 포인터 한 번의 조작을 실행 취소 한 번으로 묶고, 취소·무효 이동은 기록을 남기지 않는다.
+let windowGesture = null;
+export function beginWindowGesture(id) {
+  finishWindowGesture(true);
+  if (!app.state.room.windows?.some((w) => w.id === id)) return;
+  windowGesture = {
+    id,
+    roomId: app.state.roomId,
+    room: structuredClone(app.state.room),
+    history: [...app.history],
+    future: [...app.future],
+    changed: false,
+  };
+}
+export function dragWindow(patch) {
+  const g = windowGesture;
+  if (!g || g.roomId !== app.state.roomId) return '다른 공간으로 이동했어요.';
+  try {
+    const next = structuredClone(app.state);
+    ops.setWindow(next, g.id, patch);
+    if (JSON.stringify(next.room) === JSON.stringify(app.state.room)) return;
+    if (!g.changed) {
+      snapshot();
+      g.changed = true;
+    }
+    Object.assign(app.state, next);
+    emit();
+  } catch (e) {
+    return e.message;
+  }
+}
+export function finishWindowGesture(cancel = false) {
+  const g = windowGesture;
+  if (!g) return false;
+  windowGesture = null;
+  if (cancel && g.changed) {
+    const r =
+      g.roomId === app.state.roomId
+        ? app.state
+        : app.state.otherRooms.find((r) => r.roomId === g.roomId);
+    if (r) r.room = g.room;
+    app.history = g.history;
+    app.future = g.future;
+  }
+  persist();
+  emit();
+  return true;
 }
 function rememberFinish(room) {
   app.view.lastFinish = {
@@ -1562,6 +1836,7 @@ export function removeById(id) {
 
 // ---------- 공간 ----------
 export function switchSpace(id) {
+  finishWindowGesture(true);
   if (id === app.state.roomId) return;
   app.view.addSide = null;
   app.view.ghostRoom = null;
@@ -1695,6 +1970,7 @@ export function loadExampleAction() {
 
 // ---------- 보기 설정 ----------
 export function setView(view) {
+  finishWindowGesture(true);
   if (view === '3d' && app.view.webglError)
     return toast('이 기기에서 3D를 시작하지 못했어요. 2D 평면을 이용해주세요.');
   app.state.view = view;
@@ -1732,22 +2008,81 @@ export function exportJSON() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   toast('배치 파일을 저장했어요. 다른 기기에서 불러올 수 있어요.');
 }
+let fileReadSeq = 0;
+export function cancelImport() {
+  if (!app.fileLoading) return;
+  fileReadSeq++;
+  app.fileLoading = false;
+  app.fileError = '';
+  toast('배치 불러오기를 취소했어요.');
+}
 export async function importJSON(file) {
+  if (!file) return;
+  const seq = ++fileReadSeq;
+  const stamp = () => JSON.stringify([designBase(), app.state.roomId, app.draft, app.queue]);
+  const before = stamp();
+  app.fileLoading = true;
+  app.fileError = '';
+  emit();
   try {
-    if (!file) return;
     if (file.size > 5e6) throw Error('배치 파일은 5MB 이하로 선택해주세요.');
     const next = loadState(JSON.parse(await file.text()));
+    if (seq !== fileReadSeq) return;
+    if (stamp() !== before)
+      throw Error(
+        '파일을 읽는 동안 직접 고친 배치를 유지했어요. 다시 불러오면 파일의 배치로 바꿔요.',
+      );
+    // 불러오기 전에 시작한 상담·사진의 결과가 새 파일에 섞이지 않게 한다.
+    if (pending) {
+      const { turn } = pending;
+      pending = null;
+      app.modelSeq++;
+      interruptAI();
+      turn.status = 'done';
+      turn.engine = 'app';
+      turn.text = '배치 파일을 불러와 이전 상담을 멈췄어요.';
+    }
+    if (app.busy?.kind === 'model') app.busy = null;
+    if (app.busy?.kind === 'vision') cancelModel();
+    finishWindowGesture(true);
     snapshot();
     Object.assign(app.state, next);
     for (const a of app.state.items) clampItem(a, app.state.room);
+    if (app.view.webglError) app.state.view = '2d';
     app.selected = null;
-    app.target = app.draft ? { type: 'draft' } : { type: 'room' };
+    app.draft = null;
+    app.queue = [];
+    app.design = null;
+    app.target = { type: 'room' };
+    app.photo = null;
+    photoReadSeq++;
+    app.photoLoading = false;
+    app.photoError = '';
+    Object.assign(app.view, {
+      preview: null,
+      door: null,
+      doorList: false,
+      addSide: null,
+      ghostRoom: null,
+      avatarBar: false,
+      menu: null,
+    });
     event(`배치 파일을 불러왔어요 · 공간 ${spaces(app.state).length}개`);
     persist();
     emit();
     toast('배치를 불러왔어요.');
   } catch (e) {
-    toast(`불러오기 실패: ${e.message}`);
+    if (seq !== fileReadSeq) return;
+    app.fileError =
+      e instanceof SyntaxError
+        ? '배치 JSON 형식을 읽지 못했어요. 룸꾸에서 저장한 배치 파일을 선택해 주세요.'
+        : e.message;
+    toast(`불러오기 실패: ${app.fileError}`);
+  } finally {
+    if (seq === fileReadSeq) {
+      app.fileLoading = false;
+      emit();
+    }
   }
 }
 export function exportPNG() {
@@ -1769,6 +2104,7 @@ export function exportPNG() {
 
 // ---------- 사진 ----------
 let photoInput = null;
+let photoReadSeq = 0;
 export function registerPhotoInput(el) {
   photoInput = el;
 }
@@ -1777,16 +2113,28 @@ export function pickPhoto() {
 }
 export async function attachPhoto(file) {
   if (!file) return;
+  const seq = ++photoReadSeq;
+  app.photoLoading = true;
+  app.photoError = '';
+  emit();
   try {
     const data = await imageData(file);
+    if (seq !== photoReadSeq) return;
     if (app.busy?.kind === 'vision') cancelModel();
     app.photo = { data, caption: '', analyzed: false, sent: false, type: null };
-    emit();
   } catch (e) {
-    toast(e.message);
+    if (seq === photoReadSeq) app.photoError = e.message;
+  } finally {
+    if (seq === photoReadSeq) {
+      app.photoLoading = false;
+      emit();
+    }
   }
 }
 export function removePhoto() {
+  photoReadSeq++;
+  app.photoLoading = false;
+  app.photoError = '';
   if (app.photo && !app.photo.sent) app.photo = null;
   emit();
 }
@@ -1807,6 +2155,7 @@ function makePhotoDraft(photo, type) {
   for (let i = 0; i < 3; i++)
     if (!String(next.sources[i]).startsWith('사용자')) next.sources[i] = '사진 유형 · 기본값';
   app.draft = ops.sanitizeItem(next);
+  app.queue = [];
   photo.draftId = app.draft.id;
   app.target = { type: 'draft' };
   app.selected = null;
@@ -1815,12 +2164,16 @@ async function applyPhotoCaption(photo, turn) {
   if (!photo.captionPending || photo !== app.photo || photo.roomId !== app.state.roomId) return;
   photo.captionPending = false;
   turn.photoIntro = turn.text;
-  await respondToText(photo.caption, turn, photo.history || historyForModel());
+  const caption = photoCaption(requestedText(photo.caption, app.state), app.draft?.type);
+  if (!caption) return;
+  await respondToText(caption, turn, photo.history || historyForModel());
 }
 export async function analyzePhoto() {
   const photo = app.photo;
-  if (!photo || app.busy) return;
+  if (!photo || !photo.sent || app.busy || app.photoLoading) return;
   photo.roomId ||= app.state.roomId;
+  const editStamp = () => JSON.stringify([app.state, app.draft, app.queue, app.target]);
+  const before = editStamp();
   const job = { kind: 'vision', photo };
   app.busy = job;
   setLaneDownload(
@@ -1839,6 +2192,7 @@ export async function analyzePhoto() {
   app.ai.visionLabel = '사진 판별 모델 준비 중';
   app.ai.visionProgress = 0;
   app.ai.visionError = '';
+  photo.error = '';
   visionFiles.clear();
   emit();
   try {
@@ -1851,53 +2205,73 @@ export async function analyzePhoto() {
     photo.device = raw?.device;
     photo.candidates = candidates;
     const top = candidates[0];
-    const sure = !!top && top.p >= PHOTO_CONFIDENT;
+    const clear = requestedText(photo.caption || '', app.state);
+    const described = [
+      ...new Set(
+        furnitureMentions(clear)
+          .filter((m) => !m.ref)
+          .map((m) => m.type),
+      ),
+    ];
+    const conflict = !!top && described.length === 1 && described[0] !== top.type;
+    const sure = !!top && top.p >= PHOTO_CONFIDENT && !conflict;
     const sameRoom = photo.roomId === app.state.roomId;
+    const unchanged = sameRoom && before === editStamp();
     const pct = (c) => `${Math.round(c.p * 100)}%`;
     photo.type = sure ? top.type : null;
-    if (sure && sameRoom) makePhotoDraft(photo, top.type);
+    if (sure && unchanged) makePhotoDraft(photo, top.type);
     const names = candidates.map((c) => TYPES[c.type].name);
+    const choices = [
+      ...new Set([...(conflict ? [top.type, described[0]] : []), ...candidates.map((c) => c.type)]),
+    ].slice(0, 3);
     const turn = push({
       role: 'assistant',
       engine: 'siglip',
       text: !sameRoom
         ? '사진 판별 중 공간이 바뀌어 초안을 만들지 않았어요. 사진을 보낸 공간으로 돌아온 뒤 종류를 골라 주세요.'
-        : sure
-          ? `사진은 ${josa(names[0], '으로/로')} 보여요. 크기는 유형 기본값이며 사진에서 실제 cm를 잰 값은 아니에요.`
-          : top
-            ? `사진만으로는 종류를 확신하기 어려워요. 가까운 후보는 ${josa(names.join(', '), '이에요/예요')}. 맞는 것을 고르면 함께 보낸 설명도 반영해요.`
-            : '사진에서 가구 종류를 읽지 못했어요. 아래에서 종류를 골라 주세요. 함께 보낸 설명은 보관하고 있어요.',
+        : !unchanged
+          ? '사진 판별 중 직접 바꾼 배치를 유지했어요. 사진의 후보를 고르면 새 초안을 만들고 함께 보낸 설명을 반영해요.'
+          : conflict
+            ? `사진은 ${TYPES[top.type].name}, 설명은 ${TYPES[described[0]].name}을 가리켜요. 어느 쪽인지 골라 주세요. 치수와 색은 고른 가구에 반영할게요.`
+            : sure
+              ? `사진은 ${josa(names[0], '으로/로')} 보여요. 크기는 유형 기본값이며 사진에서 실제 cm를 잰 값은 아니에요.`
+              : top
+                ? `사진만으로는 종류를 확신하기 어려워요. 가까운 후보는 ${josa(names.join(', '), '이에요/예요')}. 맞는 것을 고르면 함께 보낸 설명도 반영해요.`
+                : '사진에서 가구 종류를 읽지 못했어요. 아래에서 종류를 골라 주세요. 함께 보낸 설명은 보관하고 있어요.',
       photoScores:
         candidates.map((c) => `${TYPES[c.type].name} ${pct(c)}`).join(' · ') || undefined,
       surfaces:
-        sure && sameRoom
+        sure && unchanged
           ? [{ kind: 'furniture-size', target: { type: 'draft', id: app.draft.id } }]
-          : [{ kind: 'catalog', target: roomTarget() }],
+          : [],
       receipt:
-        sure && sameRoom ? [{ label: '사진 판별', to: names[0], tag: `SigLIP ${pct(top)}` }] : [],
+        sure && unchanged ? [{ label: '사진 판별', to: names[0], tag: `SigLIP ${pct(top)}` }] : [],
       suggestions:
-        sure && sameRoom
+        sure && unchanged
           ? [
               { label: '방에 놓기', action: 'place', primary: true },
               ...candidates.slice(1).map((c) => ({
                 label: `${josa(TYPES[c.type].name, '이었/였')}나요?`,
                 action: 'draft',
                 arg: c.type,
+                photoId: photo.surfaceId,
               })),
             ]
-          : candidates.map((c, i) => ({
-              label: `${josa(TYPES[c.type].name, '으로/로')} 잡기`,
+          : choices.map((type, i) => ({
+              label: `${josa(TYPES[type].name, '으로/로')} 잡기`,
               action: 'draft',
-              arg: c.type,
+              arg: type,
+              photoId: photo.surfaceId,
               primary: i === 0,
             })),
     });
     app.busy = null;
-    if (sure && sameRoom) await applyPhotoCaption(photo, turn);
+    if (sure && unchanged) await applyPhotoCaption(photo, turn);
   } catch (e) {
     if (app.photo !== photo || app.busy !== job) return;
     app.ai.vision = 'error';
     app.ai.visionError = explainLoadError(e.message);
+    photo.error = app.ai.visionError;
     failDownload('vision', app.ai.visionError);
     toast(`사진 판별: ${app.ai.visionError}`);
   } finally {

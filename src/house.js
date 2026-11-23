@@ -1,4 +1,4 @@
-import { PlanScene, drawAvatar, drawDoor, doorHit } from './plan.js';
+import { PlanScene, drawAvatar, drawDoor, drawWindow, doorHit } from './plan.js';
 import { spaces } from './data.js';
 import { FLAT_TYPES } from './catalog.js';
 import { floorplanWarnings, normalizeFloorplan, roomBounds } from './floorplan.js';
@@ -219,6 +219,7 @@ export class HouseScene extends PlanScene {
       c.lineWidth = wall;
       c.strokeRect(ox + b.left * scale, oy + b.top * scale, r.room.w * scale, r.room.d * scale);
     }
+    for (const o of layout.windows) drawWindow(c, o, ox, oy, scale, wall);
     const picked = this.doorSelected;
     for (const o of layout.openings)
       drawDoor(

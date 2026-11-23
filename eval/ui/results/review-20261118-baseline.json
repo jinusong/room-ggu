@@ -1,0 +1,86 @@
+{
+  "date": "2026-11-18",
+  "baseline_commit": "1d88795b77c80a192da32c5df394a3a91837b4bb",
+  "baseline_observations": [
+    {
+      "case": "menu-keyboard",
+      "active": "<button type=\"button\" class=\"icon-btn\" aria-label=\"도구 열기\" aria-expanded=\"true\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke"
+    },
+    {
+      "case": "menu-escape-focus",
+      "active": "BUTTON"
+    },
+    {
+      "case": "IME229",
+      "turns": 2,
+      "text": ""
+    },
+    {
+      "case": "sheet-keyboard",
+      "snap": "half"
+    },
+    {
+      "case": "sheet-cancel",
+      "snap": "full"
+    },
+    {
+      "case": "resizer-aria",
+      "aria": "920",
+      "max": "920",
+      "actual": 504
+    },
+    {
+      "case": "resizer-cancel",
+      "stuck": true
+    },
+    {
+      "case": "autosize-resize",
+      "before": {
+        "h": 68,
+        "scroll": 68
+      },
+      "after": {
+        "h": 68,
+        "scroll": 188
+      }
+    },
+    {
+      "case": "landscape",
+      "input": {
+        "x": 129,
+        "y": 334.40625,
+        "width": 544,
+        "height": 68,
+        "top": 334.40625,
+        "right": 673,
+        "bottom": 402.40625,
+        "left": 129
+      },
+      "send": {
+        "x": 717,
+        "y": 362.40625,
+        "width": 40,
+        "height": 40,
+        "top": 362.40625,
+        "right": 757,
+        "bottom": 402.40625,
+        "left": 717
+      }
+    },
+    {
+      "case": "file-race",
+      "name": "먼저 선택"
+    },
+    {
+      "case": "import-draft",
+      "result": {
+        "draft": "bed",
+        "target": {
+          "type": "draft"
+        },
+        "name": "불러온 방"
+      }
+    }
+  ],
+  "note": "Baseline audit used production preview on Mac Chrome. Final expected behavior is asserted by tests/ux-input.spec.js and tests/ux-files.spec.js. Audit timing is not a latency benchmark."
+}

@@ -1,3 +1,5 @@
+import { windowOpenings, wallPieces } from './windows.js';
+import { windowModel } from './window-three.js';
 import * as T from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -135,6 +137,8 @@ export class RoomScene {
     const pmrem = new T.PMREMGenerator(this.renderer);
     this.envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
+    // 카메라 이동·격자 표시로는 물체의 그림자가 바뀌지 않는다.
+    this.renderer.shadowMap.autoUpdate = false;
     this.scene.environment = this.envMap;
     this.scene.environmentIntensity = 0.5;
     this.camera = new T.PerspectiveCamera(30, 1, 0.05, 200);
@@ -393,7 +397,9 @@ export class RoomScene {
     }
   }
   renderRoom() {
+    this.renderer.shadowMap.needsUpdate = true;
     this.clear(this.room);
+    this.floorGrid = null;
     if (this.state.scope === 'house') {
       this.renderer.domElement.setAttribute(
         'aria-label',
@@ -469,25 +475,7 @@ export class RoomScene {
     });
     // 다른 공간과 맞닿은 벽에는 집 전체와 같은 자리에 연결 문을 비워 둔다(위치는 초안).
     const doors = roomOpenings(spaces(this.state), this.state.floorplan, this.state.roomId);
-    const split = (from, to, wall) => {
-      const gaps = doors
-        .filter((o) => o.wall === wall)
-        .map((o) => {
-          const c = o.vertical ? o.z : o.x;
-          return [Math.max(from, c - o.width / 2), Math.min(to, c + o.width / 2)];
-        })
-        .filter((g) => g[1] - g[0] > 0.05)
-        .sort((a, b) => a[0] - b[0]);
-      const parts = [];
-      let at = from;
-      for (const [g0, g1] of gaps) {
-        if (g0 > at + 0.001) parts.push([at, g0, false]);
-        if (g1 > at + 0.001) parts.push([Math.max(at, g0), g1, true]);
-        at = Math.max(at, g1);
-      }
-      if (to > at + 0.001) parts.push([at, to, false]);
-      return parts;
-    };
+    const windows = windowOpenings(this.state.room);
     const piece = (alongX, start, end, across, y0, y1, thick, mats, shadow = true) => {
       const len = end - start,
         m = new T.Mesh(
@@ -509,28 +497,29 @@ export class RoomScene {
       [false, -d / 2, d / 2, -w / 2 - WALL_T / 2, 'left', true],
       [false, -d / 2, d / 2 + WALL_T, w / 2 + WALL_T / 2, 'right', false],
       [true, -w / 2 - WALL_T, w / 2 + WALL_T, d / 2 + WALL_T / 2, 'front', false],
-    ])
-      for (const [start, end, door] of split(from, to, wall)) {
-        if (!door) {
-          piece(alongX, start, end, across, -0.08, high ? h : 0.08, WALL_T, high ? tall : low);
-          if (high && end - start > 0.02)
-            piece(
-              alongX,
-              Math.max(start, alongX ? -w / 2 : -d / 2),
-              end,
-              across + WALL_T / 2 + 0.006,
-              0,
-              0.07,
-              0.012,
-              base,
-              false,
-            );
-          continue;
-        }
-        // 문턱은 바닥 높이로 남기고, 높은 벽은 문 위쪽만 막는다.
-        piece(alongX, start, end, across, -0.08, 0, WALL_T, low);
-        if (high && h > DOOR_H + 0.05) piece(alongX, start, end, across, DOOR_H, h, WALL_T, tall);
-      }
+    ]) {
+      const cuts = [
+        ...doors
+          .filter((o) => o.wall === wall)
+          .map((o) => ({
+            start: (o.vertical ? o.z : o.x) - o.width / 2,
+            end: (o.vertical ? o.z : o.x) + o.width / 2,
+            bottom: 0,
+            top: DOOR_H,
+          })),
+        ...windows
+          .filter((o) => o.wall === wall)
+          .map((o) => ({
+            start: (o.vertical ? o.z : o.x) - o.width / 2,
+            end: (o.vertical ? o.z : o.x) + o.width / 2,
+            bottom: o.sill,
+            top: o.sill + o.height,
+          })),
+      ];
+      for (const p of wallPieces(from, to, high ? h : 0.08, cuts, -0.08))
+        piece(alongX, p.start, p.end, across, p.bottom, p.top, WALL_T, high ? tall : low);
+    }
+    for (const o of windows) this.room.add(windowModel(o));
     for (const o of doors) {
       const { hinge, along, leaf } = doorSwing(o),
         points = [new T.Vector3(hinge[0] + leaf[0] * o.width, 0.004, hinge[1] + leaf[1] * o.width)];
@@ -560,43 +549,9 @@ export class RoomScene {
       arc.userData.door = true;
       this.room.add(arc);
     }
-    if (this.state.grid) {
-      const fine = [],
-        bold = [];
-      for (let x = 0; x <= w + 0.001; x += 0.25)
-        (Math.abs(x % 1) < 0.01 ? bold : fine).push(
-          x - w / 2,
-          0.002,
-          -d / 2,
-          x - w / 2,
-          0.002,
-          d / 2,
-        );
-      for (let z = 0; z <= d + 0.001; z += 0.25)
-        (Math.abs(z % 1) < 0.01 ? bold : fine).push(
-          -w / 2,
-          0.002,
-          z - d / 2,
-          w / 2,
-          0.002,
-          z - d / 2,
-        );
-      for (const [pts, o] of [
-        [fine, 0.1],
-        [bold, 0.22],
-      ])
-        this.room.add(
-          new T.LineSegments(
-            new T.BufferGeometry().setAttribute('position', new T.Float32BufferAttribute(pts, 3)),
-            new T.LineBasicMaterial({
-              color: '#3a3326',
-              transparent: true,
-              opacity: o,
-              depthWrite: false,
-            }),
-          ),
-        );
-    }
+    this.floorGrid = this.makeFloorGrid(w, d);
+    this.floorGrid.visible = this.state.grid;
+    this.room.add(this.floorGrid);
     if (this.state.dimensions) {
       const wl = tapeSprite(`${Math.round(w * 100)} cm`, undefined, this.height);
       wl.position.set(0, 0.06, d / 2 + WALL_T + 0.32);
@@ -609,6 +564,52 @@ export class RoomScene {
       this.room.add(wl, dl, hl);
     }
     this.dirty = true;
+  }
+  // 격자는 표시만 바뀐다. 방·창문·가구·카메라의 상태를 다시 만들 필요가 없다.
+  setGridVisibility() {
+    const grid = this.floorGrid;
+    if (!grid || grid.visible === this.state.grid) return;
+    grid.visible = this.state.grid;
+    this.invalidate();
+  }
+  makeFloorGrid(w, d) {
+    const group = new T.Group();
+    const fine = [],
+      bold = [];
+    for (let x = 0; x <= w + 0.001; x += 0.25)
+      (Math.abs(x % 1) < 0.01 ? bold : fine).push(
+        x - w / 2,
+        0.002,
+        -d / 2,
+        x - w / 2,
+        0.002,
+        d / 2,
+      );
+    for (let z = 0; z <= d + 0.001; z += 0.25)
+      (Math.abs(z % 1) < 0.01 ? bold : fine).push(
+        -w / 2,
+        0.002,
+        z - d / 2,
+        w / 2,
+        0.002,
+        z - d / 2,
+      );
+    for (const [pts, o] of [
+      [fine, 0.1],
+      [bold, 0.22],
+    ])
+      group.add(
+        new T.LineSegments(
+          new T.BufferGeometry().setAttribute('position', new T.Float32BufferAttribute(pts, 3)),
+          new T.LineBasicMaterial({
+            color: '#3a3326',
+            transparent: true,
+            opacity: o,
+            depthWrite: false,
+          }),
+        ),
+      );
+    return group;
   }
   fitDistance() {
     const { w, d, h } = this.extent();
@@ -653,12 +654,14 @@ export class RoomScene {
     this.dirty = true;
   }
   sync() {
+    this.renderer.shadowMap.needsUpdate = true;
     this.clear(this.objects);
     if (this.state.scope === 'house') this.objects.add(houseFurniture(this.state));
     else for (const i of this.state.items) this.objects.add(furniture(i));
     this.decorate(this.selected, this.warnings || new Set());
   }
   setAvatar() {
+    this.renderer.shadowMap.needsUpdate = true;
     this.clear(this.comparison);
     this.avatarAt = null;
     const house = this.state.scope === 'house';
@@ -685,7 +688,10 @@ export class RoomScene {
   }
   moveObject(id, x, z) {
     const o = this.objects.children.find((c) => c.userData.id === id);
-    if (o) o.position.set(x, 0, z);
+    if (o) {
+      o.position.set(x, 0, z);
+      this.renderer.shadowMap.needsUpdate = true;
+    }
     this.decorate(this.selected, this.warnings || new Set());
   }
   setGhost(item) {
@@ -835,6 +841,38 @@ export class RoomScene {
       this.scene.add(line);
     }
     this.dirty = true;
+  }
+  windowPoint(e, wall) {
+    this.point(e);
+    const vertical = ['left', 'right'].includes(wall),
+      room = this.state.room;
+    const at = vertical
+      ? wall === 'left'
+        ? -room.w / 2
+        : room.w / 2
+      : wall === 'back'
+        ? -room.d / 2
+        : room.d / 2;
+    const plane = new T.Plane(vertical ? new T.Vector3(1, 0, 0) : new T.Vector3(0, 0, 1), -at),
+      p = new T.Vector3();
+    if (!this.ray.ray.intersectPlane(plane, p)) return null;
+    return { u: vertical ? p.z + room.d / 2 : p.x + room.w / 2, v: p.y };
+  }
+  windowFrames() {
+    if (this.state.scope === 'house') return [];
+    return windowOpenings(this.state.room).map((w) => {
+      const point = (along, y) =>
+        this.project(
+          new T.Vector3(w.x + (w.vertical ? 0 : along), y, w.z + (w.vertical ? along : 0)),
+        );
+      const points = [
+        point(-w.width / 2, w.sill),
+        point(w.width / 2, w.sill),
+        point(w.width / 2, w.sill + w.height),
+        point(-w.width / 2, w.sill + w.height),
+      ];
+      return { id: w.id, points, visible: points.every((p) => p.visible) };
+    });
   }
   doorAnchors() {
     if (this.state.scope === 'house') return [];

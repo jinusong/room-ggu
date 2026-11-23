@@ -1,0 +1,43 @@
+{
+  "url": "https://jinusong.github.io/room-ggu/",
+  "version": "5.12.0",
+  "validatedCommit": "b1d0893343d2e640252afea97eef2da3e7f5b3dd",
+  "photo": "bed-2.jpg",
+  "caption": "가로 150cm 깊이 210cm 높이 55cm",
+  "result": {
+    "draft": {
+      "id": "6ad3a7de-2af8-46a2-b2c9-300be7f72dac",
+      "type": "bed",
+      "name": "침대",
+      "dims": [
+        150,
+        55,
+        210
+      ],
+      "sources": [
+        "사용자 설정",
+        "사용자 설정",
+        "사용자 설정"
+      ],
+      "color": "#b29a80",
+      "x": 0,
+      "z": 0,
+      "angle": 0
+    },
+    "photo": [
+      {
+        "type": "bed",
+        "p": 0.9760454956901639
+      },
+      {
+        "type": "side",
+        "p": 0.009643862528840178
+      },
+      {
+        "type": "sofa",
+        "p": 0.0040994505034556775
+      }
+    ]
+  },
+  "errors": []
+}

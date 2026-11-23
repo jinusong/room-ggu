@@ -244,7 +244,8 @@ export function Thread({ mobile }) {
         !first && last && last.nextElementSibling === lastTurn
           ? last.offsetTop - 12
           : el.scrollHeight;
-      el.scrollTo({ top, behavior: first ? 'auto' : 'smooth' });
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      el.scrollTo({ top, behavior: first || reduced ? 'auto' : 'smooth' });
     }
   }, [thread.length, app.rev]);
   useEffect(() => {

@@ -56,6 +56,7 @@ export const SURFACE_KINDS = {
   floorplan: { scope: 'app', title: '집 전체', icon: 'house' },
   'room-size': { scope: 'room', model: 'dimensions', title: '방 크기', icon: 'ruler' },
   'room-type': { scope: 'room', model: 'types', title: '공간 유형', icon: 'layout-grid' },
+  windows: { scope: 'room', title: '창문 설정', icon: 'grid-2x2' },
   finishes: { scope: 'room', model: 'finishes', title: '벽과 바닥', icon: 'paint-roller' },
   'furniture-size': { scope: 'furniture', model: 'sizes', title: '규격 비교', icon: 'columns-3' },
   'furniture-dims': {
@@ -65,6 +66,7 @@ export const SURFACE_KINDS = {
     icon: 'ruler',
   },
   'furniture-color': { scope: 'furniture', model: 'colors', title: '가구 색상', icon: 'palette' },
+  recommendations: { scope: 'app', title: '용도에 맞는 가구', icon: 'armchair' },
   catalog: { scope: 'app', title: '가구 고르기', icon: 'armchair' },
   impact: { scope: 'app', title: '배치 확인', icon: 'triangle-alert' },
   spaces: { scope: 'app', title: '내 공간', icon: 'layers' },

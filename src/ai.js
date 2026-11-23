@@ -58,18 +58,4 @@ export function stopAI(message = 'AI 작업을 취소했어요.', task, { failed
   }
   listener({ event: 'reset', task, failed, error: failed ? message : undefined });
 }
-export async function imageData(file) {
-  if (!file.type.startsWith('image/')) throw Error('사진 파일을 선택해주세요.');
-  if (file.size > 20 * 1024 * 1024) throw Error('사진은 20MB 이하로 선택해주세요.');
-  const bitmap = await createImageBitmap(file);
-  try {
-    const scale = Math.min(1, 768 / Math.max(bitmap.width, bitmap.height));
-    const c = document.createElement('canvas');
-    c.width = Math.max(1, Math.round(bitmap.width * scale));
-    c.height = Math.max(1, Math.round(bitmap.height * scale));
-    c.getContext('2d').drawImage(bitmap, 0, 0, c.width, c.height);
-    return c.toDataURL('image/jpeg', 0.85);
-  } finally {
-    bitmap.close();
-  }
-}
+export { imageData } from './photo-input.js';

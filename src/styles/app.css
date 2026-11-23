@@ -449,37 +449,22 @@ button[aria-disabled='true'] {
   padding: 0 max(12px, calc((100% - 688px) / 2)) 0 max(20px, calc((100% - 680px) / 2));
   border-bottom: 1px solid var(--line);
 }
-/* 상담 상대의 얼굴: 종이 원 안의 룸꾸 표식 */
+/* 상담 머리와 말풍선에서 서비스 아이콘을 함께 쓴다. */
 .chat-avatar {
   display: grid;
   place-items: center;
   flex: none;
   width: 32px;
   height: 32px;
-  border: 1px solid var(--line-strong);
-  border-radius: 50%;
-  background: var(--card);
 }
 .sheet-head .chat-avatar {
   width: 40px;
   height: 40px;
 }
 .brand-mark {
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: var(--ink);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.sheet-head .brand-mark {
-  width: 22px;
-  height: 22px;
-}
-.brand-mark rect {
-  fill: var(--tape);
-  stroke-width: 1.6;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .chat-id {
   display: flex;
@@ -515,6 +500,39 @@ button[aria-disabled='true'] {
   align-items: center;
   gap: 4px;
   margin-left: auto;
+}
+.clear-wrap {
+  position: relative;
+}
+.clear-confirm {
+  position: absolute;
+  z-index: 35;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(280px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-float);
+}
+.clear-confirm p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.clear-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.clear-actions .btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+.char-count {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .collapsed-last {
   display: flex;
@@ -1376,7 +1394,9 @@ button[aria-disabled='true'] {
 .fit-fits {
   color: var(--ok);
 }
-.fit-overlap {
+.fit-overlap,
+.fit-window,
+.fit-door {
   color: var(--amber);
 }
 .fit-oversize {
@@ -1597,7 +1617,8 @@ button.row:hover,
   width: 100%;
   aspect-ratio: 1;
   border-radius: 10px;
-  object-fit: cover;
+  object-fit: contain;
+  background: var(--card);
   border: 1px solid var(--line);
 }
 .photo-side {
@@ -1611,6 +1632,32 @@ button.row:hover,
 }
 .photo-result {
   font-weight: 500;
+}
+.photo-error {
+  color: var(--ink);
+  border-inline-start: 3px solid var(--ink-2);
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.photo-kind-picker {
+  margin-top: 12px;
+}
+.photo-kind-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.photo-kind-grid .chip,
+.photo-candidates button,
+.photo-tray .icon-btn {
+  min-height: 44px;
+  min-width: 44px;
 }
 .photo-side progress,
 .model-row progress {
@@ -1682,6 +1729,20 @@ button.row:hover,
   padding: 12px 20px 14px;
   border-top: 1px solid var(--line);
   background: var(--sheet);
+}
+.composer-extras {
+  max-height: min(160px, max(40px, calc(var(--app-h, 100dvh) - 300px)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.composer-extras:empty {
+  display: none;
+}
+[data-compact-viewport] .sheet.is-mobile:focus-within .sheet-head {
+  display: none;
+}
+.composer-foot {
+  flex-wrap: wrap;
 }
 .target {
   display: inline-flex;
@@ -2540,6 +2601,9 @@ button.avatar-tag {
 }
 /* 잠깐 뜨는 알림과 모델 아일랜드는 화면 위 가운데 한 축에 둔다. */
 .toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   position: fixed;
   z-index: 50;
   top: var(--notice-top);
@@ -2549,7 +2613,7 @@ button.avatar-tag {
   max-width: min(440px, calc(100% - 32px));
   word-break: keep-all;
   overflow-wrap: anywhere;
-  padding: 10px 16px;
+  padding: 4px 6px 4px 16px;
   border-radius: 12px;
   background: var(--ink);
   color: var(--sheet);
@@ -2563,6 +2627,15 @@ button.avatar-tag {
   transition:
     opacity 0.2s var(--ease),
     transform 0.2s var(--ease);
+}
+.toast .icon-btn {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  color: inherit;
+}
+.toast .icon-btn:focus-visible {
+  outline-color: var(--tape);
 }
 .toast.is-visible {
   opacity: 1;
@@ -2654,10 +2727,6 @@ button.avatar-tag {
 .sheet.is-mobile .msg-who .chat-avatar {
   width: 22px;
   height: 22px;
-}
-.sheet.is-mobile .msg-who .brand-mark {
-  width: 13px;
-  height: 13px;
 }
 .sheet.is-mobile .msg-name {
   display: inline;
@@ -3307,6 +3376,9 @@ button.avatar-tag {
   border-color: var(--ink);
   box-shadow: inset 0 0 0 1px var(--ink);
 }
+.model-choice[aria-disabled='true'] {
+  opacity: 1;
+}
 .model-choice strong {
   font-weight: 600;
   font-size: 14px;
@@ -3407,4 +3479,323 @@ button.avatar-tag {
 .ask-model-choice select:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 3px;
+}
+
+/* 창문은 대화 속에서 치수와 위치를 정한다. */
+.window-editor {
+  border-top: 1px solid var(--line, #dedbd3);
+  padding: 16px 0;
+  display: grid;
+  gap: 10px;
+}
+.window-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.window-head .icon-btn {
+  margin-left: auto;
+}
+.window-wall,
+.window-add label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.window-wall select,
+.window-add select {
+  font: inherit;
+  color: inherit;
+  padding: 10px;
+  border: 1px solid #b8b4ab;
+  border-radius: 8px;
+  background: #fbfaf7;
+  min-height: 44px;
+  max-width: 100%;
+}
+.window-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.window-fields label {
+  font-size: 12px;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.window-fields label > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.window-fields input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  padding: 10px;
+  color: #1f1d19;
+  border: 1px solid #b8b4ab;
+  border-radius: 8px;
+  background: #fff;
+}
+.window-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  padding-top: 12px;
+}
+.window-add label {
+  flex: 1;
+  min-width: 150px;
+}
+.window-error {
+  color: #b03d29;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.window-error:empty {
+  display: none;
+}
+.window-editor .btn {
+  min-height: 44px;
+  justify-self: start;
+}
+
+.window-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  overflow: hidden;
+}
+.window-pane {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: move;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.window-pane:focus-visible {
+  background: #f2c94c55;
+}
+.window-controls .is-selected .window-pane {
+  background: #f2c94c22;
+}
+.window-outline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.window-outline polygon {
+  fill: none;
+  stroke: #1f1d19;
+  stroke-width: 2;
+  stroke-dasharray: 5 3;
+}
+.window-resize {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  touch-action: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: nwse-resize;
+}
+.window-resize span {
+  width: 12px;
+  height: 12px;
+  background: #f2c94c;
+  border: 2px solid #1f1d19;
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px #fbfaf7;
+}
+.window-toolbar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 260px;
+  padding: 6px 8px;
+  background: #fbfaf7;
+  border: 1px solid #dedbd3;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px #1f1d1912;
+}
+.window-toolbar small,
+.window-toolbar p {
+  flex-basis: 100%;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.window-toolbar p {
+  color: #b03d29;
+  margin: 0;
+}
+
+.model-capability {
+  font-size: 12px;
+  line-height: 1.6;
+  display: block;
+  padding-top: 6px;
+  color: #1f1d19;
+}
+.model-evidence {
+  line-height: 1.6;
+}
+.ask-capabilities {
+  border-top: 1px solid #ffffff30;
+  padding: 10px 0;
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ask-capabilities p {
+  margin: 6px 0;
+}
+.ask-capabilities small {
+  display: block;
+  color: #dedbd3;
+}
+.island.is-ask {
+  max-height: calc(var(--app-h, 100dvh) - 100px);
+  overflow-y: auto;
+}
+.window-toolbar .icon-btn {
+  touch-action: none;
+}
+
+.island.is-ask {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.is-ask .ask-head {
+  flex-shrink: 0;
+}
+.is-ask .island-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.is-ask .ask-content {
+  overflow-y: auto;
+  min-height: 0;
+}
+.is-ask footer {
+  flex-shrink: 0;
+}
+
+.catalog-search {
+  min-height: 46px;
+  padding-right: 2px;
+}
+.catalog-search input {
+  min-height: 44px;
+  font-size: 16px;
+}
+.catalog-search button {
+  display: grid;
+  place-items: center;
+  height: 44px;
+  width: 44px;
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+}
+.catalog-filters .chip {
+  min-height: 44px;
+}
+.purpose-list {
+  display: grid;
+  gap: 6px;
+}
+.purpose-option {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 66px;
+  width: 100%;
+  padding: 6px 12px 6px 6px;
+  text-align: start;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+}
+.purpose-option:enabled:hover,
+.purpose-option:focus-visible {
+  border-color: var(--ink);
+}
+.purpose-option:disabled {
+  cursor: default;
+}
+.purpose-option strong,
+.purpose-option small {
+  display: block;
+}
+.purpose-option small,
+.catalog-size {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.purpose-option small {
+  margin-top: 3px;
+  line-height: 1.45;
+}
+.purpose-preview {
+  display: grid;
+  place-items: center;
+  height: 50px;
+  border-radius: 5px;
+  background: var(--surface, #faf9f5);
+}
+@media (max-width: 899px) {
+  .purpose-list[data-count='2'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .purpose-list[data-count='2'] .purpose-option {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 5px;
+    padding: 8px;
+  }
+  .purpose-list[data-count='2'] .purpose-preview {
+    height: 38px;
+  }
+  .purpose-list[data-count='2'] .purpose-preview img {
+    height: 38px;
+  }
+  .purpose-list[data-count='2'] .purpose-option > svg {
+    display: none;
+  }
+}
+.purpose-preview img {
+  width: 100%;
+  height: 50px;
+  object-fit: contain;
 }

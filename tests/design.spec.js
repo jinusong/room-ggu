@@ -141,6 +141,8 @@ test('모델 선택은 첫 화면에서 열고 네 후보의 크기와 실행 �
   page,
   context,
 }) => {
+  // 모델 카드 조작 뒤 새로고침 복원까지 포함하는 전체 시나리오의 한도다.
+  test.setTimeout(60_000);
   const requests = [];
   await context.route(/huggingface\.co|raw\.githubusercontent\.com/, (r) => {
     requests.push(r.request().url());

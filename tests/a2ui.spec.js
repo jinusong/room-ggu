@@ -11,7 +11,7 @@ const say = async (page, text) => {
   await page.waitForFunction(() => !window.__roomggu.app.busy);
 };
 
-test('공개 카탈로그의 17개 도구가 실제 A2UI 경로에서 렌더링된다', async ({ page, request }) => {
+test('공개 카탈로그의 19개 도구가 실제 A2UI 경로에서 렌더링된다', async ({ page, request }) => {
   const response = await request.get('/a2ui/catalog.json');
   expect(response.ok()).toBe(true);
   const catalog = await response.json();

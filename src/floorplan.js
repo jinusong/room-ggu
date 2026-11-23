@@ -1,3 +1,4 @@
+import { windowOpenings } from './windows.js';
 // 각 방의 가구는 로컬 좌표를 유지하고, 집 평면도는 방 중심의 전역 위치만 저장한다.
 export function roomBounds(space, position) {
   return {
@@ -134,6 +135,38 @@ export function sharedOpening(a, ap, b, bp, door = {}) {
   const wall = sharedWall(a, ap, b, bp),
     place = wall && !door.closed ? doorPlacement(wall, door) : null;
   if (!place) return null;
+  // 자동 문은 창문을 피한 빈 구간으로 옮긴다. 직접 정한 문은 ops에서 충돌을 거절한다.
+  if (door.offset === undefined) {
+    const blocked = [
+      [a, ap],
+      [b, bp],
+    ]
+      .flatMap(([r, p]) => windowOpenings(r.room, p))
+      .filter(
+        (o) =>
+          o.vertical === wall.vertical &&
+          o.sill < 2.05 &&
+          Math.abs((o.vertical ? o.x : o.z) - wall.at) < 0.02,
+      )
+      .map((o) => [(o.vertical ? o.z : o.x) - o.width / 2, (o.vertical ? o.z : o.x) + o.width / 2])
+      .sort((a, b) => a[0] - b[0]);
+    if (blocked.length) {
+      const slots = [];
+      let at = wall.start + DOOR.margin;
+      for (const [start, end] of blocked) {
+        if (start - at >= place.width - 1e-6) slots.push([at, start]);
+        at = Math.max(at, end);
+      }
+      if (wall.end - DOOR.margin - at >= place.width - 1e-6)
+        slots.push([at, wall.end - DOOR.margin]);
+      if (!slots.length) return null;
+      place.center = slots
+        .map(([lo, hi]) =>
+          Math.max(lo + place.width / 2, Math.min(hi - place.width / 2, place.center)),
+        )
+        .sort((x, y) => Math.abs(x - place.center) - Math.abs(y - place.center))[0];
+    }
+  }
   // 넓이가 같으면 왼쪽·위쪽 공간으로 연다. 두 공간의 순서를 바꿔 불러도 결과가 같다.
   const areaA = a.room.w * a.room.d,
     areaB = b.room.w * b.room.d,
@@ -163,14 +196,16 @@ export function connections(list, floorplan) {
         door = findDoor(floorplan, a.roomId, b.roomId) || {},
         place = wall && doorPlacement(wall, door);
       if (!place) continue;
+      const opening = sharedOpening(a, ap, b, bp, door);
       found.push({
         ids: [a.roomId, b.roomId],
         names: [a.name, b.name],
         wall,
         door,
         ...place,
-        closed: !!door.closed,
-        opening: sharedOpening(a, ap, b, bp, door),
+        center: opening ? (opening.vertical ? opening.z : opening.x) : place.center,
+        closed: !!door.closed || !opening,
+        opening,
       });
     }
   return found;

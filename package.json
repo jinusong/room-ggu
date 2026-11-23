@@ -1,6 +1,6 @@
 {
   "name": "room-ggu",
-  "version": "5.9.0",
+  "version": "5.15.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "format": "prettier --write src tests",
     "format:check": "prettier --check src tests",
-    "test:models": "node eval/chat/full-qa.mjs"
+    "test:models": "node eval/chat/full-qa.mjs",
+    "review:build": "node .agents/skills/answer-me-with-html/scripts/am.mjs render docs/ux-review.md -o public/review/index.html --no-open && node scripts/publish-review.mjs"
   },
   "dependencies": {
     "@a2ui/web_core": "0.15.0",

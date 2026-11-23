@@ -149,8 +149,8 @@ test('주방·반려동물·식물을 포함한 가구 93종을 고르고 규격
   await expect(page.locator('.catalog-card[data-type=cat_tower]')).toContainText('캣타워');
   await page.getByRole('button', { name: '전체', exact: true }).click();
   await page.getByRole('textbox', { name: '가구 검색' }).fill('식탁');
-  await expect(page.locator('.catalog-card')).toHaveCount(1);
-  await page.locator('.catalog-card').click();
+  await expect(page.locator('.catalog-card')).toHaveCount(2);
+  await page.locator('.catalog-card[data-type=dining]').click();
   await page.getByRole('button', { name: /6인 식탁/ }).click();
   expect(await page.evaluate(() => window.__roomggu.app.draft.dims)).toEqual([180, 74, 90]);
   await expect(page.locator('.size-card.is-active')).toContainText('6인 식탁');

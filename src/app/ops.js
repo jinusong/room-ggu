@@ -1,3 +1,11 @@
+import {
+  validateWindows,
+  windowOpenings,
+  assertWindowDoors,
+  wallLength,
+  rotateWindows,
+  MAX_WINDOWS,
+} from '../windows.js';
 // 상태 변경 연산. 모든 함수는 앱 상태(v5)를 직접 바꾸고, 대화에 보여줄 변경 내역을 돌려준다.
 // 숫자 범위·경계·충돌 검사는 여기서 끝낸다. AI와 UI는 이 함수만 호출한다.
 import {
@@ -25,6 +33,7 @@ import {
   makeItem,
   validateState,
   doorZones,
+  windowZones,
   DEFAULT_SOURCE,
 } from '../data.js';
 import { defaultAvatar, POSES, poseAccepts, standAt, standSpot } from '../avatar.js';
@@ -312,11 +321,15 @@ const validColor = (c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
 
 // 방 전체를 검증한 뒤 교체한다. 가구는 새 경계 안으로 옮긴다.
 export function setRoom(state, room) {
+  const original = state;
+  state = structuredClone(state);
   for (const k of ['w', 'd', 'h'])
     if (!validRoomNumber(room[k])) throw Error('방 치수는 1~15m 범위로 알려주세요.');
   if (!Object.hasOwn(ROOM_TYPES, room.type)) throw Error('알 수 없는 공간 유형이에요.');
   if (!validColor(room.wallColor) || !validColor(room.floorColor))
     throw Error('마감 색상이 올바르지 않아요.');
+  room = { ...room, windows: validateWindows(room.windows ?? state.room.windows, room) };
+  assertWindowDoors(room, roomOpenings(spaces({ ...state, room }), state.floorplan, state.roomId));
   const before = state.room;
   state.room = room;
   const rows = diffRoom(before, room);
@@ -342,6 +355,9 @@ export function setRoom(state, room) {
     const n = fillBathroom(state);
     if (n) rows.push({ label: '설비', to: `변기·세면대·샤워부스 ${n}개` });
   }
+  for (const r of spaces(state))
+    assertWindowDoors(r.room, roomOpenings(spaces(state), state.floorplan, r.roomId));
+  Object.assign(original, state);
   return rows;
 }
 
@@ -501,7 +517,11 @@ function gridSpots(room, angle) {
 }
 export function findFreeSpot(state, item) {
   const room = state.room,
-    others = [...state.items.filter((o) => o.id !== item.id), ...doorZones(state)];
+    others = [
+      ...state.items.filter((o) => o.id !== item.id),
+      ...doorZones(state),
+      ...windowZones(state, item),
+    ];
   const fallback = { ...item, x: 0, z: 0 };
   clampItem(fallback, room);
   const result = (c, free) => ({ x: c.x, z: c.z, angle: c.angle, free });
@@ -702,6 +722,8 @@ export function addSpace(
   side = null,
   { room = null, anchor = null, strict = true } = {},
 ) {
+  const original = state;
+  state = structuredClone(state);
   if (!Object.hasOwn(ROOM_TYPES, type)) throw Error('알 수 없는 공간 유형이에요.');
   if (state.otherRooms.length >= 11) throw Error('공간은 최대 12개까지 저장할 수 있어요.');
   const size = room || makeRoom(type),
@@ -722,6 +744,23 @@ export function addSpace(
   // 붙일 벽이 모두 막혔으면 맨 오른쪽 기본 자리에 놓인다. 크기가 달라 겹치면 밀어낸다.
   else separateSpaces(state);
   fillBathroom(state, id);
+  const list = spaces(state),
+    parent = list.find((r) => r.roomId === anchorId),
+    added = list.find((r) => r.roomId === id);
+  if (
+    (parent?.room.windows?.length || added?.room.windows?.length) &&
+    sharedWall(parent, state.floorplan.positions[anchorId], added, state.floorplan.positions[id]) &&
+    !sharedOpening(
+      parent,
+      state.floorplan.positions[anchorId],
+      added,
+      state.floorplan.positions[id],
+    )
+  )
+    throw Error(
+      '창문 때문에 연결 문을 낼 자리가 없어요. 창문을 옮기거나 다른 벽에 공간을 붙여 주세요.',
+    );
+  Object.assign(original, state);
   return id;
 }
 // 새 공간이 어느 공간의 어느 쪽에 붙었는지. 대화에서 알려 줄 때 쓴다.
@@ -879,6 +918,7 @@ export function rotateSpace(state, id = state.roomId) {
   if (!space) throw Error('공간을 찾지 못했어요.');
   const { room } = space,
     before = { w: room.w, d: room.d };
+  rotateWindows(room, before);
   [room.w, room.d] = [before.d, before.w];
   [room.sources.w, room.sources.d] = [room.sources.d, room.sources.w];
   const turn = (a) => {
@@ -1010,6 +1050,7 @@ export function moveSpace(state, id, x, z, { snap = true } = {}) {
   )
     throw Error('공간이 겹쳐요. 빈 곳으로 옮겨 주세요.');
   plan.positions[id] = p;
+  for (const r of list) assertWindowDoors(r.room, roomOpenings(list, plan, r.roomId));
   state.floorplan = plan;
   return p;
 }
@@ -1074,10 +1115,14 @@ export function setDoor(state, a, b, patch = {}) {
     else delete next.offset;
   }
   const doors = (plan.doors || []).filter((d) => !(d.rooms.includes(a) && d.rooms.includes(b)));
-  state.floorplan = normalizeFloorplan(
-    { positions: plan.positions, doors: [...doors, next] },
-    list,
-  );
+  const nextPlan = normalizeFloorplan({ positions: plan.positions, doors: [...doors, next] }, list);
+  for (const r of list) assertWindowDoors(r.room, roomOpenings(list, nextPlan, r.roomId));
+  if (
+    !next.closed &&
+    !sharedOpening(A, plan.positions[a], B, plan.positions[b], findDoor(nextPlan, a, b))
+  )
+    throw Error('창문을 피해서 문을 낼 자리가 없어요. 창문을 옮기거나 줄여 주세요.');
+  state.floorplan = nextPlan;
   return sharedOpening(A, plan.positions[a], B, plan.positions[b], findDoor(state.floorplan, a, b));
 }
 
@@ -1131,6 +1176,8 @@ export function fitStatus(state, item) {
   if (oversizedAt(item, room)) return 'oversize';
   const c = { ...item };
   clampItem(c, room);
+  if (doorZones(state).some((o) => overlaps(c, o))) return 'door';
+  if (windowZones(state, c).some((o) => overlaps(c, o))) return 'window';
   return state.items.some((o) => o.id !== item.id && overlaps(c, o)) ? 'overlap' : 'fits';
 }
 
@@ -1143,4 +1190,60 @@ export function clearance(state, item) {
     back: Math.max(0, Math.round((d / 2 + item.z - f.d / 2) * 100)),
     front: Math.max(0, Math.round((d / 2 - item.z - f.d / 2) * 100)),
   };
+}
+
+// ---------- 창문 ----------
+function checkWindowRoom(state, room) {
+  room.windows = validateWindows(room.windows, room);
+  const next = spaces({ ...state, room });
+  const doors = roomOpenings(next, state.floorplan, state.roomId);
+  assertWindowDoors(room, doors);
+  const before = roomOpenings(spaces(state), state.floorplan, state.roomId);
+  if (before.some((o) => !doors.some((d) => d.roomId === o.roomId)))
+    throw Error(
+      '창문 때문에 기존 연결 문을 낼 자리가 없어져요. 창 크기를 줄이거나 다른 벽을 골라 주세요.',
+    );
+  return room;
+}
+export function setWindow(state, id, patch) {
+  const list = state.room.windows || [];
+  const before = list.find((w) => w.id === id);
+  if (!before) throw Error('창문을 찾지 못했어요.');
+  const room = {
+    ...state.room,
+    windows: list.map((w) => (w.id === id ? { ...w, ...patch, id } : w)),
+  };
+  state.room = checkWindowRoom(state, room);
+}
+export function addWindow(state, wall = 'back') {
+  if ((state.room.windows || []).length >= MAX_WINDOWS)
+    throw Error('창문은 방마다 최대 8개까지 설정해요.');
+  const room = state.room,
+    length = wallLength(room, wall),
+    id = newId();
+  const width = Math.min(1.2, length - 0.1),
+    height = Math.min(1.1, room.h - 0.2),
+    sill = Math.max(0.1, Math.min(0.9, room.h - height - 0.05));
+  for (let offset = 0.05; offset + width <= length - 0.05 + 1e-6; offset += 0.05) {
+    const next = {
+      ...room,
+      windows: [
+        ...(room.windows || []),
+        { id, wall, width, height, sill, offset: Math.round(offset * 100) / 100 },
+      ],
+    };
+    try {
+      state.room = checkWindowRoom(state, next);
+      return id;
+    } catch {
+      /* 다음 빈 구간을 찾는다. */
+    }
+  }
+  throw Error(
+    '이 벽에는 기본 창이 들어갈 빈자리가 없어요. 다른 벽을 고르거나 기존 창을 줄여 주세요.',
+  );
+}
+export function removeWindow(state, id) {
+  if (!(state.room.windows || []).some((w) => w.id === id)) throw Error('창문을 찾지 못했어요.');
+  state.room = { ...state.room, windows: state.room.windows.filter((w) => w.id !== id) };
 }

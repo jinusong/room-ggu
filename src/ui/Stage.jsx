@@ -1,3 +1,4 @@
+import { WindowControls } from './WindowControls.jsx';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { TYPES, ROOM_TYPES } from '../catalog.js';
 import { layoutWarnings, spaces } from '../data.js';
@@ -11,7 +12,7 @@ import { app } from '../app/store.js';
 import { findFreeSpot, fitStatus } from '../app/ops.js';
 import { Icon } from './icons.js';
 import { josa } from '../app/text.js';
-import { useOutside } from './widgets.jsx';
+import { useOutside, useMenu } from './widgets.jsx';
 
 // 초안과 규격 미리보기를 방 안의 점선 가구로 계산한다.
 export function ghostItem() {
@@ -42,7 +43,6 @@ function syncScenes(force = false) {
       s.roomId,
       list ? list.map((r) => [r.roomId, r.name, r.room]) : s.room,
       s.floorplan,
-      s.grid,
       s.dimensions,
     ]),
     items = JSON.stringify(list ? list.map((r) => r.items) : s.items),
@@ -74,10 +74,15 @@ function syncScenes(force = false) {
     if (fresh || s.scope !== last.scope) sc.home?.();
     else if (room !== last.room && !sc.userMoved) sc.home?.();
   }
+  if (s.grid !== last.grid) {
+    app.scenes.three?.setGridVisibility();
+    if (s.scope === 'room' && s.view === '2d') app.scenes.plan?.draw();
+  }
   if (door !== last.door) app.scenes.plan?.draw();
   app.scenes.house?.draw();
   last = {
     room,
+    grid: s.grid,
     items,
     sel: app.selected,
     warn: warnSig,
@@ -189,20 +194,15 @@ function ScopeNav() {
 function MoreMenu({ mobile }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
-  useOutside(ref, () => setOpen(false), open);
-  const run = (fn) => () => {
-    setOpen(false);
+  const menuKeys = useMenu(ref, open, setOpen);
+  const run = (fn) => (event) => {
+    menuKeys.close(event.detail === 0);
     fn();
   };
   const s = app.state;
   return (
-    <div class="more" ref={ref}>
-      <button
-        class="icon-btn on-stage"
-        aria-label="파일과 설정"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
+    <div class="more" ref={ref} onKeyDown={menuKeys.onKeyDown}>
+      <button class="icon-btn on-stage" aria-label="파일과 설정" {...menuKeys.trigger}>
         <Icon name="ellipsis" />
       </button>
       {open && (
@@ -1074,6 +1074,7 @@ export function Stage({ mobile, sheetRef }) {
         <DoorBar />
         <AvatarTag mobile={mobile} />
       </div>
+      <WindowControls />
       <div class="stage-top">
         <div class="stage-lead">
           <ScopeNav />
@@ -1107,7 +1108,11 @@ export function Stage({ mobile, sheetRef }) {
           <span>
             {warn.oversized.size
               ? `방을 넘는 가구 ${warn.oversized.size}개`
-              : `겹친 가구 ${warn.conflicts.size}개`}
+              : warn.blockedDoors.size
+                ? `문 앞을 막는 가구 ${warn.blockedDoors.size}개`
+                : warn.blockedWindows.size
+                  ? `창 앞을 가리는 가구 ${warn.blockedWindows.size}개`
+                  : `겹친 가구 ${warn.conflicts.size}개`}
           </span>
           <button class="link" onClick={() => store.relocate()}>
             빈자리로 옮기기
