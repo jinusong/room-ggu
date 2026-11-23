@@ -53,6 +53,7 @@ import {
 import { bathroomFixtures } from '../house-geometry.js';
 import { josa } from './text.js';
 import { THEMES } from './design.js';
+import { layoutHouse } from './house-layout.js';
 
 // 일괄 상담도 이 경계에서만 실제 상태로 바꾼다. 완성한 별도 상태를 검증한 뒤 store가 한 번에 적용한다.
 export function buildDesign(state, spec) {
@@ -72,65 +73,30 @@ export function buildDesign(state, spec) {
   const next = freshState(),
     omitted = [],
     list = [];
-  const total = spec.rooms.reduce((n, r) => n + r.weight, 0);
-  const width = round2(Math.sqrt(spec.areaM2 * 1.25));
-  next.floorplan.positions = {};
-  // 면적을 반씩 나눠 긴 띠 대신 방에 가까운 비율로 연결한다.
-  const partition = (rooms, left, top, w, d) => {
-    if (rooms.length === 1) {
-      const r = rooms[0];
-      if (w < 1.5 || w > 15 || d < 1.5 || d > 15)
-        throw Error('공간 비율이 너무 치우쳤어요. 공간 구성을 나눠 다시 요청해 주세요.');
-      const room = makeRoom(r.type),
-        roomId = newId();
-      Object.assign(room, {
-        w,
-        d,
-        h: 2.5,
-        wallColor: theme.wall,
-        floorColor: r.type === 'bathroom' ? '#dce1dc' : theme.floor,
-        sources: {
-          w: '대화 추정 · 집 전체 면적 배분',
-          d: '대화 추정 · 집 전체 면적 배분',
-          h: '상담 초안',
-        },
-      });
-      list.push({ roomId, name: r.name, room, items: [], requested: r.items });
-      next.floorplan.positions[roomId] = { x: round3(left + w / 2), z: round3(top + d / 2) };
-      return;
-    }
-    const sum = rooms.reduce((n, r) => n + r.weight, 0);
-    let cut = 1,
-      weight = rooms[0].weight,
-      best = Math.abs(sum / 2 - weight),
-      acc = weight;
-    for (let i = 1; i < rooms.length - 1; i++) {
-      acc += rooms[i].weight;
-      if (Math.abs(sum / 2 - acc) < best) {
-        cut = i + 1;
-        weight = acc;
-        best = Math.abs(sum / 2 - acc);
-      }
-    }
-    if (w >= d) {
-      const first = round2((w * weight) / sum);
-      partition(rooms.slice(0, cut), left, top, first, d);
-      partition(rooms.slice(cut), left + first, top, round2(w - first), d);
-    } else {
-      const first = round2((d * weight) / sum);
-      partition(rooms.slice(0, cut), left, top, w, first);
-      partition(rooms.slice(cut), left, top + first, w, round2(d - first));
-    }
-  };
-  if (!Number.isFinite(total) || total <= 0 || spec.rooms.length < 2 || spec.rooms.length > 12)
+  if (spec.rooms.length < 2 || spec.rooms.length > 12)
     throw Error('공간 구성을 다시 요청해 주세요.');
-  partition(
-    [...spec.rooms].sort((a, b) => b.weight - a.weight),
-    -width / 2,
-    0,
-    width,
-    round2(spec.areaM2 / width),
-  );
+  // 방 크기와 자리, 열어 둘 문은 house-layout이 문 규칙을 지키는 배치 가운데에서 고른다.
+  const rooms = [...spec.rooms].sort((a, b) => b.weight - a.weight),
+    layout = layoutHouse(rooms, spec.areaM2);
+  for (const [i, r] of rooms.entries()) {
+    const { w, d, x, z } = layout.rooms[i],
+      room = makeRoom(r.type),
+      roomId = newId();
+    Object.assign(room, {
+      w,
+      d,
+      h: 2.5,
+      wallColor: theme.wall,
+      floorColor: r.type === 'bathroom' ? '#dce1dc' : theme.floor,
+      sources: {
+        w: '대화 추정 · 집 전체 면적 배분',
+        d: '대화 추정 · 집 전체 면적 배분',
+        h: '상담 초안',
+      },
+    });
+    list.push({ roomId, name: r.name, room, items: [], requested: r.items });
+    next.floorplan.positions[roomId] = { x, z };
+  }
   const first = list[0];
   Object.assign(next, {
     roomId: first.roomId,
@@ -142,29 +108,17 @@ export function buildDesign(state, spec) {
     scope: 'house',
     view: state.view,
   });
-  // 맞닿은 벽마다 문을 만들지 않고, 공용 공간을 우선해 모든 방을 잇는 문만 남긴다.
-  const links = connections(list, next.floorplan),
-    seen = new Set([first.roomId]),
-    chosen = new Set();
-  while (seen.size < list.length) {
-    const candidates = links.filter((l) => seen.has(l.ids[0]) !== seen.has(l.ids[1]));
-    candidates.sort((a, b) => {
-      const cost = (l) => {
-        const parent = list.find((r) => r.roomId === l.ids.find((id) => seen.has(id)));
-        return ['living', 'dining', 'kitchen'].includes(parent.room.type)
-          ? 0
-          : parent.room.type === 'bathroom'
-            ? 100
-            : 10;
-      };
-      return cost(a) - cost(b);
-    });
-    const link = candidates[0];
-    if (!link) throw Error('연결할 수 없는 공간이 있어요. 구성을 다시 요청해 주세요.');
-    chosen.add(link);
-    link.ids.forEach((id) => seen.add(id));
-  }
-  for (const link of links) if (!chosen.has(link)) setDoor(next, ...link.ids, { closed: true });
+  // 맞닿은 벽마다 문을 만들지 않고, 배치에서 고른 문만 연다.
+  const open = new Set(
+    layout.doors.map((ids) =>
+      ids
+        .map((i) => list[i].roomId)
+        .sort()
+        .join(),
+    ),
+  );
+  for (const link of connections(list, next.floorplan))
+    if (!open.has([...link.ids].sort().join())) setDoor(next, ...link.ids, { closed: true });
   for (const r of list) {
     const local = { ...r };
     // 문 앞의 통로를 가구처럼 빈자리 계산에만 넣고 저장하기 전에 거둔다.
