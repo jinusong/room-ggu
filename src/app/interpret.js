@@ -18,7 +18,13 @@ import {
 } from '../catalog.js';
 import { makeItem, layoutWarnings, clampItem, spaces } from '../data.js';
 import { consult, applyModelResult, furnitureSubjects } from '../estimator.js';
-import { mentionsRoom, roomMentions, assertedType, parseRoomDimensions } from '../room-consult.js';
+import {
+  mentionsRoom,
+  roomMentions,
+  assertedType,
+  parseRoomDimensions,
+  roomEvidence,
+} from '../room-consult.js';
 import {
   chooseSurface,
   surfaceKind,
@@ -54,8 +60,6 @@ const WALL_WORDS = /벽|도배|벽지/;
 const FLOOR_WORDS = /바닥|마루|장판|타일/;
 const COLOR_TALK = /색|컬러|톤|[가-힣]+색|(?:으로|로)\s*(?:바꿔|바꾸|해)/;
 const MOOD_TALK = /느낌|분위기|톤/;
-const PURPOSE =
-  /책|공부|업무|작업|일하|잠|수면|자는|쉬|휴식|아이|어린이|아기|요리|조리|식사|밥|손님|가족|모여|영화|게임|운동|취미|음악|홈\s*카페|드레스룸|옷|(?:하는|할|위한|용)\s*(?:방|공간)|(?:방|공간)으로\s*(?:꾸미|꾸며|쓰|만들)/;
 const ROOM_SIZE_TALK = /아담|작|좁|컴팩트|넓|넉넉|크|큰|여유|널찍|답답|혼자|가족/;
 const LITERAL_ROOM_SIZE = /아담|작은|작게|좁은|컴팩트|넓은|넓게|넉넉|큰\s*방|크게/;
 const NEW_ITEM = /하나\s*(?:더|놓|두|사|들|있)|추가|새로|또\s|도\s*(?:하나|놓|필요|두|사)/;
@@ -240,8 +244,11 @@ export function planFromModel(raw, text, ctx) {
       modelReply: v.intent === 'chat' && v.action === 'none' ? usableReply(v.reply, t) : null,
     });
   // 어떤 공간인지 말하지 않고 방을 추가하자고 했으면 만들지 않고 묻는다. 모델이 용도에서 유형을
-  // 읽어 냈으면("잠잘 방 하나 추가해줘") 모델을 따른다.
-  if (rule.ask === 'space-type' && !(v.action === 'new_space' && v.roomType)) return done(rule);
+  // 읽어 냈고 문장에 그 용도가 있으면("잠잘 방 하나 추가해줘") 모델을 따른다.
+  if (rule.ask === 'space-type' && !(v.action === 'new_space' && roomEvidence(v.roomType, t))) {
+    if (v.roomType) fixes.push('문장에 근거가 없는 공간 유형은 고르지 않고 되물음');
+    return done(rule);
+  }
   // 방 이야기와 가구 이야기가 섞였거나 가구가 여럿이면 나눠서 처리한다.
   if (request && !request.limit) {
     const plan = compoundPlan(v, request, ctx, item, fixes);
@@ -396,6 +403,11 @@ function pickRoomType(modelType, t, fixes) {
       fixes.push('자리를 가리키거나 아니라고 한 이름은 공간 유형으로 쓰지 않음');
       return null;
     }
+    // 작은 모델은 모르면 목록 첫 값(화장실)을 고르기 쉽다. 문장에 그 용도가 없으면 쓰지 않는다.
+    if (modelType && !roomEvidence(modelType, t)) {
+      fixes.push('문장에 근거가 없는 공간 유형은 고르지 않고 되물음');
+      return null;
+    }
     return modelType;
   }
   if (modelType === literal) return literal;
@@ -442,7 +454,7 @@ function roomPlan(v, t, ctx, fixes) {
     else if (literal) fixes.push(`공간 유형은 문장에 적힌 ${ROOM_TYPES[literal].name} 유지`);
     else if (mentions.length)
       fixes.push('자리를 가리키거나 아니라고 한 이름은 공간 유형으로 쓰지 않음');
-    else if (!PURPOSE.test(t)) fixes.push('말하지 않은 공간 유형 변경은 막음');
+    else if (!roomEvidence(v.roomType, t)) fixes.push('말하지 않은 공간 유형 변경은 막음');
     else room = retypeRoom(room, v.roomType, keep);
   }
   if (v.size !== 'unknown' && !LITERAL_ROOM_SIZE.test(t) && ROOM_SIZE_TALK.test(t)) {
