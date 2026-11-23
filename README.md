@@ -148,6 +148,7 @@ v5.9부터 **A2UI 1.0 공식 코어**와 룸꾸 전용 카탈로그로 도구를
 | `src/catalog.js`, `src/data.js` | 가구·공간 카탈로그(욕실·주방·반려동물·식물·아이·운동 포함 93종), 저장 형식 v5 검증과 v1~v4 이전, 경계·충돌 |
 | `src/avatar.js`, `src/seating.js`, `src/avatar-three.js` | 키·자세·가구 참조, 앉는 면·눕는 면, 같은 축척의 아바타 모형 |
 | `src/app/design.js` | 집 전체 상담 계약, 공간 구성·가구 구성·테마 검증 |
+| `src/app/house-layout.js` | 집 전체 초안의 방 나누기와 문 규칙(침실끼리·침실과 주방은 잇지 않음, 공용 욕실은 공용 공간에) |
 | `src/app/models.js`, `src/ui/ModelIsland.jsx` | 상담 모델 후보와 크기, 받는 중·준비 중을 알리는 방 위 캡슐 |
 | `src/floorplan.js`, `src/house.js` | 집 전체 2D 도면, 공간 위치·공유 벽·중첩, 문 설정(위치·폭·방향·막기), 벽의 `+` 자리와 미리 보기 |
 | `src/house-geometry.js`, `src/house-three.js` | 전체 3D의 공유 벽·문 개구부·가구 좌표, 화장실 설비의 배치 초안 자리 |
