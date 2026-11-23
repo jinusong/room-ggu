@@ -209,16 +209,22 @@ export function overlaps(a, b) {
   }
   return true;
 }
+// 문 앞에 비워 둘 자리. 이 방 쪽으로 열리는 문은 문짝이 도는 폭만큼, 반대로 열리는 문은 드나들 50cm만 본다.
+// 양옆 여유는 5cm다. 설비 배치(house-geometry의 doorZone)와 같은 기준이다.
 export function doorZones(s) {
   if (!s.roomId || !s.floorplan?.positions) return [];
-  return roomOpenings(spaces(s), s.floorplan, s.roomId).map((o, n) => ({
-    id: `door-clearance-${n}`,
-    type: 'cabinet',
-    angle: 0,
-    dims: o.vertical ? [90, 100, (o.width + 0.4) * 100] : [(o.width + 0.4) * 100, 100, 90],
-    x: o.x + (o.vertical ? (o.x > 0 ? -0.45 : 0.45) : 0),
-    z: o.z + (!o.vertical ? (o.z > 0 ? -0.45 : 0.45) : 0),
-  }));
+  return roomOpenings(spaces(s), s.floorplan, s.roomId).map((o, n) => {
+    const depth = o.inward ? o.width + 0.05 : 0.5,
+      along = (o.width + 0.1) * 100;
+    return {
+      id: `door-clearance-${n}`,
+      type: 'cabinet',
+      angle: 0,
+      dims: o.vertical ? [depth * 100, 100, along] : [along, 100, depth * 100],
+      x: o.x + (o.vertical ? (o.x > 0 ? -depth / 2 : depth / 2) : 0),
+      z: o.z + (!o.vertical ? (o.z > 0 ? -depth / 2 : depth / 2) : 0),
+    };
+  });
 }
 // 창 앞 20cm에 놓인 가구 중 창 아래 높이를 넘는 것만 가림으로 표시한다.
 export function windowZones(s, item) {

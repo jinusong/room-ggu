@@ -89,3 +89,24 @@ test('문 앞을 막은 가구는 경고하고 자동 정리·새 가구 배치�
   ops.placeItem(s, makeItem('cabinet'));
   assert.equal(layoutWarnings(s).blockedDoors.size, 0);
 });
+
+test('문짝이 도는 범위 밖의 가구는 문 앞을 막는다고 하지 않는다', () => {
+  const s = freshState(),
+    first = s.roomId;
+  ops.addSpace(s, 'bedroom', 'right');
+  ops.switchSpace(s, first);
+  const zone = doorZones(s)[0],
+    wall = s.room.w / 2,
+    depth = zone.dims[0] / 100;
+  assert.ok(depth <= 0.86, '문짝 폭 + 5cm');
+  // 문 바로 옆 벽에 붙인 의자(48 × 50cm). 예전에는 문 양옆 20cm까지 막는다고 했다.
+  const near = { ...makeItem('chair'), x: wall - 0.3, z: zone.z + zone.dims[2] / 200 + 0.26 };
+  s.items.push(near);
+  assert.equal(layoutWarnings(s).blockedDoors.has(near.id), false);
+  // 문짝이 도는 자리에 들어오면 막는다.
+  near.z = zone.z;
+  assert.equal(layoutWarnings(s).blockedDoors.has(near.id), true);
+  // 벽에서 문짝 폭보다 멀면 막지 않는다. 예전에는 90cm 안쪽을 모두 막는다고 했다.
+  near.x = wall - depth - 0.26;
+  assert.equal(layoutWarnings(s).blockedDoors.has(near.id), false);
+});
