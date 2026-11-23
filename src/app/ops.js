@@ -22,6 +22,7 @@ import {
 import {
   clampItem,
   overlaps,
+  tucked,
   footprint,
   layoutWarnings,
   newId,
@@ -1146,7 +1147,9 @@ export function fitStatus(state, item) {
   clampItem(c, room);
   if (doorZones(state).some((o) => overlaps(c, o))) return 'door';
   if (windowZones(state, c).some((o) => overlaps(c, o))) return 'window';
-  return state.items.some((o) => o.id !== item.id && overlaps(c, o)) ? 'overlap' : 'fits';
+  return state.items.some((o) => o.id !== item.id && overlaps(c, o) && !tucked(c, o))
+    ? 'overlap'
+    : 'fits';
 }
 
 export function clearance(state, item) {

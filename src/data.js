@@ -186,6 +186,19 @@ export function clampItem(item, room) {
   item.z = Math.max(-mz, Math.min(mz, item.z));
   return f.w > room.w + 0.001 || f.d > room.d + 0.001 || item.dims[1] / 100 > room.h;
 }
+// 의자와 벤치는 책상이나 식탁 밑으로 밀어 넣어 쓴다. 앉는 가구와 탁자가 겹친 것은 겹침으로 치지 않는다.
+const SEATS = new Set(['chair', 'office_chair', 'stool', 'bench', 'high_chair']);
+const TABLES = new Set([
+  'desk',
+  'dining',
+  'island',
+  'bar_table',
+  'standing_desk',
+  'kids_desk',
+  'vanity',
+]);
+export const tucked = (a, b) =>
+  (SEATS.has(a.type) && TABLES.has(b.type)) || (SEATS.has(b.type) && TABLES.has(a.type));
 export function overlaps(a, b) {
   if (FLAT_TYPES.has(a.type) || FLAT_TYPES.has(b.type)) return false;
   const aa = (a.angle * Math.PI) / 180,
@@ -257,7 +270,7 @@ export function layoutWarnings(s) {
     )
       oversized.add(a.id);
     for (let j = i + 1; j < s.items.length; j++)
-      if (overlaps(a, s.items[j])) {
+      if (overlaps(a, s.items[j]) && !tucked(a, s.items[j])) {
         conflicts.add(a.id);
         conflicts.add(s.items[j].id);
       }

@@ -110,3 +110,22 @@ test('문짝이 도는 범위 밖의 가구는 문 앞을 막는다고 하지 �
   near.x = wall - depth - 0.26;
   assert.equal(layoutWarnings(s).blockedDoors.has(near.id), false);
 });
+
+test('책상이나 식탁 밑에 넣은 의자는 겹친 가구로 보지 않는다', () => {
+  const s = freshState(),
+    desk = { ...makeItem('desk'), x: 0, z: -1 },
+    chair = { ...makeItem('office_chair'), x: 0, z: -0.85 },
+    stool = { ...makeItem('stool'), x: 0.2, z: -0.85 },
+    bed = { ...makeItem('bed'), x: 1.5, z: 0.5 },
+    side = { ...makeItem('chair'), x: 1.2, z: 0.5 };
+  s.items.push(desk);
+  assert.equal(ops.fitStatus(s, { ...makeItem('chair'), x: 0, z: -0.9 }), 'fits');
+  s.items.push(chair);
+  assert.equal(layoutWarnings(s).conflicts.size, 0);
+  // 의자끼리, 의자와 침대가 겹친 것은 그대로 알린다.
+  s.items.push(stool, bed, side);
+  const c = layoutWarnings(s).conflicts;
+  assert.ok(c.has(chair.id) && c.has(stool.id));
+  assert.ok(c.has(bed.id) && c.has(side.id));
+  assert.equal(c.has(desk.id), false);
+});
