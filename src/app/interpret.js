@@ -209,7 +209,7 @@ export function planFromModel(raw, text, ctx) {
   // "되돌려줘", "공간 목록", "파일로 저장"처럼 문장에 명령이 분명한데 모델이 다른 일을 고르면 명령을 따른다.
   const request = splitRequest(t);
   const rule = planTurn(t, ctx, request);
-  if (rule.batchLimit || ['constraint', 'item', 'mood'].includes(rule.ask)) {
+  if (rule.batchLimit || ['constraint', 'item', 'mood', 'delete-space'].includes(rule.ask)) {
     fixes.push(
       rule.ask === 'constraint'
         ? '모호하거나 충돌하는 치수·배치는 확인 후 반영'

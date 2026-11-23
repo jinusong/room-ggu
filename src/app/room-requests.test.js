@@ -177,3 +177,40 @@ test('자리를 가리킨 공간의 별명은 새 공간 이름에 쓰지 않는
   assert.equal(p.changes.addSpace, 'bedroom');
   assert.equal(p.changes.label, null);
 });
+
+test('공간을 지우자고 하면 바로 지우지 않고 그 공간을 지우는 확인 단추를 준다', () => {
+  const s = freshState(),
+    first = s.roomId;
+  ops.addSpace(s, 'bedroom');
+  ops.addSpace(s, 'office');
+  ops.switchSpace(s, first);
+  const bed = spaces(s).find((r) => r.room.type === 'bedroom');
+  const ask = (t) => [
+    planTurn(t, { state: s, target: room }),
+    planFromModel(model({ intent: 'action', action: 'delete' }), t, { state: s, target: room }),
+  ];
+  for (const [t, id] of [
+    ['이 방 지워줘', first],
+    ['침실 삭제해줘', bed.roomId],
+    ['나의 서재 없애줘', spaces(s).find((r) => r.room.type === 'office').roomId],
+  ])
+    for (const p of ask(t)) {
+      assert.equal(p.ask, 'delete-space', t);
+      assert.deepEqual(p.changes ?? {}, {}, t);
+      assert.equal(p.suggestions[0].action, 'delete-space', t);
+      assert.equal(p.suggestions[0].arg, id, t);
+    }
+  // 대상이 없거나 같은 유형이 없으면 지우지 않고 공간 목록을 권한다.
+  for (const t of ['공간 삭제', '화장실 지워줘']) {
+    const p = planTurn(t, { state: s, target: room });
+    assert.equal(p.ask, 'delete-space', t);
+    assert.equal(p.suggestions[0].arg, 'spaces', t);
+  }
+  // 가구를 지우자는 말은 공간 삭제가 아니다.
+  for (const t of ['침대 지워줘', '침실에 있는 의자 지워줘', '이 방 가구 다 지워줘'])
+    assert.notEqual(planTurn(t, { state: s, target: room }).ask, 'delete-space', t);
+  // 마지막 공간은 지울 수 없다고 답한다.
+  const one = planTurn('이 방 지워줘', ctx());
+  assert.match(one.reply, /마지막 공간/);
+  assert.equal(one.suggestions.length, 0);
+});

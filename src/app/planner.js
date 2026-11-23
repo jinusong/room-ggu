@@ -734,6 +734,50 @@ function unlistedReply(o) {
   };
 }
 
+// "이 방 지워줘", "침실 삭제해줘"처럼 공간을 지우자는 말. 바로 지우지 않고 확인 단추를 보여 준다.
+const DELETE_VERB = /지워|지우|지울|삭제|없애|없앨|날려/;
+export function deleteSpacePlan(t, state) {
+  // "이 방 가구 다 지워줘"는 가구 비우기다.
+  if (!DELETE_VERB.test(t) || /가구|물건/.test(t) || furnitureMentions(t).some((m) => !m.ref))
+    return null;
+  const list = spaces(state),
+    named = list
+      .filter((r) => roomNameSpan(t, r.name))
+      .sort((a, b) => b.name.length - a.name.length)[0],
+    current = /(?:이|지금|현재)\s*(?:방|공간)/.test(t)
+      ? list.find((r) => r.roomId === state.roomId)
+      : null,
+    type = assertedType(roomMentions(t)),
+    sameType = type ? list.filter((r) => r.room.type === type) : [];
+  const say = (reply, suggestions = []) => ({
+    intent: 'chat',
+    ask: 'delete-space',
+    reply,
+    surfaces: [],
+    suggestions,
+  });
+  if (!named && !current && !type)
+    return /(?:방|공간)\s*(?:을|를|하나)?\s*(?:지워|지우|지울|삭제|없애|없앨|날려)/.test(t)
+      ? say('어느 공간을 지울까요? 공간 목록에서 고르거나 “침실 지워줘”처럼 말해 주세요.', [
+          act('공간 목록', 'tool', { arg: 'spaces' }),
+        ])
+      : null;
+  if (list.length < 2)
+    return say('마지막 공간은 지울 수 없어요. 새 공간을 먼저 만든 뒤에 지워 주세요.');
+  const target = named || current || (sameType.length === 1 ? sameType[0] : null);
+  if (!target)
+    return say(
+      sameType.length
+        ? `${josa(ROOM_TYPES[type].name, '이/가')} ${sameType.length}개 있어요. 어느 공간을 지울지 공간 목록에서 골라 주세요.`
+        : `${josa(ROOM_TYPES[type].name, '은/는')} 아직 없어요.`,
+      [act('공간 목록', 'tool', { arg: 'spaces' })],
+    );
+  return say(
+    `${josa(target.name, '을/를')} 지울까요?${target.items.length ? ` 가구 ${target.items.length}개도 함께 지워져요.` : ''} 지운 뒤에도 되돌리기로 살릴 수 있어요.`,
+    [act(`${target.name} 지우기`, 'delete-space', { arg: target.roomId })],
+  );
+}
+
 // 현관, 베란다처럼 아직 없는 공간 종류를 만들어 달라고 하면 가구가 아니라 공간 종류에 없다고 답한다.
 function unsupportedSpacePlan(name) {
   const kinds = Object.values(ROOM_TYPES).map((r) => r.name);
@@ -924,6 +968,8 @@ export function planTurn(text, ctx, request = splitRequest(text), ranked = null)
       ? { ...clear, ask: 'mood', reply: `마감을 바꿨어요. ${mood}` }
       : { intent: 'chat', ask: 'mood', reply: mood, surfaces: [], suggestions: [] };
   }
+  const removal = deleteSpacePlan(t, ctx.state);
+  if (removal) return removal;
   const space = unsupportedSpace(t);
   if (space) return unsupportedSpacePlan(space);
   const meta = planMeta(t, ctx, item);

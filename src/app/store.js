@@ -1529,6 +1529,13 @@ export function runSuggestion(sug) {
     if (last?.suggestions?.includes(sug)) return confirmFurnitureUse(last);
     return;
   }
+  // 공간 지우기는 마지막 답의 단추일 때만 실행한다. 지난 답의 단추로 다른 배치를 지우지 않게 한다.
+  if (sug.action === 'delete-space') {
+    const last = app.thread.at(-1);
+    if (!last?.suggestions?.includes(sug) || app.busy) return;
+    push({ role: 'user', text: sug.label, action: true });
+    return deleteSpace(sug.arg);
+  }
   if (sug.action === 'draft' && (!sug.photoId || sug.photoId !== app.photo?.surfaceId)) {
     toast('이전 사진의 후보예요. 지금 사진에서 종류를 골라 주세요.');
     return;
