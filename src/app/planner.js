@@ -28,6 +28,7 @@ import {
   wantsNewSpace,
   roomLabel,
   unsupportedSpace,
+  deniesNewSpace,
 } from '../room-consult.js';
 import { sizeFields } from '../dimensions.js';
 import { roomNameSpan } from './consult-context.js';
@@ -36,7 +37,8 @@ import { chooseSurface, surfaceKind } from '../ui-schema.js';
 // 규칙이 기본값으로 물러난 경우(방: 유형, 가구: 규격)가 아니면 요청 단어로 도구를 확신한 것이다.
 const confidentPick = (scope, pick) => pick !== (scope === 'room' ? 'types' : 'sizes');
 
-import { purposeRequest, recommendedTypes } from './purpose.js';
+import { purposeRequest, recommendedTypes, requestsRoomFurniture } from './purpose.js';
+import { roomEssentials } from './design.js';
 
 export const ROOM_REFERENCE =
   /(?:방|공간)(?:을|를|은|는|이|가|의)?\s*(?:가로|세로|크기|치수|넓이|면적)|천장|\d\s*평|평수|m²|제곱미터|벽|바닥/;
@@ -144,6 +146,38 @@ export function actionSubject(t, state, item, verb, draft = null) {
       suggestions: [],
     },
   };
+}
+
+// 방 이름은 가구를 놓을 장소다. 이미 있는 가구는 다시 놓지 않는다.
+function furnishRoomPlan(t, { state, draft }) {
+  if (!requestsRoomFurniture(t) || (draft && !mentionsRoom(t) && !/기본|세트|세팅|채워/.test(t)))
+    return null;
+  const rooms = spaces(state);
+  const mentions = roomMentions(t);
+  if (mentions.some((m) => m.role !== 'new'))
+    return surfacePlan('spaces', '가구를 놓을 방의 이름을 알려 주세요.');
+  const types = [...new Set(mentions.map((m) => m.type))];
+  const named = rooms.filter((r) => roomNameSpan(t, r.name));
+  if (types.length > 1 || named.length > 1)
+    return surfacePlan('spaces', '어느 방에 먼저 가구를 놓을까요? 방 이름을 하나 알려 주세요.');
+  let room = named[0] || state;
+  if (!named.length && types.length && types[0] !== state.room.type) {
+    const hits = rooms.filter((r) => r.room.type === types[0]);
+    if (hits.length !== 1)
+      return surfacePlan(
+        'spaces',
+        hits.length
+          ? '같은 유형의 방이 여럿이에요. 가구를 놓을 방 이름을 알려 주세요.'
+          : `${josa(ROOM_TYPES[types[0]].name, '이/가')} 아직 없어요. 공간을 먼저 추가해 주세요.`,
+      );
+    room = hits[0];
+  }
+  const essentials = roomEssentials(room.room.type, room.name);
+  const typesToAdd = (essentials.length ? essentials : ['bed', 'desk', 'chair']).filter(
+    (type) => !room.items.some((i) => i.type === type),
+  );
+  if (!typesToAdd.length) return metaPlan(null, `${room.name}에는 기본 가구가 모두 있어요.`);
+  return metaPlan('furnish-room', '', { arg: { roomId: room.roomId, types: typesToAdd } });
 }
 
 function planMeta(t, ctx, item) {
@@ -288,10 +322,11 @@ export function planRoom(t, ctx) {
       intent: 'room',
       scope: 'room',
       ask: 'space-type',
-      reply: `${where}어떤 공간을 추가할까요? 아래에서 고르거나 “거실 추가해줘”처럼 말해 주세요.`,
+      spaceRequest: t,
+      reply: `${where}어떤 공간을 추가할까요? “거실”처럼 방 종류를 알려 주세요.`,
       changes: {},
       surfaces: [],
-      suggestions: typeChips([], (name) => `${where}${name} 추가해줘`),
+      suggestions: typeChips([], (name) => name),
     };
   }
   if (r.same)
@@ -934,6 +969,16 @@ export function offerFurniture(text, types) {
 
 export function planTurn(text, ctx, request = splitRequest(text), ranked = null) {
   const t = String(text).trim().slice(0, 1500);
+  if (!ctx.guard && (mentionsRoom(t) || /방|공간/.test(t)) && deniesNewSpace(t))
+    return {
+      intent: 'chat',
+      ask: 'no-add',
+      reply: '새 공간을 추가하지 않았어요.',
+      surfaces: [],
+      suggestions: [],
+    };
+  const furnishing = !ctx.guard && furnishRoomPlan(t, ctx);
+  if (furnishing) return furnishing;
   const purpose = purposeRequest(t);
   const guard = consultationGuard(t, ctx, request, !!purpose);
   if (guard) return guard;

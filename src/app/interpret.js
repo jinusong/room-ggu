@@ -97,6 +97,7 @@ const COMMAND_NAMES = {
   switch: '공간 이동',
   'rotate-space': '방 돌리기',
   'place-all': '모두 놓기',
+  'furnish-room': '방에 기본 가구 놓기',
   catalog: '가구 고르기',
   spaces: '공간 목록',
   items: '가구 목록',
@@ -209,17 +210,23 @@ export function planFromModel(raw, text, ctx) {
   // "되돌려줘", "공간 목록", "파일로 저장"처럼 문장에 명령이 분명한데 모델이 다른 일을 고르면 명령을 따른다.
   const request = splitRequest(t);
   const rule = planTurn(t, ctx, request);
-  if (rule.batchLimit || ['constraint', 'item', 'mood', 'delete-space'].includes(rule.ask)) {
+  if (
+    rule.batchLimit ||
+    ['constraint', 'item', 'mood', 'no-add', 'delete-space'].includes(rule.ask)
+  ) {
     fixes.push(
-      rule.ask === 'constraint'
-        ? '모호하거나 충돌하는 치수와 배치는 확인 후 반영'
-        : '선택이 필요한 부분을 되물음',
+      rule.ask === 'no-add'
+        ? '추가하지 말라는 요청을 따름'
+        : rule.ask === 'constraint'
+          ? '모호하거나 충돌하는 치수와 배치는 확인 후 반영'
+          : '선택이 필요한 부분을 되물음',
     );
     return done(rule);
   }
   const edit = editSubject(t, ctx);
   if (edit?.item) item = edit.item;
   if (rule.intent === 'meta') {
+    if (!rule.action && !rule.surfaces.length) return done(rule);
     const command = rule.action || rule.surfaces[0]?.kind;
     const modelCommand = v.action === 'switch_space' ? 'switch' : v.action;
     if (command === 'switch') {

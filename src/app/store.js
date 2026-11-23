@@ -24,6 +24,7 @@ import {
 } from './consult-context.js';
 import { furnitureMentions } from '../estimator.js';
 import { planFromModel } from './interpret.js';
+import { detectRoomType } from '../room-consult.js';
 import { photoCandidates, PHOTO_CONFIDENT } from './photo.js';
 import { josa, dimsText } from './text.js';
 import { parseComparisonCommand, avatarLayout, poseAccepts, standAt } from '../avatar.js';
@@ -216,6 +217,7 @@ function sanitizeTurn(t) {
       .map((f) => cleanText(f, 80))
       .filter(Boolean);
     turn.note = cleanText(t.note, 300) || undefined;
+    if (t.spaceRequest) turn.spaceRequest = cleanText(t.spaceRequest, 1500);
     turn.tone = t.tone === 'error' ? 'error' : undefined;
     turn.photoScores = cleanText(t.photoScores, 120) || undefined;
     turn.surfaces = (Array.isArray(t.surfaces) ? t.surfaces : [])
@@ -540,21 +542,26 @@ function linkPlacedDraft(d, item) {
   app.selected = item.id;
   app.target = { type: 'item', id: item.id };
 }
-// 지금 초안과 기다리는 초안을 한꺼번에 놓는다. 되돌리기 한 번으로 모두 물린다.
-function placeAllInto(turn) {
-  const list = [app.draft, ...app.queue].filter(Boolean);
-  if (!list.length) return placeDraftInto(turn);
-  if (app.state.items.length + list.length > ops.MAX_ITEMS)
+// 전체가 들어가는지 먼저 검사한다. 실패하면 배치와 실행 취소 기록을 보존한다.
+function placeBatch(state, list) {
+  if (state.items.length + list.length > ops.MAX_ITEMS)
     throw Error('한 방에 가구 100개까지 놓을 수 있어요. 가구를 빼거나 나눠 놓아 주세요.');
-  const staged = { ...app.state, items: [...app.state.items] };
+  const staged = { ...state, items: [...state.items] };
   const placed = list.map((d) => ops.placeItem(staged, d));
   const blocked = placed.filter(({ free }) => !free).length;
   if (blocked)
     throw Error(
       `${blocked}개가 들어갈 빈자리가 없어요. 크기를 줄이거나 들어가는 가구만 하나씩 놓아 주세요.`,
     );
+  return placed;
+}
+// 지금 초안과 기다리는 초안을 한꺼번에 놓는다. 되돌리기 한 번으로 모두 물린다.
+function placeAllInto(turn) {
+  const list = [app.draft, ...app.queue].filter(Boolean);
+  if (!list.length) return placeDraftInto(turn);
+  const placed = placeBatch(app.state, list);
   snapshot();
-  app.state.items = staged.items;
+  app.state.items.push(...placed.map(({ item }) => item));
   const names = [];
   for (const [i, { item }] of placed.entries()) {
     linkPlacedDraft(list[i], item);
@@ -592,6 +599,27 @@ function runAction(action, arg, turn) {
         : typeof said === 'string'
           ? `다시 적용했어요. ${said}`
           : turn.text;
+      break;
+    }
+    case 'furnish-room': {
+      const next = structuredClone(s);
+      ops.switchSpace(next, arg.roomId);
+      const placed = placeBatch(
+        next,
+        arg.types.map((type) => makeItem(type)),
+      );
+      snapshot();
+      if (arg.roomId !== s.roomId) {
+        app.selected = null;
+        app.target = app.draft ? { type: 'draft' } : { type: 'room' };
+      }
+      next.items.push(...placed.map(({ item }) => item));
+      Object.assign(s, next, { scope: 'room' });
+      turn.roomId = s.roomId;
+      for (const { item } of placed)
+        turn.receipt.push({ label: '배치', to: TYPES[item.type].name });
+      turn.text = `${s.name}에 ${josa(placed.map(({ item }) => TYPES[item.type].name).join(', '), '을/를')} 놓았어요.`;
+      turn.surfaces.push({ kind: 'items', target: roomTarget() });
       break;
     }
     case 'focus-item': {
@@ -878,6 +906,7 @@ function finishTurn(turn, plan, meta) {
     status: 'done',
     ...meta,
   });
+  if (plan.spaceRequest) turn.spaceRequest = plan.spaceRequest;
   if (plan.recommendation) turn.recommendation = plan.recommendation;
   if (plan.confirmation) turn.confirmation = plan.confirmation;
   if (plan.note) turn.note = plan.note;
@@ -962,6 +991,17 @@ export async function send(raw) {
     );
     if (auto) await analyzePhoto();
     return;
+  }
+  if (last?.spaceRequest && last.roomId === app.state.roomId) {
+    const name = text.replace(/(?:으로|로)?(?:\s*해\s*줘|요)?[.!]?$/u, '').trim();
+    const type = detectRoomType(name);
+    if (type && (ROOM_TYPES[type].name === name || ['안방', '욕실', '부엌'].includes(name)))
+      return respondToText(
+        `${last.spaceRequest}. 거기는 ${ROOM_TYPES[type].name}임`,
+        turn,
+        history,
+        extra,
+      );
   }
   return respondToText(text, turn, history, extra);
 }
@@ -1754,20 +1794,20 @@ export function setFinish(key, color) {
   const error = editRoom((room) => ops.roomWithFinish(room, key, color));
   if (!error) rememberFinish(before);
 }
-function editWindow(change) {
+function editWindow(change, { live = false, inline = false } = {}) {
   try {
     const next = structuredClone(app.state);
     change(next);
-    snapshot();
+    if (!live) snapshot();
     Object.assign(app.state, next);
     commit();
   } catch (e) {
-    toast(e.message);
+    if (!inline) toast(e.message);
     return e.message;
   }
 }
 export const addWindow = (wall) => editWindow((s) => ops.addWindow(s, wall));
-export const setWindow = (id, patch) => editWindow((s) => ops.setWindow(s, id, patch));
+export const setWindow = (id, patch, opts) => editWindow((s) => ops.setWindow(s, id, patch), opts);
 export const removeWindow = (id) => editWindow((s) => ops.removeWindow(s, id));
 // 포인터 한 번의 조작을 실행 취소 한 번으로 묶고, 취소·무효 이동은 기록을 남기지 않는다.
 let windowGesture = null;

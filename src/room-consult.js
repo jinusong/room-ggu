@@ -48,9 +48,9 @@ export function unsupportedSpace(text) {
 // - neg: "화장실 말고", "왜 화장실로 만들어"처럼 아니라고 한 유형이다.
 // - new: 그 밖의 경우. 만들거나 바꾸려는 유형이다. strong은 "거실이라니까", "거실로 바꿔"처럼 못 박은 말이다.
 const REF_AFTER =
-  /^\s*(?:바로\s*)?(?:옆|앞|뒤|근처|맞은\s*편|건너편|왼쪽|오른쪽|위쪽|아래쪽|위에|아래에|쪽에|(?:이랑|랑|과|와|하고)\s*(?:붙|연결|이어|맞닿|나란)|에\s*(?:붙|이어|맞닿|연결))/;
+  /^\s*(?:의\s*)?(?:바로\s*)?(?:옆|앞|뒤|근처|맞은\s*편|건너편|왼쪽|오른쪽|위쪽|아래쪽|위에|아래에|쪽에|(?:이랑|랑|과|와|하고)\s*(?:붙|연결|이어|맞닿|나란)|에\s*(?:붙|이어|맞닿|연결))/;
 const NEG_AFTER =
-  /^\s*(?:이|가|은|는|으로|로)?\s*(?:말고|아니|아닌|아냐|아님|빼고|대신|(?:하지|만들지|바꾸지|넣지)\s*(?:말|마))/;
+  /^\s*(?:이|가|은|는|을|를|으로|로)?\s*(?:안\s*(?:만들|추가)|말고|아니|아닌|아냐|아님|빼고|대신|(?:하지|만들지|바꾸지|넣지)\s*(?:말|마))/;
 const BLAME_BEFORE = /왜|어째서|자꾸|계속|또\s/;
 const BLAME_AFTER =
   /^\s*(?:(?:으로|로)\s*(?:자꾸\s*|계속\s*)?(?:생성|고정|만들|만든|바꾸|바꿔|바꿨|해\s*놨|했|하냐|하는|되|돼|됐|나오|나와|잡|설정|인식|읽)|(?:이|가)\s*(?:됐|돼|된|되))/;
@@ -100,6 +100,16 @@ export const mentionsRoom = (text) => roomMentions(text).length > 0;
 // 새 공간을 만들자는 말인지. "옆에"로 자리를 짚었으면 "만들어", "붙여", "하나"만 있어도 그렇게 읽는다.
 const ADD_WORDS = /추가|하나\s*더|새로\s*만들|새\s*(?:방|공간)/;
 const ADD_NEAR = /붙여|붙이|만들|놓|두자|둬|하나|있었으면|필요|생성|달아|이어/;
+// 방을 만들지 말라는 명시적 요청은 모델이 생성 동작을 골라도 실행하지 않는다.
+export function deniesNewSpace(text) {
+  const denied =
+    /(?:(?<![가-힣])안\s*(?:만들|만드|붙|추가|생성)|(?:만들|붙이|추가하|생성하)지\s*(?:마|말|않))/.exec(
+      text,
+    );
+  if (!denied) return false;
+  const after = text.slice(denied.index + denied[0].length);
+  return !(detectRoomType(after) && /만들|추가|붙여|생성/.test(after));
+}
 export function wantsNewSpace(text, mentions = roomMentions(text)) {
   return ADD_WORDS.test(text) || (mentions.some((m) => m.role === 'ref') && ADD_NEAR.test(text));
 }
@@ -258,7 +268,8 @@ export function consultRoom(text, previous) {
     // 면적으로 크기를 잡았으면 말한 면적과 가정 여부.
     area: areaSaid,
     // 새 공간을 만들자고 했지만 어떤 공간인지는 말하지 않았다.
-    askType: wantsAdd && !type && /방|공간|룸/.test(text),
+    askType:
+      wantsAdd && !type && (/방|공간|룸/.test(text) || mentions.some((m) => m.role === 'ref')),
     // 지금 방이 이미 그 유형이다.
     same: !add && !changed && !!type && type === previous.type ? type : null,
   };
