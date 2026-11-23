@@ -12,6 +12,8 @@ async function openWindows(page, viewport) {
 
 for (const viewport of [
   { width: 1440, height: 900 },
+  { width: 1024, height: 768 },
+  { width: 900, height: 700 },
   { width: 390, height: 844 },
   { width: 320, height: 640 },
 ]) {
@@ -22,19 +24,21 @@ for (const viewport of [
     await page.getByRole('button', { name: '창문 추가', exact: true }).click();
     const editor = page.locator('[data-window]').first();
     await expect(editor).toBeVisible();
+    await editor.getByRole('combobox', { name: '창문 1 벽 방향' }).selectOption('left');
+    expect((await state(page)).room.windows[0].wall).toBe('left');
     await editor.getByRole('spinbutton', { name: '창문 1 폭', exact: true }).fill('150');
     await editor.getByRole('spinbutton', { name: '창문 1 벽 끝에서', exact: true }).fill('100');
-    await editor.getByRole('button', { name: '창문 변경 적용' }).click();
     expect((await state(page)).room.windows[0].width).toBe(1.5);
     await editor.getByRole('spinbutton', { name: '창문 1 폭', exact: true }).fill('1000');
-    await editor.getByRole('button', { name: '창문 변경 적용' }).click();
     await expect(editor.locator('[role=alert]')).toContainText('벽을 벗어나');
     await expect(editor.getByRole('spinbutton', { name: '창문 1 폭', exact: true })).toHaveValue(
       '1000',
     );
     expect((await state(page)).room.windows[0].width).toBe(1.5);
-    await editor.getByRole('spinbutton', { name: '창문 1 폭', exact: true }).fill('160');
-    await editor.getByRole('button', { name: '창문 변경 적용' }).click();
+    await editor.getByRole('spinbutton', { name: '창문 1 폭', exact: true }).blur();
+    const widthField = editor.getByRole('spinbutton', { name: '창문 1 폭', exact: true });
+    await widthField.fill('50');
+    await widthField.fill('160');
     expect((await state(page)).room.windows[0].width).toBe(1.6);
     await page.locator('#chat-input').fill('되돌려줘');
     await page.getByRole('button', { name: '설명 보내기' }).click();

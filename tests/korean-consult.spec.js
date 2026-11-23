@@ -225,3 +225,41 @@ test('상담 중 격자를 바꿔도 3D 방과 가구, 그림자 맵을 다시 �
   await answer(page);
   expect((await snapshot(page)).bed[0]).toBe(178);
 });
+
+test('거실 기본 가구는 지정한 방에 한 번만 놓고, 한 번에 되돌린다', async ({ page }) => {
+  await page.goto('/?model=off');
+  await page.waitForFunction(() => window.__roomggu?.ready());
+  const send = async (text) => {
+    await page.locator('#chat-input').fill(text);
+    await page.locator('#chat-input').press('Enter');
+    await expect(page.locator('.msg.user').last()).toContainText(text);
+  };
+  const read = () => page.evaluate(() => window.__roomggu.app.state);
+  await send('화장실 하나 추가해줘');
+  const bath = await read();
+  await send('화장실의 오른쪽에다가 방 하나 만들어줘');
+  await expect(page.locator('.msg.assistant').last()).toContainText('어떤 공간을 추가할까요');
+  expect((await read()).roomOrder).toEqual(bath.roomOrder);
+  await page.reload();
+  await page.waitForFunction(() => window.__roomggu?.ready());
+  await send('거실');
+  const living = await read();
+  expect(living.room.type).toBe('living');
+  expect(living.roomOrder.length).toBe(bath.roomOrder.length + 1);
+  await send('화장실 하나 추가해줘');
+  const before = await read();
+  await send('거실에 있을 법한 가구를 배치해줘');
+  await expect(page.locator('.msg.assistant').last()).toContainText('놓았어요');
+  const furnished = await read();
+  expect(furnished.roomId).toBe(living.roomId);
+  expect(furnished.items.map((i) => i.type)).toEqual(['sofa', 'coffee', 'tvstand']);
+  expect(furnished.otherRooms.find((r) => r.roomId === before.roomId).items).toEqual(before.items);
+  await send('거실 가구 세팅해줘');
+  await expect(page.locator('.msg.assistant').last()).toContainText('기본 가구가 모두 있어요');
+  expect((await read()).items).toEqual(furnished.items);
+  await send('되돌려줘');
+  expect((await read()).roomId).toBe(before.roomId);
+  expect((await read()).otherRooms.find((r) => r.roomId === living.roomId).items).toEqual(
+    living.items,
+  );
+});

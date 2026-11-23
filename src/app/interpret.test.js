@@ -646,3 +646,41 @@ test('띄어 쓴 여러 단어의 가구 이름도 목록의 가구로 처리한
     assert.equal(p.changes.draft.dims[1], 144);
   }
 });
+
+test('화장실은 붙일 기준이고, 유형이 없거나 생성을 거절하면 모델도 방을 만들지 않는다', () => {
+  const state = bathroomHome();
+  const ctx = { state, target: room };
+  for (const [text, ask, added] of [
+    ['화장실의 바로 옆에다가 방 하나 만들어줘', 'space-type', undefined],
+    ['화장실 옆에다가 하나만 만들어줘', 'space-type', undefined],
+    ['화장실 옆에다가 안 만들어줘', 'no-add', undefined],
+    ['화장실 오른쪽에 안방 만들어줘', undefined, 'bedroom'],
+  ]) {
+    for (const wrongType of ['bathroom', 'office']) {
+      for (const result of [
+        planTurn(text, ctx),
+        planFromModel(
+          model({ intent: 'action', action: 'new_space', room_type: wrongType }),
+          text,
+          ctx,
+        ),
+      ]) {
+        assert.equal(result.ask, ask, text);
+        assert.equal(result.changes?.addSpace, added, text);
+        if (added) assert.equal(result.changes.near.side, 'right');
+      }
+    }
+  }
+});
+
+test('준비한 가구를 넣어 달라는 요청은 초안 하나에 적용한다', () => {
+  const draft = makeItem('desk');
+  const ctx = { state: freshState(), draft, target: { type: 'draft' } };
+  for (const text of ['가구 넣어줘', '이 가구 넣어줘']) {
+    assert.equal(planTurn(text, ctx).action, 'place');
+    assert.equal(
+      planFromModel(model({ intent: 'action', action: 'place' }), text, ctx).action,
+      'place',
+    );
+  }
+});

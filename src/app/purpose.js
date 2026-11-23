@@ -145,7 +145,21 @@ export function activityTypes(text) {
   ];
 }
 
+export function requestsRoomFurniture(text) {
+  return (
+    /가구(?:들)?(?:를|로|가|는|도)?\s*(?:(?:자동(?:으로)?|알아서|한꺼번에|전부|좀|일단)\s*)*(?:(?:놓아|놔|넣어|채워|배치해|준비해|[세셋]팅(?:해)?)\s*(?:줘요?|주세요|주라|달라(?:고|니까)?|봐|보자|부탁해)?|배치하자)[.!~\s]*$/.test(
+      text,
+    ) &&
+    !/(?:이|그|저|내|고른|있는)\s+가구|기존|배치된|놓인|놓여|다시|재배치|지\s*(?:마|말)|말고|어떻게|방법/.test(
+      text,
+    ) &&
+    !furnitureMentions(text).length &&
+    !activityTypes(text).length
+  );
+}
+
 export function purposeRequest(text) {
+  if (requestsRoomFurniture(text)) return null;
   if (
     /되돌|삭제|비워|회전|복제|치워|(?:이|그|저)\s*가구.{0,15}(?:고쳐|수정|옮|바꾸|줄|늘|바꿔)|(?:가구|배치)(?:를|들)?\s*(?:정리하|저장|불러)|로\s*바꿔|(?:방|공간)(?:을|으로)?\s*(?:꾸며|꾸미|만들|추가|추천)|(?:공부|독서|작업|운동|수면)할\s*(?:방|공간)|아바타/.test(
       text,

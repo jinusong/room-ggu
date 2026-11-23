@@ -470,29 +470,28 @@ function RoomType() {
 }
 
 function WindowEditor({ window: w, index }) {
-  const [values, setValues] = useState(w);
-  const [error, setError] = useState('');
-  useLayoutEffect(() => {
-    setValues(w);
-    setError('');
-  }, [w]);
-  const update = (key, value) => {
-    setValues({ ...values, [key]: value });
-    setError('');
+  const [invalid, setInvalid] = useState(null);
+  const edit = useRef(null);
+  const errorId = `window-error-${w.id}`;
+  useLayoutEffect(() => setInvalid(null), [w]);
+  // 한 입력란에서 연속으로 친 유효한 숫자는 한 번에 되돌린다.
+  const save = (key, value) => {
+    if (w[key] === value) {
+      setInvalid(null);
+      return;
+    }
+    const message = store.setWindow(
+      w.id,
+      { [key]: value },
+      { live: edit.current?.key === key && edit.current.window === w, inline: true },
+    );
+    if (message) return message;
+    if (key !== 'wall')
+      edit.current = { key, window: app.state.room.windows.find((entry) => entry.id === w.id) };
+    setInvalid(null);
   };
   return (
-    <form
-      class="window-editor"
-      data-window={w.id}
-      onSubmit={(e) => {
-        e.preventDefault();
-        const patch = Object.fromEntries(
-          ['offset', 'width', 'height', 'sill'].map((k) => [k, Number(values[k])]),
-        );
-        patch.wall = values.wall;
-        setError(store.setWindow(w.id, patch) || '');
-      }}
-    >
+    <div class="window-editor" data-window={w.id}>
       <div class="window-head">
         <strong>창문 {index + 1}</strong>
         <Tape source="사용자 설정">직접 설정</Tape>
@@ -509,8 +508,16 @@ function WindowEditor({ window: w, index }) {
         벽 방향
         <select
           aria-label={`창문 ${index + 1} 벽 방향`}
-          value={values.wall}
-          onChange={(e) => update('wall', e.currentTarget.value)}
+          value={w.wall}
+          onChange={(e) => {
+            const message = save('wall', e.currentTarget.value);
+            if (message) {
+              e.currentTarget.value = w.wall;
+              setInvalid({ key: 'wall', message });
+            }
+          }}
+          aria-invalid={invalid?.key === 'wall' || undefined}
+          aria-describedby={invalid?.key === 'wall' ? errorId : undefined}
         >
           {Object.entries(WINDOW_WALLS).map(([key, label]) => (
             <option key={key} value={key}>
@@ -536,15 +543,27 @@ function WindowEditor({ window: w, index }) {
                 max={1500}
                 step="1"
                 required
-                value={
-                  values[key] === '' ? '' : Math.round(Number(values[key]) * 100 * 1000) / 1000
-                }
-                onInput={(e) =>
-                  update(
-                    key,
-                    e.currentTarget.value === '' ? '' : Number(e.currentTarget.value) / 100,
-                  )
-                }
+                value={invalid?.key === key ? invalid.raw : Math.round(w[key] * 100000) / 1000}
+                aria-invalid={(invalid?.key === key && !!invalid.message) || undefined}
+                aria-describedby={invalid?.key === key && invalid.message ? errorId : undefined}
+                onFocus={() => {
+                  edit.current = null;
+                }}
+                onInput={(e) => {
+                  const field = e.currentTarget;
+                  const raw = field.value;
+                  const message = field.validity.valid
+                    ? save(key, field.valueAsNumber / 100)
+                    : `${label}에 ${min}~1500cm 사이의 정수를 입력해 주세요.`;
+                  if (message) setInvalid({ key, raw, message });
+                }}
+                onBlur={() => {
+                  edit.current = null;
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229)
+                    e.currentTarget.blur();
+                }}
               />
               <small>cm</small>
             </span>
@@ -552,13 +571,10 @@ function WindowEditor({ window: w, index }) {
         ))}
       </div>
       <p class="surface-hint">벽 끝은 정면 벽의 왼쪽 끝, 옆벽의 위쪽 끝이에요.</p>
-      <div class="window-error" role="alert">
-        {error}
+      <div class="window-error" role="alert" id={errorId}>
+        {invalid?.message}
       </div>
-      <button class="btn" type="submit">
-        창문 변경 적용
-      </button>
-    </form>
+    </div>
   );
 }
 function Windows() {
