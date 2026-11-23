@@ -653,11 +653,54 @@ function AddRoomPop({ side, mobile }) {
 }
 
 // 집 전체에서 공간마다 붙는 이름표. 고른 공간의 이름표에서 바로 방 편집으로 들어간다.
+// 고른 공간의 휴지통 단추는 바로 지우지 않고 이름표 안에서 한 번 더 묻는다. 다른 곳을 누르거나 Esc면 취소한다.
 function RoomTags() {
-  const s = app.state;
-  return spaces(s).map((r) => {
+  const s = app.state,
+    list = spaces(s),
+    [confirm, setConfirm] = useState(null),
+    askRef = useRef(null);
+  useEffect(() => {
+    if (!confirm) return;
+    if (confirm !== s.roomId || !list.some((r) => r.roomId === confirm)) return setConfirm(null);
+    askRef.current?.querySelector('.tag-cancel')?.focus({ preventScroll: true });
+    const away = (e) => !askRef.current?.contains(e.target) && setConfirm(null),
+      esc = (e) => e.key === 'Escape' && setConfirm(null);
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [confirm, s.roomId, list.length]);
+  return list.map((r) => {
     const selected = r.roomId === s.roomId,
       dims = `${r.room.w} × ${r.room.d}m`;
+    if (selected && confirm === r.roomId)
+      return (
+        <div
+          key={r.roomId}
+          ref={askRef}
+          class="stage-tag room-tag is-selected is-asking"
+          data-room-tag={r.roomId}
+          role="group"
+          aria-label={`${r.name} 삭제 확인`}
+        >
+          <span class="tag-ask">
+            {josa(r.name, '을/를')} 지울까요?
+            {r.items.length ? ` 가구 ${r.items.length}개도 함께 지워져요.` : ''}
+          </span>
+          <button
+            class="tag-confirm"
+            data-room-delete-confirm
+            onClick={() => (setConfirm(null), store.deleteSpace(r.roomId))}
+          >
+            삭제
+          </button>
+          <button class="tag-cancel" onClick={() => setConfirm(null)}>
+            취소
+          </button>
+        </div>
+      );
     return (
       <div
         key={r.roomId}
@@ -687,6 +730,18 @@ function RoomTags() {
             onClick={() => store.rotateSpace(r.roomId)}
           >
             <Icon name="rotate-cw" size={14} />
+          </button>
+        )}
+        {selected && (
+          <button
+            class="tag-delete"
+            aria-label="선택한 방 지우기"
+            title={list.length > 1 ? '방 지우기' : '마지막 공간은 지울 수 없어요'}
+            disabled={list.length < 2}
+            data-room-delete
+            onClick={() => setConfirm(r.roomId)}
+          >
+            <Icon name="trash-2" size={14} />
           </button>
         )}
         {selected && (

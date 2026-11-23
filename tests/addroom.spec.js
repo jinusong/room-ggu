@@ -136,3 +136,31 @@ for (const size of [
     await expect(list).toHaveCount(0);
   });
 }
+
+test('집 전체에서 고른 방의 휴지통을 누르면 이름표에서 확인한 뒤 지우고 되돌릴 수 있다', async ({
+  page,
+}) => {
+  await openHouse(page);
+  await page.evaluate(() => window.__roomggu.store.addSpace('bedroom'));
+  await frames(page);
+  const bed = await page.evaluate(() => window.__roomggu.app.state.roomId);
+  const tag = page.locator(`[data-room-tag="${bed}"]`);
+  await tag.locator('[data-room-delete]').click();
+  await expect(tag).toHaveClass(/is-asking/);
+  await expect(tag).toContainText('나의 침실을 지울까요?');
+  await page.screenshot({ path: 'test-results/room-delete-ask.png' });
+  // Esc는 취소한다.
+  await page.keyboard.press('Escape');
+  await expect(tag).not.toHaveClass(/is-asking/);
+  await tag.locator('[data-room-delete]').click();
+  await tag.locator('[data-room-delete-confirm]').click();
+  await expect(page.locator(`[data-room-tag="${bed}"]`)).toHaveCount(0);
+  expect((await stored(page)).otherRooms.length).toBe(0);
+  await page.locator('#undo').click();
+  await expect(page.locator(`[data-room-tag="${bed}"]`)).toHaveCount(1);
+  // 마지막 공간이면 휴지통을 끈다.
+  await page.locator('[data-room-tag] .tag-main').first().click();
+  await page.evaluate(() => window.__roomggu.store.deleteSpace(window.__roomggu.app.state.roomId));
+  await frames(page);
+  await expect(page.locator('[data-room-delete]')).toBeDisabled();
+});
