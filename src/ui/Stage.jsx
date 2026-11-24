@@ -1083,6 +1083,17 @@ export function Stage({ mobile, sheetRef }) {
 
   const s = app.state,
     warn = layoutWarnings(s);
+  const [problemItems, problemLabel] =
+    [
+      [warn.oversized, '방을 넘는 가구'],
+      [warn.blockedDoors, '문 앞을 막는 가구'],
+      [warn.blockedWindows, '창 앞을 가리는 가구'],
+      [warn.conflicts, '겹친 가구'],
+    ].find(([ids]) => ids.size) || [];
+  const findProblemItem = () => {
+    const ids = [...problemItems];
+    store.select(ids[(ids.indexOf(app.selected) + 1) % ids.length]);
+  };
   const house = s.scope === 'house';
   const empty = !house && !s.items.length && !app.draft;
   const avatarOn = !!avatarLayout(s);
@@ -1155,20 +1166,17 @@ export function Stage({ mobile, sheetRef }) {
           <MoreMenu mobile={mobile} />
         </div>
       </div>
-      {!house && warn.all.size > 0 && (
-        <div class="stage-warning" id="warning" role="status">
+      {!house && problemItems && (
+        <div class="stage-warning" id="warning">
           <Icon name="triangle-alert" size={16} />
-          <span>
-            {warn.oversized.size
-              ? `방을 넘는 가구 ${warn.oversized.size}개`
-              : warn.blockedDoors.size
-                ? `문 앞을 막는 가구 ${warn.blockedDoors.size}개`
-                : warn.blockedWindows.size
-                  ? `창 앞을 가리는 가구 ${warn.blockedWindows.size}개`
-                  : `겹친 가구 ${warn.conflicts.size}개`}
+          <span role="status">
+            {problemLabel} {problemItems.size}개
           </span>
-          <button class="link" onClick={() => store.relocate()}>
-            빈자리로 옮기기
+          <button class="link" aria-label={`${problemLabel} 찾기`} onClick={findProblemItem}>
+            찾기
+          </button>
+          <button class="link" onClick={() => store.relocate('배치 경고 정리')}>
+            자동 정리
           </button>
         </div>
       )}

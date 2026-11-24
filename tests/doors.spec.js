@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { makeItem, freshState, spaces } from '../src/data.js';
+import { roomOpenings } from '../src/floorplan.js';
+import { addSpace, switchSpace } from '../src/app/ops.js';
 
 // 연결 문을 화면에서 직접 옮기고, 폭·여는 방향을 바꾸고, 막았다가 다시 내는 흐름.
 const stored = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('room-ggu-v2')));
@@ -45,6 +48,58 @@ const doors3d = (page) =>
     });
     return out;
   });
+
+for (const [width, height] of [
+  [1440, 900],
+  [1024, 900],
+  [900, 900],
+  [390, 844],
+  [320, 640],
+]) {
+  test(`문 앞을 막는 가구 찾기와 이동을 되돌리기 (${width}px)`, async ({ page }) => {
+    const state = freshState();
+    const room = state.roomId;
+    addSpace(state, 'bathroom', 'right');
+    switchSpace(state, room);
+    const [door] = roomOpenings(spaces(state), state.floorplan, room);
+    const chair = { ...makeItem('chair'), x: door.x - 0.27, z: door.z, name: '문 앞 의자' };
+    const desk = { ...makeItem('desk'), x: -1, z: 1, name: '책상' };
+    Object.assign(state, { view: '2d', scope: 'room', items: [chair, desk] });
+    await page.setViewportSize({ width, height });
+    await page.addInitScript((s) => localStorage.setItem('room-ggu-v2', JSON.stringify(s)), state);
+    await page.goto('/?model=off');
+    const warning = page.locator('#warning');
+    const find = warning.getByRole('button', { name: '문 앞을 막는 가구 찾기' });
+    await expect(warning).toContainText('문 앞을 막는 가구 1개');
+    await expect(find).toBeInViewport();
+    expect((await find.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await find.press('Enter');
+    const bar = page.getByRole('group', { name: '문 앞 의자 도구' });
+    await expect(bar).toBeVisible();
+    if (width < 900) {
+      // CSS 글꼴과 좌표 반올림에 따라 8px 여백에 1px 이내의 차이가 날 수 있다.
+      await expect.poll(async () => (await bar.boundingBox()).x).toBeGreaterThanOrEqual(7);
+      const { x, width: barWidth } = await bar.boundingBox();
+      expect(x + barWidth).toBeLessThanOrEqual(width - 7);
+      for (const button of await bar.getByRole('button').all()) {
+        const box = await button.boundingBox();
+        expect(box.width).toBeGreaterThanOrEqual(44);
+        expect(box.height).toBeGreaterThanOrEqual(44);
+      }
+    }
+    expect((await stored(page)).items).toEqual(state.items);
+    if (width === 1440 || width === 320)
+      await page.screenshot({ path: `test-results/door-warning-${width}.png` });
+    await warning.getByRole('button', { name: '자동 정리' }).click();
+    await expect(warning).toHaveCount(0);
+    expect((await stored(page)).items[0]).not.toEqual(chair);
+    expect((await stored(page)).items[1]).toEqual(desk);
+    await page.getByRole('button', { name: '실행 취소', exact: true }).click();
+    await expect(warning).toBeVisible();
+    expect((await stored(page)).items).toEqual(state.items);
+    await expect(page.locator('#chat-input')).toBeInViewport();
+  });
+}
 
 test('문을 끌어 옮기고 폭·여는 방향을 바꾸면 2D·3D·방 편집 화면이 함께 바뀐다', async ({
   page,

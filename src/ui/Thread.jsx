@@ -180,6 +180,11 @@ function Turn({ turn, live, latest, canUndo, showMeta }) {
           </p>
         )}
         {turn.status === 'thinking' && <Thinking />}
+        {latest && turn.photoId && turn.photoId === app.photo?.surfaceId && (
+          <button class="chip photo-edit-kind" onClick={() => store.openPhotoKinds(turn.photoId)}>
+            사진 종류 다시 고르기
+          </button>
+        )}
         {turn.surfaces?.map((s) => (
           <A2uiSurface
             key={s.id}

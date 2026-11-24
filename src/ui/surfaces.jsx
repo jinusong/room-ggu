@@ -1326,9 +1326,17 @@ function Items() {
 }
 
 function Photo({ spec }) {
-  const [allKinds, setAllKinds] = useState(false);
   const [query, setQuery] = useState('');
+  const search = useRef(null);
   const p = app.photo;
+  const kindSearch = p?.surfaceId === spec.id ? p.kindSearch : 0;
+  const allKinds = Boolean(kindSearch);
+  useEffect(() => {
+    const field = search.current;
+    if (!kindSearch || !field) return;
+    field.scrollIntoView({ block: 'center', behavior: 'instant' });
+    field.focus({ preventScroll: true });
+  }, [kindSearch]);
   if (!p || p.surfaceId !== spec.id)
     return (
       <>
@@ -1435,7 +1443,15 @@ function Photo({ spec }) {
             {TYPES[k].name}
           </button>
         ))}
-        <button class="chip" aria-expanded={allKinds} onClick={() => setAllKinds(!allKinds)}>
+        <button
+          class="chip"
+          aria-expanded={allKinds}
+          onClick={(e) => {
+            p.kindSearch = allKinds ? 0 : 1;
+            if (allKinds) e.currentTarget.focus();
+            store.emit();
+          }}
+        >
           다른 종류
         </button>
       </div>
@@ -1444,6 +1460,7 @@ function Photo({ spec }) {
           <label class="search">
             <Icon name="search" size={16} />
             <input
+              ref={search}
               aria-label="사진의 가구 종류 검색"
               placeholder="가구 이름으로 검색"
               value={query}

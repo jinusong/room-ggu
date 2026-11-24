@@ -263,3 +263,32 @@ test('거실 기본 가구는 지정한 방에 한 번만 놓고, 한 번에 되
     living.items,
   );
 });
+
+test('방 종류를 되물었을 때 별칭으로 답해도 기준 공간과 처음 치수를 유지한다', async ({ page }) => {
+  await page.goto('/?model=off');
+  await page.waitForFunction(() => window.__roomggu?.ready());
+  const read = () => page.evaluate(() => window.__roomggu.app.state);
+  const chat = page.locator('#chat-input');
+  for (const text of [
+    '화장실 하나 추가해줘',
+    '화장실 오른쪽에 가로 3m 세로 2.5m짜리 방 하나 추가해줘',
+  ]) {
+    await chat.fill(text);
+    await chat.press('Enter');
+  }
+  await expect(page.locator('.msg.assistant').last()).toContainText('어떤 공간을 추가할까요');
+  const before = await read();
+  await page.reload();
+  await page.waitForFunction(() => window.__roomggu?.ready());
+  await chat.fill('공부방으로 해주세요');
+  await chat.press('Enter');
+  await expect(page.locator('.msg.assistant').last()).toContainText('나의 공부방');
+  const after = await read();
+  expect(after.roomOrder).toHaveLength(before.roomOrder.length + 1);
+  expect(after.name).toBe('나의 공부방');
+  expect(after.room).toMatchObject({ type: 'office', w: 3, d: 2.5 });
+  expect(after.floorplan.positions[after.roomId].x).toBeCloseTo(
+    before.floorplan.positions[before.roomId].x + (before.room.w + after.room.w) / 2,
+  );
+  expect(after.otherRooms.find((r) => r.roomId === before.roomId).room).toEqual(before.room);
+});

@@ -24,7 +24,7 @@ import {
 } from './consult-context.js';
 import { furnitureMentions } from '../estimator.js';
 import { planFromModel } from './interpret.js';
-import { detectRoomType } from '../room-consult.js';
+import { spaceTypeAnswer } from '../room-consult.js';
 import { photoCandidates, PHOTO_CONFIDENT } from './photo.js';
 import { josa, dimsText } from './text.js';
 import { parseComparisonCommand, avatarLayout, poseAccepts, standAt } from '../avatar.js';
@@ -993,15 +993,8 @@ export async function send(raw) {
     return;
   }
   if (last?.spaceRequest && last.roomId === app.state.roomId) {
-    const name = text.replace(/(?:으로|로)?(?:\s*해\s*줘|요)?[.!]?$/u, '').trim();
-    const type = detectRoomType(name);
-    if (type && (ROOM_TYPES[type].name === name || ['안방', '욕실', '부엌'].includes(name)))
-      return respondToText(
-        `${last.spaceRequest}. 거기는 ${ROOM_TYPES[type].name}임`,
-        turn,
-        history,
-        extra,
-      );
+    const name = spaceTypeAnswer(text);
+    if (name) return respondToText(`${last.spaceRequest}. 거기는 ${name}임`, turn, history, extra);
   }
   return respondToText(text, turn, history, extra);
 }
@@ -1724,6 +1717,7 @@ export function createDraft(type, { via = 'catalog' } = {}) {
   const turn = push({
     role: 'assistant',
     text: `${TYPES[type].name} 초안을 방 안에 먼저 띄웠어요. 규격을 고르거나 아는 치수를 말해 주세요.`,
+    photoId: photo?.surfaceId,
     surfaces: [{ kind: 'furniture-size', target: { type: 'draft', id: item.id } }],
     suggestions: [
       { label: '방에 놓기', action: 'place', primary: true },
@@ -2223,6 +2217,14 @@ export function registerPhotoInput(el) {
 export function pickPhoto() {
   photoInput?.click();
 }
+export function openPhotoKinds(id) {
+  if (!id || id !== app.photo?.surfaceId) return;
+  const card = app.thread.flatMap((t) => t.surfaces || []).find((s) => s.id === id);
+  if (!card) return;
+  card.open = true;
+  app.photo.kindSearch = (app.photo.kindSearch || 0) + 1;
+  emit();
+}
 export async function attachPhoto(file) {
   if (!file) return;
   const seq = ++photoReadSeq;
@@ -2339,6 +2341,7 @@ export async function analyzePhoto() {
     const turn = push({
       role: 'assistant',
       engine: 'siglip',
+      photoId: photo.surfaceId,
       text: !sameRoom
         ? '사진 판별 중 공간이 바뀌어 초안을 만들지 않았어요. 사진을 보낸 공간으로 돌아온 뒤 종류를 골라 주세요.'
         : !unchanged
@@ -2346,7 +2349,7 @@ export async function analyzePhoto() {
           : conflict
             ? `사진은 ${TYPES[top.type].name}, 설명은 ${TYPES[described[0]].name}을 가리켜요. 어느 쪽인지 골라 주세요. 치수와 색은 고른 가구에 반영할게요.`
             : sure
-              ? `사진은 ${josa(names[0], '으로/로')} 보여요. 크기는 유형 기본값이며 사진에서 실제 cm를 잰 값은 아니에요.`
+              ? `사진은 ${josa(names[0], '으로/로')} 보여요. 사진만으로는 치수를 잴 수 없어요.`
               : top
                 ? `사진만으로는 종류를 확신하기 어려워요. 가까운 후보는 ${josa(names.join(', '), '이에요/예요')}. 맞는 것을 고르면 함께 보낸 설명도 반영해요.`
                 : '사진에서 가구 종류를 읽지 못했어요. 아래에서 종류를 골라 주세요. 함께 보낸 설명은 보관하고 있어요.',

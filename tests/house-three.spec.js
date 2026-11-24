@@ -85,12 +85,27 @@ test('화장실 포함 집 전체 3D: 회전·선택·편집·복원·PNG', asyn
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   );
-  const editPoint = await page.evaluate(
-    (id) => window.__roomggu.app.scenes.three.roomAnchor(id),
-    bath,
-  );
+  const editPoint = await page.evaluate((id) => {
+    const scene = window.__roomggu.app.scenes.three;
+    const canvas = scene.renderer.domElement;
+    const center = scene.roomAnchor(id);
+    // 고른 방의 이름표와 회전 버튼이 바닥 위에 겹칠 수 있다.
+    for (const dy of [0, -16, -32, -48, 16, 32, 48])
+      for (const dx of [0, -16, 16, -32, 32]) {
+        const x = Math.round(center.x + dx),
+          y = Math.round(center.y + dy);
+        if (
+          document.elementFromPoint(x, y) === canvas &&
+          scene.pickRoom({ clientX: x, clientY: y }) === id
+        )
+          return { x, y };
+      }
+    return null;
+  }, bath);
+  expect(editPoint).not.toBeNull();
   await page.mouse.dblclick(editPoint.x, editPoint.y);
-  expect((await stored(page)).scope).toBe('room');
+  await expect.poll(async () => (await stored(page)).scope).toBe('room');
+  expect((await stored(page)).room).toEqual(initial.otherRooms[0].room);
   await page.getByRole('button', { name: '3D 모형', exact: true }).click();
   await page.evaluate(() => {
     const sc = window.__roomggu.app.scenes.three,

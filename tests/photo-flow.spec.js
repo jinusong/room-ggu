@@ -515,6 +515,36 @@ test('사진과 설명의 가구 종류가 다르면 확인하고 고른 가구�
   expect((await snapshot(page)).draft).toMatchObject({ type: 'bed', dims: [130, 55, 70] });
 });
 
+test('사진 판별 답에서 전체 종류를 열고 고쳐도 직접 말한 치수는 보존한다', async ({ page }) => {
+  await start(page, { mobile: true });
+  await page.locator('#ask-later').click();
+  await sendPhoto(page, '가로 120cm 깊이 60cm');
+  await page.getByRole('button', { name: '사진으로 종류 확인' }).click();
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => window.__finishPhoto('bed'));
+  const correction = page.getByRole('button', { name: '사진 종류 다시 고르기', exact: true });
+  await expect(correction).toBeVisible();
+  await correction.click();
+  const query = page.getByRole('textbox', { name: '사진의 가구 종류 검색' });
+  await expect(query).toBeFocused();
+  await expect
+    .poll(async () =>
+      query.evaluate((el) => {
+        const { x, y, width, height } = el.getBoundingClientRect();
+        return document.elementFromPoint(x + width / 2, y + height / 2) === el;
+      }),
+    )
+    .toBe(true);
+  await query.fill('책상');
+  await page.locator('.photo-kind-grid').getByRole('button', { name: '책상', exact: true }).click();
+  expect((await snapshot(page)).draft).toMatchObject({
+    type: 'desk',
+    dims: [120, 74, 60],
+    sources: ['사용자 설정', '사진 유형 기본값', '사용자 설정'],
+  });
+  await expect(page.locator('#chat-input')).toBeInViewport();
+});
+
 test('사진 Worker 오류 뒤 직접 고른 종류에 원래 설명의 치수를 반영한다', async ({ page }) => {
   await start(page);
   await sendPhoto(page, '침대 가로 130cm 깊이 67cm');

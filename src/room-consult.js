@@ -95,6 +95,16 @@ export function assertedType(mentions) {
   return (wanted.filter((m) => m.strong).at(-1) || wanted[0])?.type || null;
 }
 export const detectRoomType = (text) => assertedType(roomMentions(text));
+export function spaceTypeAnswer(text) {
+  const [mention] = roomMentions(text);
+  if (mention?.index !== 0 || mention.role !== 'new') return null;
+  const ending = text.slice(mention.name.length).trim();
+  return /^(?:(?:으로|로)\s*)?(?:해\s*(?:줘요?|주세요)|할게요?|이야|이에요|예요|입니다|요)?[.!?]?$/u.test(
+    ending,
+  )
+    ? mention.name
+    : null;
+}
 // 어떤 뜻으로든 공간 이름이 나왔는지. 방 이야기인지 가를 때 쓴다.
 export const mentionsRoom = (text) => roomMentions(text).length > 0;
 // 새 공간을 만들자는 말인지. "옆에"로 자리를 짚었으면 "만들어", "붙여", "하나"만 있어도 그렇게 읽는다.
