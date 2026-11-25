@@ -1,6 +1,7 @@
 import { TYPES } from '../catalog.js';
 import { spaces } from '../data.js';
 import { furnitureMentions } from '../estimator.js';
+import { spaceReferenceTail } from '../room-consult.js';
 import { NOT_THIS, lengthCm, numericCorrection, relativeSize, sizeFields } from '../dimensions.js';
 
 const separator = /[!?\n]|\.(?!\d)|,\s*|\s+그리고\s+/g;
@@ -84,9 +85,10 @@ export function namedEdit(text, state) {
     if (!hit) continue;
     const end = hit.index + hit[0].length;
     const tail = rest.slice(end);
-    if (reference.test(tail) || exception.test(tail)) continue;
-    hits.push({ room, at: hit.index, end, tail });
+    if (exception.test(tail)) continue;
     rest = rest.slice(0, hit.index) + ' '.repeat(hit[0].length) + rest.slice(end);
+    if (reference.test(tail) || spaceReferenceTail(tail)) continue;
+    hits.push({ room, at: hit.index, end, tail });
   }
   if (hits.length > 1 && !editing) return null;
   if (hits.length > 1) return { guard: ask('어느 방부터 바꿀까요? 방 이름을 하나 골라 주세요.') };

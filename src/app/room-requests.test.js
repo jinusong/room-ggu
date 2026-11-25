@@ -93,16 +93,18 @@ test('용도만 말했으면 그 용도와 맞는 모델 유형만 따른다', (
 });
 
 test('따로 유형이 없는 공간은 가까운 유형으로 만들고 말한 이름을 붙인다', () => {
-  for (const [t, type, name] of [
+  for (const [t, type, name, anchorType] of [
     ['공부방 하나 추가해줘', 'office', '나의 공부방'],
     ['손님방 하나 추가해줘', 'bedroom', '나의 손님방'],
     ['드레스룸 하나 추가해줘', 'bedroom', '나의 드레스룸'],
     ['침실 하나 추가해줘', 'bedroom', '나의 침실'],
-    ['서재 옆에 손님방 하나 추가해줘', 'bedroom', '나의 손님방'],
+    ['서재 옆에 손님방 하나 추가해줘', 'bedroom', '나의 손님방', 'office'],
   ]) {
-    const s = freshState(),
-      p = planTurn(t, { state: s, target: room });
-    ops.addSpace(s, p.changes.addSpace, null, { room: p.changes.room, label: p.changes.label });
+    const s = freshState();
+    if (anchorType) ops.addSpace(s, anchorType);
+    const p = planTurn(t, { state: s, target: room });
+    assert.equal(p.changes.addSpace, type, t);
+    ops.addSpace(s, type, null, { room: p.changes.room, label: p.changes.label });
     assert.equal(s.room.type, type, t);
     assert.equal(s.name, name, t);
   }

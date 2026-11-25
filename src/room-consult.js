@@ -69,11 +69,16 @@ const SIDE_AFTER = [
 const CURRENT_SPACE =
   /(?<![\p{L}\p{N}])(?:(?:이|내|우리|지금|현재)\s*)?(?:방|공간)|(?<![\p{L}\p{N}])여기/gu;
 
+export function spaceReferenceTail(text) {
+  return REF_AFTER.test(text)
+    ? { side: SIDE_AFTER.find(([, pattern]) => pattern.test(text))?.[0] || null }
+    : null;
+}
+
 export function currentSpaceReference(text) {
   for (const match of text.matchAll(CURRENT_SPACE)) {
-    const after = text.slice(match.index + match[0].length);
-    if (REF_AFTER.test(after))
-      return { side: SIDE_AFTER.find(([, pattern]) => pattern.test(after))?.[0] || null };
+    const reference = spaceReferenceTail(text.slice(match.index + match[0].length));
+    if (reference) return reference;
   }
   return null;
 }
@@ -83,7 +88,7 @@ export function roomMentions(text) {
   for (const [type, re] of Object.entries(roomAliases))
     for (const m of t.matchAll(new RegExp(re.source, 'g'))) {
       const end = m.index + m[0].length,
-        after = t.slice(end, end + 24),
+        after = t.slice(end, end + 24).replace(/^\s+\d+(?=\s)/u, ''),
         // 같은 문장 안에서만 "왜 … 로 만들어" 같은 따지는 말을 찾는다.
         before = t
           .slice(0, m.index)

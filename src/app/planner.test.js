@@ -307,10 +307,9 @@ test('자리를 가리킨 공간 이름은 새 공간 유형으로 읽지 않고
   assert.equal(p.changes.room.type, 'living');
   assert.deepEqual(p.changes.near, { roomId: s.roomId, name: '나의 화장실', side: null });
   const q = planTurn('침실 오른쪽에 서재 붙여줘', { state: s, target: room });
-  assert.equal(q.changes.addSpace, 'office');
-  assert.equal(q.changes.near.side, 'right');
-  // 침실이 아직 없으면 지금 방을 기준으로 하고 그 사실을 알린다.
-  assert.equal(q.changes.near.missing, '침실');
+  assert.equal(q.ask, 'space-anchor');
+  assert.match(q.reply, /침실이 없어요/);
+  assert.deepEqual(q.changes, {});
   assert.deepEqual(
     roomMentions('화장실 옆에 방하나 추가하자. 거기는 거실임').map((m) => [m.type, m.role]),
     [

@@ -212,7 +212,7 @@ export function planFromModel(raw, text, ctx) {
   const rule = planTurn(t, ctx, request);
   if (
     rule.batchLimit ||
-    ['constraint', 'item', 'mood', 'no-add', 'delete-space'].includes(rule.ask)
+    ['constraint', 'item', 'mood', 'no-add', 'delete-space', 'space-anchor'].includes(rule.ask)
   ) {
     fixes.push(
       rule.ask === 'no-add'
@@ -441,7 +441,7 @@ function newSpacePlan(type, t, v, ctx) {
     scope: 'room',
     // 답은 실제로 붙은 공간과 벽, 크기를 넣어 store가 쓴다(applyPlan). 모델 답은 어디에 붙었는지 모른다.
     reply: `${josa(label || ROOM_TYPES[type].name, '을/를')} 새 공간으로 만들었어요. 가로와 세로를 알려주면 바로 맞출게요.`,
-    changes: { addSpace: type, room, near: refSpace(t, ctx.state), label },
+    changes: { addSpace: type, room, near: refSpace(t, ctx.state, ctx.spaceAnchor), label },
     surfaces: [{ kind: 'room-size', target: { type: 'room' } }],
     suggestions: [
       { label: '크기 알려주기', text: '가로 4m 세로 3m' },

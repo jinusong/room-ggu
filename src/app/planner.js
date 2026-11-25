@@ -25,6 +25,7 @@ import {
   mentionsRoom,
   roomMentions,
   currentSpaceReference,
+  spaceReferenceTail,
   assertedType,
   wantsNewSpace,
   roomLabel,
@@ -316,15 +317,34 @@ export function planRoom(t, ctx) {
       .filter((k) => !skip.includes(k))
       .slice(0, 4)
       .map((k) => say(ROOM_TYPES[k].name, phrase(ROOM_TYPES[k].name)));
+  const near = r.askType || r.add ? refSpace(t, state, ctx.spaceAnchor) : null;
+  if (near?.missing || near?.choices) {
+    return {
+      intent: 'room',
+      scope: 'room',
+      ask: 'space-anchor',
+      reply: near.missing
+        ? `평면도에 ${josa(near.missing, '이/가')} 없어요. 먼저 그 공간을 추가해 주세요.`
+        : `어느 ${near.name} 옆에 붙일까요? 아래에서 기준으로 삼을 방을 골라 주세요.`,
+      changes: {},
+      surfaces: [],
+      spaceRequest: near.choices ? t : undefined,
+      spaceAnchors: near.choices?.map((room) => room.roomId),
+      suggestions: near.choices
+        ? near.choices.slice(0, 5).map((room, i) => say(room.name, `${i + 1}번`))
+        : [],
+    };
+  }
   if (r.askType) {
-    const near = refSpace(t, state),
-      side = { right: '오른쪽', left: '왼쪽', front: '아래쪽', back: '위쪽' }[near?.side] || '옆',
+    const side =
+        { right: '오른쪽', left: '왼쪽', front: '아래쪽', back: '위쪽' }[near?.side] || '옆',
       where = near?.name ? `${near.name} ${side}에 ` : '';
     return {
       intent: 'room',
       scope: 'room',
       ask: 'space-type',
       spaceRequest: t,
+      spaceAnchor: near?.roomId,
       reply: `${where}어떤 공간을 추가할까요? “거실”처럼 방 종류를 알려 주세요.`,
       changes: {},
       surfaces: [],
@@ -382,7 +402,7 @@ export function planRoom(t, ctx) {
       ? {
           addSpace: r.room.type,
           room: r.room,
-          near: refSpace(t, state),
+          near,
           label: roomLabel(t, r.room.type),
         }
       : r.changed
@@ -397,27 +417,33 @@ export function planRoom(t, ctx) {
 export const COMPLAINT = /왜|아니\s|아니[,.]|라니까|잖아|했잖|냐고|하냐|!!|ㅡㅡ|;;|틀렸|잘못/;
 
 // "화장실 옆에", "이 방 오른쪽에"처럼 새 공간을 붙일 기준 공간과 벽. 말하지 않았으면 null.
-export function refSpace(text, state) {
+export function refSpace(text, state, anchorId) {
   const list = spaces(state),
-    ref = roomMentions(text).find((m) => m.role === 'ref');
+    ref = roomMentions(text).find((m) => m.role === 'ref'),
+    here = currentSpaceReference(text);
+  if (anchorId) {
+    const room = list.find((r) => r.roomId === anchorId);
+    if (!room) return { missing: ref ? ROOM_TYPES[ref.type].name : '기준 공간' };
+    return { roomId: room.roomId, name: room.name, side: ref?.side ?? here?.side ?? null };
+  }
+  for (const room of list) {
+    const match = roomNameSpan(text, room.name);
+    if (!match) continue;
+    const tail = spaceReferenceTail(text.slice(match.index + match[0].length));
+    if (tail) return { roomId: room.roomId, name: room.name, side: tail.side };
+  }
   if (!ref) {
-    const here = currentSpaceReference(text);
     return here ? { roomId: state.roomId, name: state.name, side: here.side } : null;
   }
-  const same = list.filter((r) => r.room.type === ref.type),
-    hit =
-      same.find((r) => r.name.length >= 2 && text.includes(r.name)) ||
-      same.find((r) => r.roomId === state.roomId) ||
-      same[0];
-  // 그런 공간이 없으면 지금 방에 붙이고, 없었다는 것을 답에서 알린다.
-  return hit
-    ? { roomId: hit.roomId, name: hit.name, side: ref.side }
-    : {
-        roomId: state.roomId,
-        name: state.name,
-        side: ref.side,
-        missing: ROOM_TYPES[ref.type].name,
-      };
+  const same = list.filter((r) => r.room.type === ref.type);
+  const name = ROOM_TYPES[ref.type].name;
+  const explicitCurrent = /(?:^|\s)(?:이|지금|현재)\s*$/u.test(text.slice(0, ref.index));
+  const hit =
+    same.length === 1
+      ? same[0]
+      : explicitCurrent && same.find((room) => room.roomId === state.roomId);
+  if (hit) return { roomId: hit.roomId, name: hit.name, side: ref.side };
+  return same.length ? { name, choices: same } : { missing: name };
 }
 
 // 아니라고 한 유형만 있고 바라는 유형은 말하지 않은 문장("왜 화장실로 만들어?", "화장실 아니야").

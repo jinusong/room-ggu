@@ -423,7 +423,14 @@ function AddRoomPop({ side, sides }) {
     <div class="editor-pop add-pop-standalone" data-add-list role="group" aria-label="방 추가">
       <div class="editor-pop-head">
         <strong>방 추가</strong>
-        <button class="icon-btn" aria-label="방 추가 닫기" onClick={() => store.pickAddSide(null)}>
+        <button
+          class="icon-btn"
+          aria-label="방 추가 닫기"
+          onClick={() => {
+            store.pickAddSide(null);
+            document.getElementById('add-space')?.focus();
+          }}
+        >
           <Icon name="x" size={16} />
         </button>
       </div>
@@ -475,6 +482,7 @@ function FloorplanControls() {
   const list = spaces(state);
   const side = app.view.addSide;
   const editing = app.view.roomEditor;
+  const deleting = confirm && !side && !editing;
   const close = (event) => {
     if (event?.target?.closest?.('[data-add-side]')) return;
     if (event?.key === 'Escape')
@@ -487,9 +495,12 @@ function FloorplanControls() {
   };
   useOutside(ref, close, Boolean(side || editing || confirm));
   useEffect(() => setConfirm(false), [state.roomId]);
+  useEffect(() => {
+    if (side || editing) setConfirm(false);
+  }, [side, editing]);
   useLayoutEffect(() => {
-    if (confirm) cancel.current?.focus();
-  }, [confirm]);
+    if (deleting) cancel.current?.focus();
+  }, [deleting]);
   return (
     <div class="floorplan-controls" ref={ref} role="group" aria-label="방 편집 도구">
       <label class="floorplan-room-picker">
@@ -524,7 +535,7 @@ function FloorplanControls() {
         id="delete-space"
         class="editor-command on-stage"
         aria-label="방 삭제"
-        aria-expanded={confirm}
+        aria-expanded={deleting}
         disabled={list.length < 2}
         data-room-delete
         onClick={() => {
@@ -538,7 +549,7 @@ function FloorplanControls() {
       </button>
       {editing && <RoomEditor key={state.roomId} room={state.room} name={state.name} />}
       {side && <AddRoomPop side={side} sides={store.freeSides()} />}
-      {confirm && (
+      {deleting && (
         <div class="editor-pop delete-room-pop" role="group" aria-label="방 삭제 확인">
           <strong>{josa(state.name, '을/를')} 삭제할까요?</strong>
           {state.items.length > 0 && <p>이 방의 가구 {state.items.length}개도 함께 삭제돼요.</p>}

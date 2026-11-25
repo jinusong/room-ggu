@@ -220,6 +220,9 @@ function sanitizeTurn(t) {
     turn.note = cleanText(t.note, 300) || undefined;
     if (t.spaceRequest) {
       turn.spaceRequest = cleanText(t.spaceRequest, 1500);
+      turn.spaceAnchor = cleanText(t.spaceAnchor, 100) || undefined;
+      if (Array.isArray(t.spaceAnchors))
+        turn.spaceAnchors = t.spaceAnchors.slice(0, 12).map((id) => cleanText(id, 100));
       const choice = spaceTypeAnswer(cleanText(t.spaceChoice, 40));
       if (choice && !choice.unsupported) turn.spaceChoice = choice.name;
       const dims = Object.fromEntries(
@@ -948,6 +951,8 @@ function finishTurn(turn, plan, meta) {
     ...meta,
   });
   if (plan.spaceRequest) turn.spaceRequest = plan.spaceRequest;
+  if (plan.spaceAnchor) turn.spaceAnchor = plan.spaceAnchor;
+  if (plan.spaceAnchors) turn.spaceAnchors = plan.spaceAnchors;
   if (plan.spaceDims) turn.spaceDims = plan.spaceDims;
   if (plan.spaceChoice) turn.spaceChoice = plan.spaceChoice;
   if (plan.recommendation) turn.recommendation = plan.recommendation;
@@ -1037,9 +1042,39 @@ export async function send(raw) {
   }
   if (last?.spaceRequest && last.roomId === app.state.roomId) {
     const answer = spaceFollowup(text);
+    if (last.spaceAnchors?.length) {
+      const selected = spaceAnchorAnswer(text, last.spaceAnchors);
+      if (selected)
+        return respondToText(last.spaceRequest, turn, history, extra, { anchor: selected });
+      if (answer || /^\d+\s*번/.test(text)) {
+        finishTurn(
+          turn,
+          {
+            reply: last.text,
+            suggestions: last.suggestions,
+            spaceRequest: last.spaceRequest,
+            spaceAnchors: last.spaceAnchors,
+          },
+          { engine: 'app' },
+        );
+        return;
+      }
+    }
     if (answer) return respondToSpaceFollowup(answer, last, turn, history, extra);
   }
   return respondToText(text, turn, history, extra);
+}
+
+function spaceAnchorAnswer(text, ids) {
+  const answer = text.trim().replace(/\s*옆(?:에)?[.!?]?$/u, '');
+  const order = answer.match(/^(첫|두|세|\d+)\s*(?:번째|번|째)(?:\s*방)?[.!?]?$/u);
+  const rooms = spaces(app.state);
+  if (order) {
+    const index = { 첫: 1, 두: 2, 세: 3 }[order[1]] || Number(order[1]);
+    return rooms.find((room) => room.roomId === ids[index - 1])?.roomId;
+  }
+  const matches = rooms.filter((room) => ids.includes(room.roomId) && room.name === answer);
+  return matches.length === 1 ? matches[0].roomId : null;
 }
 
 function respondToSpaceFollowup(answer, last, turn, history, extra) {
@@ -1047,6 +1082,7 @@ function respondToSpaceFollowup(answer, last, turn, history, extra) {
   const choice = answer.choice || spaceTypeAnswer(last.spaceChoice || '');
   const plan = {
     spaceRequest: last.spaceRequest,
+    spaceAnchor: last.spaceAnchor,
     spaceDims: last.spaceDims,
     suggestions: last.suggestions,
   };
@@ -1074,23 +1110,24 @@ function respondToSpaceFollowup(answer, last, turn, history, extra) {
   if (choice?.unsupported) {
     finishTurn(
       turn,
-      { ...unsupportedSpacePlan(choice.name, last.spaceRequest), spaceDims: plan.spaceDims },
+      {
+        ...unsupportedSpacePlan(choice.name, last.spaceRequest),
+        spaceDims: plan.spaceDims,
+        spaceAnchor: last.spaceAnchor,
+      },
       { engine: 'app' },
     );
     return;
   }
   if (choice)
-    return respondToText(
-      `${last.spaceRequest}. 거기는 ${choice.name}임`,
-      turn,
-      history,
-      extra,
-      plan.spaceDims,
-    );
+    return respondToText(`${last.spaceRequest}. 거기는 ${choice.name}임`, turn, history, extra, {
+      dims: plan.spaceDims,
+      anchor: last.spaceAnchor,
+    });
   finishTurn(turn, plan, { engine: 'app' });
 }
 
-async function respondToText(text, turn, history, extra = [], spaceDims) {
+async function respondToText(text, turn, history, extra = [], spaceContext = {}) {
   if (
     app.design &&
     /^(?:이대로\s*)?(?:초안\s*|집\s*전체\s*)?(?:적용|반영)(?:해\s*줘|해줘|해|하자|할게|해요)?[.!]?$/u.test(
@@ -1177,7 +1214,8 @@ async function respondToText(text, turn, history, extra = [], spaceDims) {
     return;
   }
   const ctx = context();
-  if (spaceDims) ctx.spaceDims = spaceDims;
+  if (spaceContext.dims) ctx.spaceDims = spaceContext.dims;
+  if (spaceContext.anchor) ctx.spaceAnchor = spaceContext.anchor;
   if (named?.room) {
     text = named.text;
     if (named.room.roomId !== app.state.roomId) {
