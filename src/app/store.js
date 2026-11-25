@@ -14,7 +14,7 @@ import { validateSurfaceSpec, SURFACE_KINDS } from '../ui-schema.js';
 import { runAI, stopAI, interruptAI, onAIStatus, imageData } from '../ai.js';
 import * as ops from './ops.js';
 import { purposeGroups } from './purpose.js';
-import { offerFurniture, purposeDraft, planTurn } from './planner.js';
+import { offerFurniture, purposeDraft, planTurn, unsupportedSpacePlan } from './planner.js';
 import {
   appliedSize,
   followupSize,
@@ -993,8 +993,13 @@ export async function send(raw) {
     return;
   }
   if (last?.spaceRequest && last.roomId === app.state.roomId) {
-    const name = spaceTypeAnswer(text);
-    if (name) return respondToText(`${last.spaceRequest}. 거기는 ${name}임`, turn, history, extra);
+    const answer = spaceTypeAnswer(text);
+    if (answer?.unsupported) {
+      finishTurn(turn, unsupportedSpacePlan(answer.name, last.spaceRequest), { engine: 'app' });
+      return;
+    }
+    if (answer)
+      return respondToText(`${last.spaceRequest}. 거기는 ${answer.name}임`, turn, history, extra);
   }
   return respondToText(text, turn, history, extra);
 }

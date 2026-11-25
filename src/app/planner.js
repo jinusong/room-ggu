@@ -814,17 +814,21 @@ export function deleteSpacePlan(t, state) {
 }
 
 // 현관, 베란다처럼 아직 없는 공간 종류를 만들어 달라고 하면 가구가 아니라 공간 종류에 없다고 답한다.
-function unsupportedSpacePlan(name) {
+export function unsupportedSpacePlan(name, spaceRequest) {
   const kinds = Object.values(ROOM_TYPES).map((r) => r.name);
   return {
     intent: 'chat',
     scope: null,
     unlisted: [name],
-    reply: `${josa(name, '은/는')} 아직 만들 수 있는 공간 종류에 없어요. 지금은 ${josa(kinds.join(', '), '을/를')} 만들 수 있어요.`,
+    ...(spaceRequest ? { spaceRequest } : {}),
+    reply: spaceRequest
+      ? `${josa(name, '은/는')} 아직 공간 종류에 없어요. 추가할 다른 공간을 골라 주세요.`
+      : `${josa(name, '은/는')} 아직 만들 수 있는 공간 종류에 없어요. 지금은 ${josa(kinds.join(', '), '을/를')} 만들 수 있어요.`,
     surfaces: [],
-    suggestions: ['living', 'bedroom', 'office', 'kitchen'].map((k) =>
-      say(`${ROOM_TYPES[k].name} 추가`, `${ROOM_TYPES[k].name} 추가해줘`),
-    ),
+    suggestions: ['living', 'bedroom', 'office', 'kitchen'].map((k) => {
+      const choice = ROOM_TYPES[k].name;
+      return spaceRequest ? say(choice, choice) : say(`${choice} 추가`, `${choice} 추가해줘`);
+    }),
   };
 }
 

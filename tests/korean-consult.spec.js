@@ -264,31 +264,51 @@ test('거실 기본 가구는 지정한 방에 한 번만 놓고, 한 번에 되
   );
 });
 
-test('방 종류를 되물었을 때 별칭으로 답해도 기준 공간과 처음 치수를 유지한다', async ({ page }) => {
-  await page.goto('/?model=off');
-  await page.waitForFunction(() => window.__roomggu?.ready());
-  const read = () => page.evaluate(() => window.__roomggu.app.state);
-  const chat = page.locator('#chat-input');
-  for (const text of [
-    '화장실 하나 추가해줘',
-    '화장실 오른쪽에 가로 3m 세로 2.5m짜리 방 하나 추가해줘',
-  ]) {
-    await chat.fill(text);
+for (const answer of ['아니, 공부방으로 해주세요', '주방']) {
+  test(`지원하지 않는 방 종류 뒤에 다시 골라도 처음 위치와 치수를 유지한다 (${answer})`, async ({
+    page,
+  }) => {
+    await page.goto('/?model=off');
+    await page.waitForFunction(() => window.__roomggu?.ready());
+    const read = () => page.evaluate(() => window.__roomggu.app.state);
+    const chat = page.locator('#chat-input');
+    for (const text of [
+      '화장실 하나 추가해줘',
+      '화장실 오른쪽에 가로 3m 세로 2.5m짜리 방 하나 추가해줘',
+    ]) {
+      await chat.fill(text);
+      await chat.press('Enter');
+    }
+    await expect(page.locator('.msg.assistant').last()).toContainText('어떤 공간을 추가할까요');
+    const before = await read();
+    await chat.fill('현관으로 해주세요');
     await chat.press('Enter');
-  }
-  await expect(page.locator('.msg.assistant').last()).toContainText('어떤 공간을 추가할까요');
-  const before = await read();
-  await page.reload();
-  await page.waitForFunction(() => window.__roomggu?.ready());
-  await chat.fill('공부방으로 해주세요');
-  await chat.press('Enter');
-  await expect(page.locator('.msg.assistant').last()).toContainText('나의 공부방');
-  const after = await read();
-  expect(after.roomOrder).toHaveLength(before.roomOrder.length + 1);
-  expect(after.name).toBe('나의 공부방');
-  expect(after.room).toMatchObject({ type: 'office', w: 3, d: 2.5 });
-  expect(after.floorplan.positions[after.roomId].x).toBeCloseTo(
-    before.floorplan.positions[before.roomId].x + (before.room.w + after.room.w) / 2,
-  );
-  expect(after.otherRooms.find((r) => r.roomId === before.roomId).room).toEqual(before.room);
-});
+    await expect(page.locator('.msg.assistant').last()).toContainText(
+      '현관은 아직 공간 종류에 없어요',
+    );
+    expect(await read()).toEqual(before);
+    await page.reload();
+    await page.waitForFunction(() => window.__roomggu?.ready());
+    const isOffice = answer.includes('공부방');
+    if (isOffice) {
+      await chat.fill(answer);
+      await chat.press('Enter');
+    } else {
+      await page
+        .locator('.msg.assistant')
+        .last()
+        .getByRole('button', { name: answer, exact: true })
+        .click();
+    }
+    const name = isOffice ? '나의 공부방' : '나의 주방';
+    await expect(page.locator('.msg.assistant').last()).toContainText(name);
+    const after = await read();
+    expect(after.roomOrder).toHaveLength(before.roomOrder.length + 1);
+    expect(after.name).toBe(name);
+    expect(after.room).toMatchObject({ type: isOffice ? 'office' : 'kitchen', w: 3, d: 2.5 });
+    expect(after.floorplan.positions[after.roomId].x).toBeCloseTo(
+      before.floorplan.positions[before.roomId].x + (before.room.w + after.room.w) / 2,
+    );
+    expect(after.otherRooms.find((r) => r.roomId === before.roomId).room).toEqual(before.room);
+  });
+}

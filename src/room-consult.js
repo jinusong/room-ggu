@@ -38,8 +38,12 @@ const ROOM_EVIDENCE = {
 };
 export const roomEvidence = (type, text) => !!ROOM_EVIDENCE[type]?.test(text);
 // 아직 만들 수 없는 공간. 만들어 달라고 하면 가구 목록이 아니라 공간 종류에 없다고 답한다.
-const UNSUPPORTED_SPACE =
-  /(현관|베란다|발코니|다용도실|팬트리|복도|창고|테라스)\s*(?:을|를|도|좀|하나|한\s*개)?\s*(?:더\s*)?(?:만들|추가|붙여|붙이|생성|넣어|있었으면|필요)/;
+const UNSUPPORTED_SPACE_NAMES = '현관|베란다|발코니|다용도실|팬트리|복도|창고|테라스';
+const UNSUPPORTED_SPACE_NAME = new RegExp(`^(?:${UNSUPPORTED_SPACE_NAMES})$`, 'u');
+const UNSUPPORTED_SPACE = new RegExp(
+  String.raw`(${UNSUPPORTED_SPACE_NAMES})\s*(?:을|를|도|좀|하나|한\s*개)?\s*(?:더\s*)?(?:만들|추가|붙여|붙이|생성|넣어|있었으면|필요)`,
+  'u',
+);
 export function unsupportedSpace(text) {
   return String(text).match(UNSUPPORTED_SPACE)?.[1] || null;
 }
@@ -96,14 +100,17 @@ export function assertedType(mentions) {
 }
 export const detectRoomType = (text) => assertedType(roomMentions(text));
 export function spaceTypeAnswer(text) {
-  const [mention] = roomMentions(text);
-  if (mention?.index !== 0 || mention.role !== 'new') return null;
-  const ending = text.slice(mention.name.length).trim();
-  return /^(?:(?:으로|로)\s*)?(?:해\s*(?:줘요?|주세요)|할게요?|이야|이에요|예요|입니다|요)?[.!?]?$/u.test(
-    ending,
-  )
-    ? mention.name
-    : null;
+  const name = text
+    .trim()
+    .replace(/^(?:아니|네|응)(?:\s*[,，]\s*|\s+)/u, '')
+    .replace(
+      /\s*(?:(?:으로|로)\s*)?(?:해\s*(?:줘요?|주세요)|할게요?|이야|이에요|예요|입니다|요)?[.!?]?$/u,
+      '',
+    )
+    .trim();
+  if (UNSUPPORTED_SPACE_NAME.test(name)) return { name, unsupported: true };
+  const [mention] = roomMentions(name);
+  return mention?.name === name ? { name, unsupported: false } : null;
 }
 // 어떤 뜻으로든 공간 이름이 나왔는지. 방 이야기인지 가를 때 쓴다.
 export const mentionsRoom = (text) => roomMentions(text).length > 0;
