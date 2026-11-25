@@ -239,8 +239,7 @@ function Floorplan() {
     list = spaces(s),
     conflicts = floorplanWarnings(list, s.floorplan),
     links = connections(list, s.floorplan),
-    blocked = links.filter((l) => l.closed).length,
-    house = s.scope === 'house';
+    blocked = links.filter((l) => l.closed).length;
   return (
     <>
       <Head
@@ -249,21 +248,6 @@ function Floorplan() {
         meta={`${list.length}개 공간, ${list.reduce((sum, r) => sum + r.room.w * r.room.d, 0).toFixed(1)}m²`}
       />
       <div class="house-actions">
-        <div class="segmented" role="group" aria-label="집 전체 보기 방식">
-          {['2d', '3d'].map((view) => (
-            <button
-              key={view}
-              class={house && s.view === view ? 'is-active' : ''}
-              aria-pressed={house && s.view === view}
-              onClick={() => {
-                store.setScope('house');
-                store.setView(view);
-              }}
-            >
-              {view === '2d' ? '2D 평면도' : '3D 모형'}
-            </button>
-          ))}
-        </div>
         <button class="btn small" disabled={list.length >= 12} onClick={store.attachBathroom}>
           <Icon name="bath" size={16} />이 방 옆에 화장실 붙이기
         </button>
@@ -314,7 +298,7 @@ function Floorplan() {
       </ul>
       <details class="house-positions">
         <summary>위치를 숫자로 맞추기</summary>
-        <p class="surface-hint">공간 중심의 좌표예요. 보통은 2D에서 끌어 맞추는 편이 쉬워요.</p>
+        <p class="surface-hint">공간 중심의 좌표예요. 평면도에서 끌어 옮길 수도 있어요.</p>
         {list.map((r) => {
           const p = s.floorplan.positions[r.roomId];
           return (
@@ -360,7 +344,7 @@ function Floorplan() {
             문 {links.length - blocked}개{blocked ? `, 막은 벽 ${blocked}곳` : ''}, 위치와 폭 맞추기
           </summary>
           <p class="surface-hint">
-            2D에서는 문을 끌어 옮길 수 있어요. 문을 누르면 폭과 여는 방향, 막기를 고르는 막대가
+            평면도에서 문을 끌어 옮길 수 있어요. 문을 누르면 폭과 여는 방향, 막기를 고르는 막대가
             떠요.
           </p>
           {links.map((link) => (
@@ -370,8 +354,7 @@ function Floorplan() {
       )}
       <p class="surface-hint">
         벽이 맞닿으면 가운데에 80cm 문을 자동으로 그려요. 폭 80cm는 가정값이니 실제 문에 맞게 바꿔
-        주세요. 낮춘 안쪽 벽은 배치를 가늠하기 위한 초안이에요. 화장실 설비는 다른 가구처럼 옮기거나
-        뺄 수 있어요.
+        주세요. 화장실 설비는 다른 가구처럼 옮기거나 뺄 수 있어요.
       </p>
     </>
   );
@@ -621,8 +604,8 @@ function Windows() {
         {error}
       </div>
       <p class="surface-hint">
-        2D와 3D, 배치 파일에 저장해요. 앞쪽과 오른쪽 벽은 낮춰 보여도 창은 실제 높이에 남아요. 자동
-        문은 창문을 피해 옮겨질 수 있어요. 햇빛과 채광은 계산하지 않아요.
+        창문은 평면도와 배치 파일에 반영돼요. 자동 문은 창문을 피해 옮겨질 수 있어요. 햇빛과 채광은
+        계산하지 않아요.
       </p>
     </>
   );
@@ -1729,10 +1712,7 @@ function Files() {
           <Icon name="camera" />
           <span>
             <strong>지금 화면 이미지로</strong>
-            <small>
-              {app.state.scope === 'house' ? '집 전체 ' : ''}
-              {app.state.view === '2d' ? '2D 평면' : '3D 모형'}, PNG
-            </small>
+            <small>{app.state.scope === 'house' ? '집 전체 ' : ''}집 전체 평면도, PNG</small>
           </span>
         </button>
       </div>
@@ -1776,8 +1756,8 @@ function Help() {
         <li>
           <b>집 전체로 잇기</b>
           <span>
-            위쪽의 ‘집 전체’에서 방과 화장실을 함께 봐요. 2D에서 공간을 끌어 ㄱ자 같은 모양을
-            만들고, 3D에서 돌려 본 뒤 이름표의 ‘방 편집’으로 들어가요.
+            평면도에서 방을 고른 뒤 위쪽의 추가, 편집, 삭제를 쓰세요. 방 바닥을 끌어 위치를 바꿀 수
+            있어요.
           </span>
         </li>
         <li>

@@ -9,11 +9,7 @@ const frames = (page) =>
 async function openHouse(page, size) {
   if (size) await page.setViewportSize(size);
   await page.goto('/?model=off');
-  await page.waitForFunction(
-    () => window.__roomggu?.app.scenes.three || window.__roomggu?.app.view.webglError,
-  );
-  await page.locator('#scope-house').click();
-  await page.locator('[data-view="2d"]').click();
+  await page.waitForFunction(() => window.__roomggu?.ready());
   await page.waitForFunction(() => window.__roomggu.app.scenes.house.scale > 0);
   await frames(page);
 }
@@ -36,7 +32,7 @@ test('고른 공간의 벽에서 +를 눌러 종류를 고르면 미리 본 자�
   const handle = page.getByRole('button', { name: /오른쪽에 공간 붙이기/ });
   await handle.click();
   await expect(handle).toHaveAttribute('aria-expanded', 'true');
-  const pop = page.getByRole('group', { name: '오른쪽에 붙일 공간' });
+  const pop = page.getByRole('group', { name: '방 추가', exact: true });
   await expect(pop).toBeVisible();
   await expect(pop.locator('[data-add-type]')).toHaveCount(8);
   await expect(pop.locator('[data-add-type=bedroom]')).toContainText('4 × 3.5m');
@@ -74,7 +70,7 @@ test('고른 공간의 벽에서 +를 눌러 종류를 고르면 미리 본 자�
   await frames(page);
   expect((await shown(page)).sort()).toEqual(['back', 'front', 'right']);
   // 원룸을 다시 고르면 막힌 오른쪽 벽에는 손잡이가 없다.
-  await page.locator(`[data-room-tag="${studio}"] .tag-main`).click();
+  await page.getByLabel('선택한 방').selectOption(studio);
   await frames(page);
   expect((await shown(page)).sort()).toEqual(['back', 'front', 'left']);
   // 위쪽의 공간 추가 버튼은 비어 있는 첫 벽의 고르기 창을 연다. Esc로 닫으면 초점이 손잡이로 돌아간다.
@@ -89,15 +85,11 @@ test('고른 공간의 벽에서 +를 눌러 종류를 고르면 미리 본 자�
   s = await stored(page);
   expect(s.otherRooms).toHaveLength(2);
   expect(s.floorplan.positions[s.roomId]).toEqual({ x: -1.1, z: 3.1 });
-  // 3D에서도 손잡이와 미리 보기 테두리가 뜬다.
-  await page.locator('[data-view="3d"]').click();
-  await frames(page);
-  expect((await shown(page)).length).toBeGreaterThan(0);
   await page.locator('#add-space').click();
   await page.locator('[data-add-type=bathroom]').focus();
-  expect(await page.evaluate(() => !!window.__roomggu.app.scenes.three.roomGhost)).toBe(true);
+  expect(await page.evaluate(() => !!window.__roomggu.app.scenes.house.ghostRoom)).toBe(true);
   await page.keyboard.press('Escape');
-  expect(await page.evaluate(() => !!window.__roomggu.app.scenes.three.roomGhost)).toBe(false);
+  expect(await page.evaluate(() => !!window.__roomggu.app.scenes.house.ghostRoom)).toBe(false);
   // 실행 취소로 붙인 공간이 사라진다.
   await page.locator('#undo').click();
   expect((await stored(page)).otherRooms).toHaveLength(1);
@@ -108,27 +100,16 @@ for (const size of [
   { width: 390, height: 844 },
   { width: 320, height: 640 },
 ]) {
-  test(`모바일 ${size.width}: 고르는 줄이 모형을 가리지 않고 화면 안에 들어온다`, async ({
-    page,
-  }) => {
+  test(`모바일 ${size.width}: 방 종류 선택지가 시트 위에 들어온다`, async ({ page }) => {
     await openHouse(page, size);
     await page.locator('[data-add-side=right]').click();
     const list = page.locator('[data-add-list]');
     await expect(list).toBeVisible();
     const box = await list.boundingBox(),
-      tools = await page.locator('.stage-bottom').boundingBox(),
-      model = await page.evaluate(() => {
-        const { app } = window.__roomggu,
-          sc = app.scenes.house,
-          p = sc.anchor(app.state.roomId),
-          half = (app.state.room.d / 2) * sc.scale;
-        return { top: p.y - half, bottom: p.y + half };
-      });
+      sheet = await page.locator('.sheet').boundingBox();
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(size.width);
-    // 방 아래 도구 줄 바로 위에 깔린다.
-    expect(box.y + box.height).toBeLessThanOrEqual(tools.y + 1);
-    expect(box.y).toBeGreaterThan(model.top);
+    expect(box.y + box.height).toBeLessThanOrEqual(sheet.y + 1);
     await list.locator('[data-add-type=bathroom]').click();
     const s = await stored(page);
     expect(s.otherRooms).toHaveLength(1);
@@ -137,29 +118,26 @@ for (const size of [
   });
 }
 
-test('집 전체에서 고른 방의 휴지통을 누르면 이름표에서 확인한 뒤 지우고 되돌릴 수 있다', async ({
-  page,
-}) => {
+test('방 삭제를 Esc로 취소하거나 확인한 뒤 되돌릴 수 있다', async ({ page }) => {
   await openHouse(page);
   await page.evaluate(() => window.__roomggu.store.addSpace('bedroom'));
   await frames(page);
   const bed = await page.evaluate(() => window.__roomggu.app.state.roomId);
-  const tag = page.locator(`[data-room-tag="${bed}"]`);
-  await tag.locator('[data-room-delete]').click();
-  await expect(tag).toHaveClass(/is-asking/);
-  await expect(tag).toContainText('나의 침실을 지울까요?');
+  await page.locator('[data-room-delete]').click();
+  const confirm = page.getByRole('group', { name: '방 삭제 확인' });
+  await expect(confirm).toContainText('나의 침실을 삭제할까요?');
   await page.screenshot({ path: 'test-results/room-delete-ask.png' });
   // Esc는 취소한다.
   await page.keyboard.press('Escape');
-  await expect(tag).not.toHaveClass(/is-asking/);
-  await tag.locator('[data-room-delete]').click();
-  await tag.locator('[data-room-delete-confirm]').click();
+  await expect(confirm).toHaveCount(0);
+  await page.locator('[data-room-delete]').click();
+  await confirm.locator('[data-room-delete-confirm]').click();
   await expect(page.locator(`[data-room-tag="${bed}"]`)).toHaveCount(0);
   expect((await stored(page)).otherRooms.length).toBe(0);
   await page.locator('#undo').click();
   await expect(page.locator(`[data-room-tag="${bed}"]`)).toHaveCount(1);
   // 마지막 공간이면 휴지통을 끈다.
-  await page.locator('[data-room-tag] .tag-main').first().click();
+  await page.getByLabel('선택한 방').selectOption({ index: 0 });
   await page.evaluate(() => window.__roomggu.store.deleteSpace(window.__roomggu.app.state.roomId));
   await frames(page);
   await expect(page.locator('[data-room-delete]')).toBeDisabled();

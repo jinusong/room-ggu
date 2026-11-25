@@ -35,7 +35,7 @@ test('첫 화면은 대화가 중심이고, 방 설명으로 크기 도구가 �
   expect(sheet.x).toBe(0);
   expect(sheet.width).toBeGreaterThanOrEqual(570);
   expect(sheet.height).toBeGreaterThanOrEqual(959);
-  await expect(page.locator('#viewport-3d canvas')).toBeVisible();
+  await expect(page.locator('#viewport-house canvas')).toBeVisible();
   await say(page, '거실 가로 5m 세로 4m 천장 2.6m로 바꿔줘');
   await expect(page.locator('[data-surface=room-size]')).toBeVisible();
   // 사용자 말은 오른쪽의 먹색 말풍선, 룸꾸의 답은 얼굴이 붙은 왼쪽 말풍선이다.
@@ -60,7 +60,7 @@ test('첫 화면은 대화가 중심이고, 방 설명으로 크기 도구가 �
   await expect(page.locator('.receipt')).toContainText('5m');
   await page.getByRole('textbox', { name: '방 가로', exact: true }).fill('5.5');
   expect((await stored(page)).room.w).toBe(5.5);
-  await expect(page.locator('.space-button')).toContainText('5.5 × 4m');
+  await expect(page.locator('.room-tag.is-selected')).toContainText('5.5 × 4m');
   await say(page, '벽은 세이지 바닥은 월넛');
   await expect(page.locator('[data-surface=finishes]')).toBeVisible();
   await expect(page.locator('[data-surface=room-size]')).toHaveCount(0);
@@ -122,7 +122,7 @@ test('선택한 가구는 입력창의 대상이 되고, 다른 가구 이름은
   const desk = (await stored(page)).items.find((a) => a.type === 'desk');
   await page.evaluate((id) => {
     const { app } = window.__roomggu;
-    app.scenes.three.cb.select(id);
+    window.__roomggu.store.select(id);
   }, desk.id);
   await expect(page.locator('.target.is-item')).toContainText('책상');
   await say(page, '가로 140cm로 바꿔줘');
@@ -214,23 +214,21 @@ test('대화로 방을 바꾸고 새 공간을 만들어도 대화는 이어지�
   await say(page, '가로 120cm인 책상이야');
   await page.locator('.chip.is-primary').click();
   expect((await stored(page)).items).toHaveLength(1);
-  await page.locator('.space-button').click();
-  await page.locator(`[data-space="${first.roomId}"]`).click();
+  await page.getByLabel('선택한 방').selectOption(first.roomId);
   s = await stored(page);
   expect([s.items.length, s.room.w]).toEqual([4, 5]);
   await expect(page.locator('.surface-chip', { hasText: '다른 공간' })).toHaveCount(1);
   await page.reload();
   await ready(page);
   expect((await stored(page)).otherRooms[0].items).toHaveLength(1);
-  await page.locator('.space-button').click();
-  await expect(page.locator('[data-space]')).toHaveCount(2);
+  await expect(page.getByLabel('선택한 방').locator('option')).toHaveCount(2);
 });
 
 test('공간을 추가·삭제하고 실행 취소로 공간 전체를 복원한다', async ({ page }) => {
   await page.goto('/?model=off');
   await ready(page);
-  await page.locator('.space-button').click();
-  await page.locator('[data-newspace=bedroom]').click();
+  await page.locator('#add-space').click();
+  await page.locator('[data-add-type=bedroom]').click();
   expect((await stored(page)).room.type).toBe('bedroom');
   await openTool(page, '내 공간');
   await page.getByRole('button', { name: '나의 침실 삭제' }).click();
@@ -262,13 +260,13 @@ test('잘못된 배치 파일을 거절하고 기존 데이터를 보존한다',
   expect(await stored(page)).toEqual(before);
 });
 
-test('2D로 복원한 뒤 3D에서 실제 가구를 끌어 옮기고 2D에서도 옮긴다', async ({ page }) => {
+test('평면도를 복원한 뒤 가구 두 개를 직접 끌어 옮긴다', async ({ page }) => {
   await page.goto('/?model=off');
   await ready(page);
-  await page.locator('[data-view="2d"]').click();
+
   await page.reload();
   await ready(page);
-  await page.locator('[data-view="3d"]').click();
+
   await page.evaluate(
     () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
   );
@@ -281,7 +279,7 @@ test('2D로 복원한 뒤 3D에서 실제 가구를 끌어 옮기고 2D에서도
   await expect(page.locator('#selection-tools')).toContainText('침대');
   let next = (await stored(page)).items[0];
   expect(Math.abs(next.x - a.x) + Math.abs(next.z - a.z)).toBeGreaterThan(0.1);
-  await page.locator('[data-view="2d"]').click();
+
   const b = (await stored(page)).items[1];
   p = await page.evaluate((id) => window.__roomggu.anchor(id, { center: true }), b.id);
   await page.mouse.move(p.x, p.y);
@@ -299,7 +297,7 @@ test('모바일은 대화로 시작하고 시트를 접고 펴도 입력창이 �
   await expect(page.locator('#chat-input')).toBeVisible();
   await expect(page.locator('#greeting')).toContainText('안녕하세요, 방 꾸미기를 돕는 룸꾸예요');
   await expect(page.locator('.sheet-head')).toContainText('방 꾸미기 상담');
-  await expect(page.locator('#viewport-3d canvas')).toBeVisible();
+  await expect(page.locator('#viewport-house canvas')).toBeVisible();
   await page.locator('#chat-input').fill('입력하던 설명');
   await page.locator('.sheet-handle').click();
   await expect(page.locator('.sheet')).toHaveAttribute('data-snap', 'full');

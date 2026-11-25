@@ -178,50 +178,26 @@ test('WebGPU를 지원하지 않을 때에도 치수를 안전하게 반영한�
   expect((await snapshot(page)).last).toMatchObject({ engine: 'rule', fallback: 'unsupported' });
 });
 
-test('상담 중 격자를 바꿔도 3D 방과 가구, 그림자 맵을 다시 만들지 않는다', async ({ page }) => {
+test('상담 중 격자를 바꿔도 같은 평면도와 편집 대상을 유지한다', async ({ page }) => {
   await start(page);
   await send(page, '침대 가로 178cm로 해줘');
-  await page.waitForFunction(() => {
-    const scene = window.__roomggu.app.scenes.three;
-    return scene?.floorGrid && scene.sun.shadow.map && !scene.dirty;
-  });
   const prior = await page.evaluate(() => {
     const { app } = window.__roomggu;
-    const scene = app.scenes.three;
-    window.__gridScene = {
-      floor: scene.room.children[0],
-      grid: scene.floorGrid,
-      furniture: scene.objects.children[0],
-      shadow: scene.sun.shadow.map,
-      draw: scene.renderer.render,
-      shadows: [],
-    };
-    scene.renderer.render = function (...args) {
-      window.__gridScene.shadows.push(this.shadowMap.needsUpdate);
-      return window.__gridScene.draw.apply(this, args);
-    };
-    return app.state.grid;
+    window.__gridCanvas = app.scenes.house.canvas;
+    return { grid: app.state.grid, items: structuredClone(app.state.items) };
   });
   const grid = page.getByRole('button', { name: '격자 표시' });
   await grid.click();
-  await expect(grid).toHaveAttribute('aria-pressed', String(!prior));
-  await page.waitForFunction(() => window.__gridScene.shadows.length > 0);
-  const result = await page.evaluate(() => {
-    const scene = window.__roomggu.app.scenes.three;
-    const before = window.__gridScene;
+  await expect(grid).toHaveAttribute('aria-pressed', String(!prior.grid));
+  const actual = await page.evaluate(() => {
+    const { app } = window.__roomggu;
     return {
-      same:
-        before.floor === scene.room.children[0] &&
-        before.grid === scene.floorGrid &&
-        before.furniture === scene.objects.children[0] &&
-        before.shadow === scene.sun.shadow.map,
-      visible: scene.floorGrid.visible,
-      shadows: before.shadows,
-      busy: window.__roomggu.app.busy?.kind,
+      same: window.__gridCanvas === app.scenes.house.canvas,
+      items: app.state.items,
+      busy: app.busy?.kind,
     };
   });
-  expect(result).toMatchObject({ same: true, visible: !prior, busy: 'model' });
-  expect(result.shadows).not.toContain(true);
+  expect(actual).toEqual({ same: true, items: prior.items, busy: 'model' });
   await answer(page);
   expect((await snapshot(page)).bed[0]).toBe(178);
 });

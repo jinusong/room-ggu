@@ -3,13 +3,12 @@ import { app } from '../app/store.js';
 import * as store from '../app/store.js';
 import { dragWindowPatch } from '../window-drag.js';
 import { Icon } from './icons.js';
-const NAMES = { bl: '왼쪽 아래', br: '오른쪽 아래', tr: '오른쪽 위', tl: '왼쪽 위' };
 export function WindowControls() {
   const root = useRef(null),
     gesture = useRef(null);
   const [selected, select] = useState(null),
     [error, setError] = useState('');
-  const scene = () => (app.state.view === '2d' ? app.scenes.plan : app.scenes.three);
+  const scene = () => app.scenes.house;
   const finish = (cancel = false) => {
     if (!gesture.current) return;
     gesture.current = null;
@@ -95,7 +94,7 @@ export function WindowControls() {
       document.removeEventListener('keydown', key);
       finish(true);
     };
-  }, [app.state.roomId, app.state.view, app.state.scope]);
+  }, [app.state.roomId]);
   const start = (e, w, mode) => {
     if (e.button !== 0 || gesture.current) return;
     const point = scene()?.windowPoint?.(e, w.wall);
@@ -134,19 +133,15 @@ export function WindowControls() {
     e.preventDefault();
     e.stopPropagation();
     const step = e.shiftKey ? 0.25 : 0.05;
-    const start = { u: 0, v: app.state.view === '2d' ? null : 0 },
+    const start = { u: 0, v: null },
       point = {
-        u:
-          (app.state.view === '2d' && ['left', 'right'].includes(w.wall)
-            ? delta[0] - delta[1]
-            : delta[0]) * step,
-        v: app.state.view === '2d' ? null : delta[1] * step,
+        u: (['left', 'right'].includes(w.wall) ? delta[0] - delta[1] : delta[0]) * step,
+        v: null,
       };
     setError(
       store.setWindow(w.id, dragWindowPatch(app.state.room, w, start, point, mode, false)) || '',
     );
   };
-  if (app.state.scope === 'house') return null;
   return (
     <div class="window-controls" ref={root}>
       {(app.state.room.windows || []).map((w, i) => (
@@ -172,12 +167,12 @@ export function WindowControls() {
               <svg class="window-outline" aria-hidden="true">
                 <polygon />
               </svg>
-              {(app.state.view === '2d' ? ['bl', 'br'] : ['bl', 'br', 'tr', 'tl']).map((mode) => (
+              {['bl', 'br'].map((mode) => (
                 <button
                   key={mode}
                   class="window-resize"
                   data-window-handle={mode}
-                  aria-label={`창문 ${i + 1} ${app.state.view === '2d' ? (mode.includes('l') ? '시작 쪽 폭' : '끝 쪽 폭') : NAMES[mode] + ' 크기'} 조절`}
+                  aria-label={`창문 ${i + 1} ${mode === 'bl' ? '시작 쪽 폭' : '끝 쪽 폭'} 조절`}
                   onPointerDown={(e) => start(e, w, mode)}
                   onPointerMove={move}
                   onPointerUp={() => finish()}

@@ -70,13 +70,14 @@ const FALLBACKS = [
 const MAX_TURNS = 80;
 
 // 저장본을 읽는다. v4 이하에서 온 것이면 화장실 설비·기본 이름·겹친 공간을 한 번 손본다.
+const floorplanView = (state) => Object.assign(state, { scope: 'house', view: '2d' });
 function loadState(raw) {
   const state = validateState(raw);
   if (raw.version < 5) ops.migrateLegacy(state);
-  return state;
+  return floorplanView(state);
 }
 let readError = false;
-let initial = exampleState();
+let initial = floorplanView(exampleState());
 try {
   const raw = localStorage.getItem(KEY);
   if (raw) initial = loadState(JSON.parse(raw));
@@ -125,6 +126,7 @@ export const app = {
     avatarBar: false,
     door: null,
     doorList: false,
+    roomEditor: false,
     addSide: null,
     ghostRoom: null,
     // 위쪽 모델 아일랜드를 펼쳐 둘지. 처음 내려받을 때와 실패했을 때만 저절로 펼친다.
@@ -134,12 +136,11 @@ export const app = {
     modelAsk: null,
     toast: null,
     menu: null,
-    webglError: false,
     saveStatus: '이 기기에 저장됨',
   },
   history: [],
   future: [],
-  scenes: { three: null, plan: null, house: null, tags: null },
+  scenes: { house: null, tags: null },
   rev: 0,
   readError,
 };
@@ -364,7 +365,7 @@ function finishSceneGesture(cancel = false) {
 }
 function restore(json) {
   const roomBefore = app.state.roomId;
-  Object.assign(app.state, validateState(JSON.parse(json)));
+  Object.assign(app.state, floorplanView(validateState(JSON.parse(json))));
   if (app.design) {
     if (designBase() === app.design.base) app.design.applied = false;
     else if (designBase() === designBase(app.design.state)) app.design.applied = true;
@@ -652,7 +653,7 @@ function runAction(action, arg, turn) {
         app.target = app.draft ? { type: 'draft' } : { type: 'room' };
       }
       next.items.push(...placed.map(({ item }) => item));
-      Object.assign(s, next, { scope: 'room' });
+      Object.assign(s, next);
       turn.roomId = s.roomId;
       for (const { item } of placed)
         turn.receipt.push({ label: '배치', to: TYPES[item.type].name });
@@ -665,7 +666,6 @@ function runAction(action, arg, turn) {
       const item = room?.items.find((i) => i.id === arg.id);
       if (!item) throw Error('그 가구를 찾지 못했어요.');
       if (s.roomId !== room.roomId) switchSpace(room.roomId);
-      s.scope = 'room';
       app.selected = item.id;
       app.target = { type: 'item', id: item.id };
       turn.roomId = s.roomId;
@@ -812,7 +812,6 @@ function applyPlan(plan, turn) {
       app.draft = null;
       app.queue = [];
     }
-    s.scope = 'room';
     turn.roomId = s.roomId;
     turn.receipt.push({ label: '대상 공간', to: s.name });
   }
@@ -1102,7 +1101,7 @@ async function respondToText(text, turn, history, extra = [], spaceDims) {
     finishTurn(
       turn,
       {
-        reply: error || '초안을 적용했어요. 방 이름표를 눌러 들어가거나 가구를 끌어 다듬어 보세요.',
+        reply: error || '초안을 적용했어요. 평면도에서 방을 선택하거나 가구를 끌어 다듬어 보세요.',
         surfaces: [{ kind: 'floorplan', target: { type: 'room' } }],
       },
       { engine: 'app' },
@@ -1130,10 +1129,7 @@ async function respondToText(text, turn, history, extra = [], spaceDims) {
     let reply;
     try {
       if (comparison.kind === 'floorplan') {
-        setScope('house');
-        if (comparison.view) setView(comparison.view);
-        reply =
-          '집 전체를 열었어요. 2D에서 공간을 끌어 배치하고, 3D에서 화장실과 가구를 함께 둘러보세요.';
+        reply = '집 전체 평면도에서 방과 가구를 끌어 옮길 수 있어요.';
       } else if (comparison.kind === 'door') {
         // 문 명령의 답에는 집 전체 도구(문 목록)를 붙인다.
         comparison.kind = 'floorplan';
@@ -1313,7 +1309,7 @@ export function applyDesign() {
   if (!d || d.applied) return '적용할 새 초안이 없어요. 원하는 구성을 다시 말해 주세요.';
   if (designStale()) return '초안 뒤에 배치가 바뀌었어요. 지금 배치를 기준으로 다시 요청해 주세요.';
   // 검증을 끝낸 뒤 스냅샷 한 번으로 전체 변경을 기록한다.
-  const next = validateState(d.state);
+  const next = floorplanView(validateState(d.state));
   snapshot();
   Object.assign(app.state, next);
   app.selected = null;
@@ -1462,7 +1458,7 @@ const TOOL_TEXT = {
   design: '집 전체 면적과 원하는 테마를 말해 주세요. 예: 100평 집 전체를 재팬디로 꾸며줘.',
   avatar:
     '키를 알려주면 가구와 같은 축척의 아바타를 세워요. 의자나 소파, 침대에는 앉히거나 눕혀 볼 수 있어요.',
-  floorplan: '방과 화장실을 2D와 3D로 함께 보세요. 공간 위치는 2D에서 끌어 맞출 수 있어요.',
+  floorplan: '평면도에서 공간을 끌어 옮기고, 여기서 위치와 문 치수를 맞춰 보세요.',
   'room-size': '방 크기를 정해 볼까요? 숫자를 바로 고치거나 “가로 4m 세로 3m”처럼 말해도 돼요.',
   'room-type': '어떤 공간인가요? 유형을 바꾸면 직접 정한 치수는 그대로 두고 나머지만 바꿔요.',
   windows:
@@ -1499,7 +1495,6 @@ const TOOL_LABEL = {
 };
 export function openTool(kind, { echo = true, target } = {}) {
   if (!Object.hasOwn(SURFACE_KINDS, kind)) return;
-  if (kind === 'floorplan') app.state.scope = 'house';
   const scope = SURFACE_KINDS[kind].scope;
   let t = target || (scope === 'furniture' ? app.target : roomTarget());
   if (scope === 'furniture' && !subject(t)) {
@@ -1592,21 +1587,19 @@ export function closeAvatarBar() {
   app.view.avatarBar = false;
   emit();
 }
-export function setScope(scope) {
-  finishSceneGesture(true);
-  finishWindowGesture(true);
-  app.state.scope = scope === 'house' ? 'house' : 'room';
-  app.selected = null;
-  app.target = { type: 'room' };
-  app.view.avatarBar = false;
-  app.view.door = null;
-  app.view.addSide = null;
-  app.view.ghostRoom = null;
-  commit();
+export function setRoomEditor(open) {
+  app.view.roomEditor = open;
+  if (open) {
+    app.view.addSide = null;
+    app.view.ghostRoom = null;
+    app.view.door = null;
+    if (innerWidth < 900) app.view.sheet = 'peek';
+  }
+  emit();
 }
 export function editSpace(id) {
   if (id && id !== app.state.roomId) switchSpace(id);
-  setScope('room');
+  setRoomEditor(true);
 }
 export function moveSpace(id, x, z, opts = {}) {
   try {
@@ -1624,12 +1617,7 @@ function doorCommand({ action, width }) {
     target = here.length === 1 ? here[0] : wanted.length === 1 ? wanted[0] : null;
   if (!all.length)
     return '아직 벽이 맞닿은 공간이 없어 문이 없어요. 집 전체에서 공간을 붙이면 그 사이에 문이 생겨요.';
-  const show = () => {
-    setScope('house');
-    setView('2d');
-  };
   if (!target || action === 'show' || (action === 'width' && !width)) {
-    show();
     if (action === 'open' && !wanted.length) return '막아 둔 문이 없어요. 문은 모두 열려 있어요.';
     return target || action === 'show'
       ? '집 전체 2D를 열었어요. 문을 끌어 옮기고, 눌러서 폭과 여는 방향을 바꿀 수 있어요. 아래 문 목록에서 숫자로도 맞출 수 있어요.'
@@ -1887,6 +1875,29 @@ export function setRoomPreset(index) {
 export function setRoomType(type) {
   return editRoom((room) => ops.roomWithType(room, type));
 }
+export function updateSpace({ name, type, dims }) {
+  try {
+    const next = structuredClone(app.state);
+    const patch = Object.fromEntries(
+      Object.entries(dims).filter(([key, value]) => value !== next.room[key]),
+    );
+    if (type !== next.room.type || Object.keys(patch).length) {
+      const room = type === next.room.type ? next.room : ops.roomWithType(next.room, type);
+      for (const key of ['w', 'd', 'h']) {
+        room[key] = next.room[key];
+        room.sources[key] = next.room.sources[key];
+      }
+      ops.setRoom(next, ops.roomWithDims(room, patch));
+    }
+    if (name.trim() !== app.state.name) ops.renameSpace(next, name);
+    if (JSON.stringify(next) === JSON.stringify(app.state)) return;
+    snapshot();
+    Object.assign(app.state, next);
+    commit();
+  } catch (e) {
+    return e.message;
+  }
+}
 export function setFinish(key, color) {
   if (app.state.room[key] === color) return;
   const before = app.state.room;
@@ -2052,7 +2063,7 @@ export function switchSpace(id) {
   if (id === app.state.roomId) return;
   app.view.addSide = null;
   app.view.ghostRoom = null;
-  snapshot();
+  app.view.door = null;
   ops.switchSpace(app.state, id);
   app.selected = null;
   app.target = app.draft ? { type: 'draft' } : { type: 'room' };
@@ -2065,6 +2076,7 @@ export function pickAddSide(side) {
   app.view.addSide = side || null;
   app.view.ghostRoom = null;
   app.view.door = null;
+  if (side) app.view.roomEditor = false;
   emit();
 }
 export function previewSpace(type, side = app.view.addSide) {
@@ -2086,7 +2098,7 @@ export function spaceFits(type, side) {
 // 고르는 동안 도면이 미리 보기까지 담도록 비워 둘 자리: 그 벽에 붙일 수 있는 공간 중 가장 큰 가로·세로.
 export function addReserve() {
   const side = app.view.addSide;
-  if (!side || app.state.scope !== 'house') return null;
+  if (!side) return null;
   const sizes = Object.keys(ROOM_TYPES)
     .map((type) => makeRoom(type))
     .filter((size) => ops.sideSlot(app.state, side, size));
@@ -2105,8 +2117,10 @@ export function freeSides() {
 export function addSpace(type, { side = null } = {}) {
   try {
     const from = app.state.name;
+    const next = structuredClone(app.state);
+    ops.addSpace(next, type, side);
     snapshot();
-    ops.addSpace(app.state, type, side);
+    Object.assign(app.state, next);
     app.selected = null;
     app.view.addSide = null;
     app.view.ghostRoom = null;
@@ -2130,7 +2144,6 @@ export function addSpace(type, { side = null } = {}) {
     persist();
     emit();
   } catch (e) {
-    app.history.pop();
     toast(e.message);
   }
 }
@@ -2152,15 +2165,16 @@ export function rotateSpace(id = app.state.roomId) {
 }
 export function deleteSpace(id) {
   try {
+    const next = structuredClone(app.state);
+    const name = ops.deleteSpace(next, id);
     snapshot();
-    const name = ops.deleteSpace(app.state, id);
+    Object.assign(app.state, next);
     app.selected = null;
     app.target = app.draft ? { type: 'draft' } : { type: 'room' };
     event(`${josa(name, '을/를')} 삭제했어요. 되돌리기로 복구할 수 있어요`);
     persist();
     emit();
   } catch (e) {
-    app.history.pop();
     toast(e.message);
   }
 }
@@ -2181,14 +2195,6 @@ export function loadExampleAction() {
 }
 
 // ---------- 보기 설정 ----------
-export function setView(view) {
-  finishSceneGesture(true);
-  finishWindowGesture(true);
-  if (view === '3d' && app.view.webglError)
-    return toast('이 기기에서 3D를 시작하지 못했어요. 2D 평면을 이용해주세요.');
-  app.state.view = view;
-  commit();
-}
 export function toggle(key) {
   app.state[key] = !app.state[key];
   commit();
@@ -2262,7 +2268,6 @@ export async function importJSON(file) {
     snapshot();
     Object.assign(app.state, next);
     for (const a of app.state.items) clampItem(a, app.state.room);
-    if (app.view.webglError) app.state.view = '2d';
     app.selected = null;
     app.draft = null;
     app.queue = [];
@@ -2276,6 +2281,7 @@ export async function importJSON(file) {
       preview: null,
       door: null,
       doorList: false,
+      roomEditor: false,
       addSide: null,
       ghostRoom: null,
       avatarBar: false,
@@ -2301,15 +2307,9 @@ export async function importJSON(file) {
 }
 export function exportPNG() {
   try {
-    const sc =
-      app.state.view === '3d'
-        ? app.scenes.three
-        : app.state.scope === 'house'
-          ? app.scenes.house
-          : app.scenes.plan;
-    const url = sc?.png(app.scenes.tags?.() || []);
+    const url = app.scenes.house?.png(app.scenes.tags?.() || []);
     if (!url) throw Error('현재 화면을 저장하지 못했어요.');
-    download(url, `${app.state.scope === 'house' ? '집 전체' : app.state.name}-배치.png`);
+    download(url, '집 전체-배치.png');
     toast('지금 보이는 배치 화면을 저장했어요.');
   } catch (e) {
     toast(e.message);
@@ -2940,10 +2940,7 @@ export const sceneCallbacks = {
     a.x = x;
     a.z = z;
     ops.updateItem(app.state, id, a);
-    const moved = app.state.items.find((i) => i.id === id);
-    app.scenes.three?.moveObject(id, moved.x, moved.z);
-    app.scenes.three?.setAvatar();
-    app.scenes.plan?.draw();
+    app.scenes.house?.draw();
     app.rev++;
     for (const fn of subs) fn('move');
   },

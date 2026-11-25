@@ -257,6 +257,10 @@ export function planFromModel(raw, text, ctx) {
     if (v.roomType) fixes.push('문장에 근거가 없는 공간 유형은 고르지 않고 되물음');
     return done(rule);
   }
+  if (rule.intent === 'room' && rule.changes?.addSpace && v.action !== 'new_space') {
+    if (v.action !== 'none' || v.intent !== 'room') fixes.push('문장의 공간 추가 요청을 따름');
+    return done(rule);
+  }
   // 방 이야기와 가구 이야기가 섞였거나 가구가 여럿이면 나눠서 처리한다.
   if (request && !request.limit) {
     const plan = compoundPlan(v, request, ctx, item, fixes);

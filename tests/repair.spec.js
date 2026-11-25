@@ -149,7 +149,8 @@ test('화장실 옆에 거실을 붙이고, 한 문장의 방·가구 요청과 
   expect([s.room.w, s.room.d]).toEqual([before.d, before.w]);
   expect(r.text).toContain('나의 거실을 오른쪽으로 90° 돌렸어요');
   expect(await overlaps(page)).toBe(0);
-  // 집 전체에서 고른 방의 이름표에도 돌리기 단추가 있다.
+  // 고른 방의 편집 도구로도 돌릴 수 있다.
+  await page.locator('#edit-space').click();
   await page.locator('[data-room-turn]').click();
   await frames(page);
   s = await stored(page);
@@ -226,7 +227,7 @@ test('화장실 설비는 가구처럼 고르고 옮기고 빼고 다시 놓을 
     );
   });
   await page.goto('/?model=off');
-  await page.waitForFunction(() => window.__roomggu?.app.scenes.plan?.scale > 0);
+  await page.waitForFunction(() => window.__roomggu?.app.scenes.house?.scale > 0);
   await frames(page);
   let s = await page.evaluate(() => window.__roomggu.app.state);
   expect(s.version).toBe(5);
@@ -236,7 +237,7 @@ test('화장실 설비는 가구처럼 고르고 옮기고 빼고 다시 놓을 
   // 2D에서 변기를 눌러 고르고 끌어 옮긴다.
   const toilet = s.items[0];
   const at = await page.evaluate(
-    (id) => window.__roomggu.app.scenes.plan.anchor(id, { center: true }),
+    (id) => window.__roomggu.app.scenes.house.anchor(id, { center: true }),
     toilet.id,
   );
   await page.mouse.click(at.x, at.y);
@@ -263,18 +264,6 @@ test('화장실 설비는 가구처럼 고르고 옮기고 빼고 다시 놓을 
     'shower',
     'toilet',
   ]);
-  // 3D에서도 설비 모형이 가구로 선다.
-  await page.locator('[data-view="3d"]').click();
-  await frames(page);
-  const fixtures = await page.evaluate(() => {
-    const out = [];
-    window.__roomggu.app.scenes.three?.objects.traverse(
-      (o) => o.userData.fixture && out.push(o.userData.fixture),
-    );
-    return out.sort();
-  });
-  if (!(await page.evaluate(() => window.__roomggu.app.view.webglError)))
-    expect(fixtures).toEqual(['basin', 'shower', 'toilet']);
   expect(errors).toEqual([]);
 });
 

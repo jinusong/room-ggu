@@ -1,7 +1,11 @@
 # 룸꾸 (room ggu)
 
-**룸꾸와 대화하며 방과 가구를 설명하면 필요한 도구가 대화에 나타나고, 실제 치수의 2D와 3D 방에 바로 반영되는 인테리어 상담 웹.**
+**말이나 사진으로 방과 가구를 설명하고, 집 전체 평면도에서 실제 치수로 배치하는 인테리어 상담 앱.**
+## 집 전체 평면도 편집기
 
+평면도 위에서 방을 고른 뒤 **추가**, **편집**, **삭제**를 씁니다. 방 편집에서는 이름과 종류, 가로, 세로와 천장 높이를 한 번에 저장합니다. 같은 평면도에서 방, 가구, 문, 창문을 끌어 옮길 수 있습니다.
+
+“방 옆에 화장실 추가해달라”는 고른 방 옆에 화장실을 붙입니다. “화장실 옆에 방 추가해달라”에는 새 방의 종류를 묻고, 답한 공간을 화장실 벽에 붙입니다.
 [사이트 열기](https://jinusong.github.io/room-ggu/), [한국어 상담과 성능 QA 보고서](https://jinusong.github.io/room-ggu/review/), [v5.12 사진 검증](https://jinusong.github.io/room-ggu/review/photo/), [v5.10 개선 리뷰](https://room-ggu-review-20261117.divine-angel-0926.chatgpt.site), [기획](docs/product-plan.md) ([HTML](docs/product-plan.html)), [디자인 방향](docs/design-direction.md), [검증 기록](docs/verification.md)
 
 

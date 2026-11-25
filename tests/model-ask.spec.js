@@ -10,10 +10,7 @@ const gpu = () =>
     value: { requestAdapter: async () => ({ features: new Set(['shader-f16']) }) },
     configurable: true,
   });
-const ready = (page) =>
-  page.waitForFunction(
-    () => window.__roomggu?.app.scenes.three || window.__roomggu?.app.view.webglError,
-  );
+const ready = (page) => page.waitForFunction(() => window.__roomggu?.ready());
 const ai = (page) =>
   page.evaluate(() => {
     const { app } = window.__roomggu;
@@ -168,7 +165,7 @@ test.describe('휴대 기기', () => {
     await expect(page.locator('[data-surface=furniture-size]').first()).toBeVisible();
     // 3D가 없어도 아바타는 2D 도면의 방 밖에 선다.
     await page.locator('#avatar-toggle').click();
-    await expect(page.locator('#viewport-2d canvas')).toBeVisible();
+    await expect(page.locator('#viewport-house canvas')).toBeVisible();
     expect(await page.evaluate(() => window.__roomggu.store.avatarHere().outside)).toBe(true);
     await expect(page.locator('[data-avatar-tag]')).toBeInViewport();
     expect(requested).toEqual([]);

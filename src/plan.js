@@ -167,7 +167,7 @@ export class PlanScene {
     this.drag = null;
     this.resize = new ResizeObserver(() => this.draw());
     this.resize.observe(host);
-    this.hit = (p) => {
+    this.hit = (p, roomState = this.state) => {
       const inside = (a) => {
         const dx = p.x - a.x,
           dz = p.z - a.z,
@@ -178,10 +178,10 @@ export class PlanScene {
       };
       // 앉거나 누운 아바타는 가구 위를 덮는다. 그 가구를 누르면 가구가 잡히게 하고,
       // 아바타는 머리 위 이름표나 가구 밖으로 나온 부분으로 고른다.
-      const avatar = avatarLayout(this.state);
+      const avatar = avatarLayout(roomState);
       if (avatar && avatarHit(avatar, p.x, p.z) && !(avatar.item && inside(avatar.item)))
         return { id: 'avatar', x: avatar.x, z: avatar.z, fixed: avatar.pose !== 'standing' };
-      for (const a of [...this.state.items].sort(
+      for (const a of [...roomState.items].sort(
         (a, b) => FLAT_TYPES.has(a.type) - FLAT_TYPES.has(b.type),
       ))
         if (inside(a)) return a;
@@ -330,33 +330,34 @@ export class PlanScene {
   setAvatar() {
     this.draw();
   }
-  anchor(id, { center = false } = {}) {
+  anchor(id, { center = false } = {}, origin = { x: 0, z: 0 }) {
     const a = id === 'ghost' ? this.ghostItem : this.state.items.find((x) => x.id === id);
     if (!a || !this.scale) return null;
     const r = this.canvas.getBoundingClientRect(),
       f = footprint(a);
     return {
-      x: r.left + this.ox + a.x * this.scale,
-      y: r.top + this.oy + (center ? a.z : a.z - f.d / 2) * this.scale - (center ? 0 : 8),
+      x: r.left + this.ox + (origin.x + a.x) * this.scale,
+      y:
+        r.top + this.oy + (origin.z + a.z - (center ? 0 : f.d / 2)) * this.scale - (center ? 0 : 8),
       visible: true,
     };
   }
   // 고른 문의 막대 자리: 문 가운데.
-  windowPoint(e, wall) {
+  windowPoint(e, wall, origin = { x: 0, z: 0 }) {
     const p = this.point(e);
     return {
       u: ['left', 'right'].includes(wall)
-        ? p.z + this.state.room.d / 2
-        : p.x + this.state.room.w / 2,
+        ? p.z - origin.z + this.state.room.d / 2
+        : p.x - origin.x + this.state.room.w / 2,
       v: null,
     };
   }
-  windowFrames() {
-    if (!this.scale || this.state.scope === 'house') return [];
+  windowFrames(origin = { x: 0, z: 0 }) {
+    if (!this.scale) return [];
     const r = this.canvas.getBoundingClientRect();
     return windowOpenings(this.state.room).map((w) => {
-      const cx = r.left + this.ox + w.x * this.scale,
-        cy = r.top + this.oy + w.z * this.scale,
+      const cx = r.left + this.ox + (origin.x + w.x) * this.scale,
+        cy = r.top + this.oy + (origin.z + w.z) * this.scale,
         half = (w.width * this.scale) / 2;
       return {
         id: w.id,

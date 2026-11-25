@@ -24,6 +24,7 @@ import {
   consultationScope,
   mentionsRoom,
   roomMentions,
+  currentSpaceReference,
   assertedType,
   wantsNewSpace,
   roomLabel,
@@ -317,7 +318,8 @@ export function planRoom(t, ctx) {
       .map((k) => say(ROOM_TYPES[k].name, phrase(ROOM_TYPES[k].name)));
   if (r.askType) {
     const near = refSpace(t, state),
-      where = near?.name ? `${near.name} 옆에 ` : '';
+      side = { right: '오른쪽', left: '왼쪽', front: '아래쪽', back: '위쪽' }[near?.side] || '옆',
+      where = near?.name ? `${near.name} ${side}에 ` : '';
     return {
       intent: 'room',
       scope: 'room',
@@ -399,16 +401,8 @@ export function refSpace(text, state) {
   const list = spaces(state),
     ref = roomMentions(text).find((m) => m.role === 'ref');
   if (!ref) {
-    const here = text.match(
-      /(?:이\s*방|여기|지금\s*방)\s*(?:바로\s*)?(오른쪽|왼쪽|위쪽|뒤쪽|아래쪽|앞쪽|옆|뒤|앞)/,
-    );
-    if (!here) return null;
-    const side = { 오른쪽: 'right', 왼쪽: 'left', 위쪽: 'back', 뒤쪽: 'back', 뒤: 'back' }[here[1]];
-    return {
-      roomId: state.roomId,
-      name: state.name,
-      side: side || (/아래쪽|앞쪽|앞/.test(here[1]) ? 'front' : null),
-    };
+    const here = currentSpaceReference(text);
+    return here ? { roomId: state.roomId, name: state.name, side: here.side } : null;
   }
   const same = list.filter((r) => r.room.type === ref.type),
     hit =
@@ -1077,7 +1071,7 @@ export const STARTERS = [
   { label: '사진으로 시작', detail: '가구 사진에서 종류부터 잡기', action: 'photo' },
   { label: '벽과 바닥', detail: '마감 색 비교하기', action: 'tool', arg: 'finishes' },
   { label: '내 키로 가늠하기', detail: '같은 축척의 아바타 세우기', action: 'tool', arg: 'avatar' },
-  { label: '집 전체로 잇기', detail: '화장실까지 2D와 3D로', action: 'tool', arg: 'floorplan' },
+  { label: '집 전체로 잇기', detail: '방과 문을 한 평면도에서', action: 'tool', arg: 'floorplan' },
 ];
 export const EXAMPLE_PROMPTS = [
   '100평 집 전체를 재팬디로 꾸며줘',

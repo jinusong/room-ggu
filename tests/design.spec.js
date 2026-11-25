@@ -121,7 +121,7 @@ test('상담만으로 집을 적용하고 전체 테마를 바꾸며 치수·위
   expect(after.room.wallColor).toBe('#d5d2cb');
 });
 
-test('100평 집의 방 12개를 각각 열어 2D에서 가구를 직접 끌고 한 번에 되돌린다', async ({
+test('100평 집의 방 12개를 하나의 평면도에서 가구를 직접 끌고 한 번에 되돌린다', async ({
   page,
 }) => {
   await start(page);
@@ -132,16 +132,14 @@ test('100평 집의 방 12개를 각각 열어 2D에서 가구를 직접 끌고 
     await page.evaluate((id) => {
       const { store } = window.__roomggu;
       store.switchSpace(id);
-      store.setScope('room');
-      store.setView('2d');
     }, room.roomId);
     await frames(page);
     const before = await state(page),
       item = before.items.find((i) => i.type !== 'rug');
     const point = await page.evaluate((id) => {
       const { app } = window.__roomggu;
-      const p = app.scenes.plan.anchor(id, { center: true });
-      return { ...p, scale: app.scenes.plan.scale };
+      const p = app.scenes.house.anchor(id, { center: true });
+      return { ...p, scale: app.scenes.house.scale };
     }, item.id);
     await page.mouse.move(point.x, point.y);
     await page.mouse.down();
@@ -423,40 +421,31 @@ test('상담 도중 새 대화를 시작하면 예전 모델 응답과 초안이
 });
 
 for (const width of [1440, 390])
-  test(`${width}px: 상담으로 만든 가구를 2D·3D에서 끌고 회전·되돌리기·저장을 이어 간다`, async ({
-    page,
-  }) => {
+  test(`${width}px: 상담으로 만든 가구를 평면도에서 끌고 되돌린다`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await start(page);
     await say(page, '100평 집 전체를 내추럴로 꾸며줘');
     await say(page, '초안 적용해줘');
     if (width < 900) await page.evaluate(() => window.__roomggu.store.setSheet('peek'));
-    for (const view of ['2d', '3d']) {
-      await page.evaluate((view) => {
-        const { store } = window.__roomggu;
-        store.setScope('room');
-        store.setView(view);
-      }, view);
-      // 시트를 낮추는 동안 도면 축척이 바뀐다. 실제 배치가 멈춘 뒤 보이는 가구 중심을 잡는다.
-      await page.evaluate(() =>
-        Promise.all(
-          document
-            .getAnimations()
-            .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
-            .map((a) => a.finished.catch(() => {})),
-        ),
-      );
-      await frames(page);
-      const before = await state(page),
-        item = before.items.find((i) => i.type === 'sofa');
-      const p = await page.evaluate((id) => window.__roomggu.anchor(id, { center: true }), item.id);
-      await page.mouse.move(p.x, p.y);
-      await page.mouse.down();
-      await page.mouse.move(p.x + 32, p.y + 28, { steps: 10 });
-      await page.mouse.up();
-      const moved = (await state(page)).items.find((i) => i.id === item.id);
-      expect(moved.x !== item.x || moved.z !== item.z, view).toBe(true);
-      await page.evaluate(() => window.__roomggu.store.undo());
-      expect((await state(page)).items).toEqual(before.items);
-    }
+    // 시트를 낮추는 동안 도면 축척이 바뀐다. 실제 배치가 멈춘 뒤 보이는 가구 중심을 잡는다.
+    await page.evaluate(() =>
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+          .map((a) => a.finished.catch(() => {})),
+      ),
+    );
+    await frames(page);
+    const before = await state(page),
+      item = before.items.find((i) => i.type === 'sofa');
+    const p = await page.evaluate((id) => window.__roomggu.anchor(id, { center: true }), item.id);
+    await page.mouse.move(p.x, p.y);
+    await page.mouse.down();
+    await page.mouse.move(p.x + 32, p.y + 28, { steps: 10 });
+    await page.mouse.up();
+    const moved = (await state(page)).items.find((i) => i.id === item.id);
+    expect(moved.x !== item.x || moved.z !== item.z).toBe(true);
+    await page.evaluate(() => window.__roomggu.store.undo());
+    expect((await state(page)).items).toEqual(before.items);
   });

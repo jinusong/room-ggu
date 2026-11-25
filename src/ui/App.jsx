@@ -71,6 +71,10 @@ function useShortcuts() {
         return;
       }
       if (typing) return;
+      if (e.key === 'Escape' && (app.selected || app.view.avatarBar)) {
+        store.select(null);
+        return;
+      }
       if (
         e.target.closest?.('button,[role="radio"],[role="menu"],[role="dialog"],[role="separator"]')
       )
@@ -80,7 +84,6 @@ function useShortcuts() {
         document.getElementById('chat-input')?.focus();
         return;
       }
-      if (e.key === 'Escape' && (app.selected || app.view.avatarBar)) store.select(null);
       if (!app.selected) return;
       if (['Delete', 'Backspace'].includes(e.key)) {
         e.preventDefault();
@@ -186,15 +189,13 @@ export function App() {
     window.__roomggu = {
       app,
       store,
-      anchor: (id, opts) =>
-        (app.state.view === '2d' ? app.scenes.plan : app.scenes.three)?.anchor(id, opts),
-      ready: () => !!app.scenes.three || app.view.webglError,
+      anchor: (id, opts) => app.scenes.house?.anchor(id, opts),
+      ready: () => !!app.scenes.house,
     };
     const hide = (e) => {
       store.persist();
       if (!e.persisted) {
-        app.scenes.three?.dispose();
-        app.scenes.plan?.dispose();
+        app.scenes.house?.dispose();
       }
     };
     window.addEventListener('pagehide', hide);

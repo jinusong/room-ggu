@@ -9,9 +9,7 @@ const frames = (page) =>
 async function open(page, size) {
   if (size) await page.setViewportSize(size);
   await page.goto('/?model=off');
-  await page.waitForFunction(
-    () => window.__roomggu?.app.scenes.three || window.__roomggu?.app.view.webglError,
-  );
+  await page.waitForFunction(() => window.__roomggu?.ready());
 }
 async function say(page, text) {
   await page.locator('#chat-input').fill(text);
@@ -21,7 +19,7 @@ async function say(page, text) {
 const planPoint = (page, x, z) =>
   page.evaluate(
     ([x, z]) => {
-      const sc = window.__roomggu.app.scenes.plan,
+      const sc = window.__roomggu.app.scenes.house,
         r = sc.canvas.getBoundingClientRect();
       return { x: r.left + sc.ox + x * sc.scale, y: r.top + sc.oy + z * sc.scale, s: sc.scale };
     },
@@ -68,29 +66,13 @@ test('아바타는 방 밖에서 시작하고 2D에서 끌어 방 안팎으로 �
   expect(s.avatar.x).toBeLessThan(-w / 2);
   expect(s.avatar.z).toBeGreaterThan(d / 2);
   expect((await layout(page)).outside).toBe(true);
-  // 3D: 이름표와 몸이 방 위 컨트롤에 가리지 않는 자리에 보인다.
   await frames(page);
-  const tag = page.locator('[data-avatar-tag]');
+  const tag = page.locator('[data-avatar-tag]'),
+    area = await clearArea(page);
   await expect(tag).toBeInViewport({ ratio: 1 });
-  const area = await clearArea(page),
-    feet = await page.evaluate(() => {
-      const sc = window.__roomggu.app.scenes.three,
-        a = window.__roomggu.store.avatarHere(),
-        v = sc.avatarAt.clone().set(a.x, 0, a.z).project(sc.camera),
-        r = sc.renderer.domElement.getBoundingClientRect();
-      return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
-    });
-  expect(feet.x).toBeGreaterThan(area.left + 8);
-  expect(feet.x).toBeLessThan(area.right);
-  expect(feet.y).toBeGreaterThan(area.top);
-  expect(feet.y).toBeLessThan(area.bottom);
   await expect(page.locator('[data-surface=avatar]')).toContainText('아바타는 방 옆에 서 있어요');
-  // 2D: 방 밖 아바타까지 도면에 담는다. 이름표는 몸 아래에 둔다.
-  await page.locator('[data-view="2d"]').click();
-  await page.waitForFunction(() => Number.isFinite(window.__roomggu.app.scenes.plan.scale));
-  await frames(page);
   const out = await planPoint(page, s.avatar.x, s.avatar.z),
-    canvas = await page.locator('#viewport-2d canvas').boundingBox();
+    canvas = await page.locator('#viewport-house canvas').boundingBox();
   expect(out.x).toBeGreaterThan(Math.max(canvas.x, area.left) + 20);
   expect(out.y).toBeLessThan(area.bottom - 20);
   const tagBox = await tag.boundingBox();
@@ -119,7 +101,7 @@ test('아바타는 방 밖에서 시작하고 2D에서 끌어 방 안팎으로 �
   // 새로고침해도 놓은 자리가 남고, 숨겼다 다시 세우면 방 밖 기본 자리로 돌아온다.
   const kept = (await stored(page)).avatar;
   await page.reload();
-  await page.waitForFunction(() => window.__roomggu?.app.scenes.plan);
+  await page.waitForFunction(() => window.__roomggu?.app.scenes.house);
   expect((await stored(page)).avatar).toEqual(kept);
   await page.locator('#avatar-toggle').click();
   await page.locator('#avatar-toggle').click();
@@ -141,7 +123,6 @@ test('옆에 방이 붙어 있으면 그 방과 겹치지 않는 바깥 자리�
     store.switchSpace(home);
     store.addSpace('bathroom', { side: 'front' });
     store.switchSpace(home);
-    store.setScope('room');
   });
   await page.locator('#avatar-toggle').click();
   const s = await stored(page),
@@ -163,13 +144,8 @@ test('옆에 방이 붙어 있으면 그 방과 겹치지 않는 바깥 자리�
         body.top >= p.z + r.room.d / 2;
     expect(apart, `${r.roomId}와 겹침`).toBe(true);
   }
-  // 집 전체 2D·3D에서도 이름표가 화면 안에 보인다.
-  await page.locator('#scope-house').click();
-  for (const view of ['2d', '3d']) {
-    await page.locator(`[data-view="${view}"]`).click();
-    await frames(page);
-    await expect(page.locator('[data-avatar-tag]')).toBeInViewport({ ratio: 1 });
-  }
+  await frames(page);
+  await expect(page.locator('[data-avatar-tag]')).toBeInViewport({ ratio: 1 });
 });
 
 for (const [width, height] of [
@@ -183,17 +159,14 @@ for (const [width, height] of [
     await page.locator('#avatar-toggle').click();
     await expect(page.locator('#avatar-toggle')).toHaveAttribute('aria-pressed', 'true');
     expect((await layout(page)).outside).toBe(true);
-    for (const view of ['3d', '2d']) {
-      await page.locator(`[data-view="${view}"]`).click();
-      await frames(page);
-      const tag = page.locator('[data-avatar-tag]'),
-        box = await tag.boundingBox(),
-        area = await clearArea(page);
-      await expect(tag).toBeInViewport({ ratio: 1 });
-      expect(box.x).toBeGreaterThanOrEqual(0);
-      expect(box.x + box.width).toBeLessThanOrEqual(width);
-      expect(box.y).toBeGreaterThanOrEqual(area.top - 1);
-    }
+    await frames(page);
+    const tag = page.locator('[data-avatar-tag]'),
+      box = await tag.boundingBox(),
+      clear = await clearArea(page);
+    await expect(tag).toBeInViewport({ ratio: 1 });
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+    expect(box.y).toBeGreaterThanOrEqual(clear.top - 1);
     const a = await layout(page),
       p = await planPoint(page, a.x, a.z),
       area = await clearArea(page);

@@ -66,6 +66,17 @@ const SIDE_AFTER = [
   ['back', /^\s*(?:의\s*)?(?:바로\s*)?(?:위쪽|위에|뒤쪽|뒤에|뒤)/],
   ['front', /^\s*(?:의\s*)?(?:바로\s*)?(?:아래쪽|아래에|앞쪽|앞에|앞)/],
 ];
+const CURRENT_SPACE =
+  /(?<![\p{L}\p{N}])(?:(?:이|내|우리|지금|현재)\s*)?(?:방|공간)|(?<![\p{L}\p{N}])여기/gu;
+
+export function currentSpaceReference(text) {
+  for (const match of text.matchAll(CURRENT_SPACE)) {
+    const after = text.slice(match.index + match[0].length);
+    if (REF_AFTER.test(after))
+      return { side: SIDE_AFTER.find(([, pattern]) => pattern.test(after))?.[0] || null };
+  }
+  return null;
+}
 export function roomMentions(text) {
   const t = String(text),
     found = [];
@@ -109,7 +120,7 @@ export function spaceTypeAnswer(text) {
     .trim()
     .replace(/^(?:아니|네|응)(?:\s*[,，]\s*|\s+)/u, '')
     .replace(
-      /\s*(?:(?:으로|로|을|를)\s*)?(?:(?:해|만들어|추가해|붙여)\s*(?:줘요?|주세요)|할게요?|이야|이에요|예요|입니다|요)?[.!?]?$/u,
+      /\s*(?:(?:으로|로|을|를)\s*)?(?:(?:해|만들어|추가해|붙여)\s*(?:줘요?|주세요|줄래요?|달라|주라)|할게요?|이야|이에요|예요|입니다|요)?[.!?]?$/u,
       '',
     )
     .trim();
@@ -154,7 +165,12 @@ export function deniesNewSpace(text) {
   return !(detectRoomType(after) && /만들|추가|붙여|생성/.test(after));
 }
 export function wantsNewSpace(text, mentions = roomMentions(text)) {
-  return ADD_WORDS.test(text) || (mentions.some((m) => m.role === 'ref') && ADD_NEAR.test(text));
+  return (
+    ADD_WORDS.test(text) ||
+    (ADD_NEAR.test(text) &&
+      (mentions.some((m) => m.role === 'ref') ||
+        (mentions.some((m) => m.role === 'new') && currentSpaceReference(text))))
+  );
 }
 export function isRoomIntent(text) {
   return (

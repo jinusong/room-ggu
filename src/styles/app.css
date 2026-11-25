@@ -2003,27 +2003,170 @@ button.row:hover,
 .stage-top > * {
   pointer-events: auto;
 }
-@container stage-top (max-width: 780px) {
-  .space-dims {
+.floorplan-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.floorplan-room-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 240px;
+  height: 44px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow-small);
+}
+.floorplan-room-picker .icon {
+  flex: none;
+}
+.floorplan-room-picker select {
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+.stage-top .add-space,
+.editor-command {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.stage-top .add-space:not(:disabled) {
+  background: var(--ink);
+  color: var(--sheet);
+}
+.stage-top .add-space:hover:not(:disabled) {
+  background: var(--ink-2);
+  color: var(--sheet);
+}
+.editor-command:hover:not(:disabled),
+.editor-command[aria-expanded='true'] {
+  border-color: var(--ink);
+  background: var(--raised);
+}
+.editor-pop {
+  position: absolute;
+  z-index: 2;
+  top: 52px;
+  left: 0;
+  width: min(344px, 100%);
+  max-height: calc(var(--app-h, 100dvh) - var(--inset-bottom) - 72px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow-float);
+  text-align: left;
+}
+.editor-pop-head,
+.editor-pop-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.editor-pop-head .icon-btn,
+.editor-pop-foot .btn {
+  min-height: 44px;
+}
+.editor-pop-head .icon-btn {
+  min-width: 44px;
+}
+.editor-pop-foot .primary {
+  margin-left: auto;
+}
+.editor-fields,
+.editor-measures {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 8px;
+}
+.editor-measures {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.editor-pop label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.editor-pop input,
+.editor-pop select {
+  min-height: 44px;
+  min-width: 0;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--sheet);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+.editor-pop .editor-side {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+.delete-room-confirm {
+  margin-left: auto;
+  color: var(--warn);
+  border-color: currentColor;
+}
+.delete-room-pop p {
+  margin: 0;
+  font-size: 13px;
+}
+@container stage-top (max-width: 525px) {
+  .floorplan-room-picker .icon {
     display: none;
   }
-}
-@container stage-top (max-width: 660px) {
-  .add-space {
-    width: 40px;
+  .stage-top .add-space,
+  .editor-command {
+    flex-direction: column;
+    gap: 2px;
+    width: 44px;
     padding: 0;
-    justify-content: center;
   }
-  .add-space span {
-    display: none;
+  .stage-top .add-space span,
+  .editor-command span {
+    display: block;
+    font-size: 10px;
+    line-height: 1.1;
   }
 }
-@container stage-top (max-width: 580px) {
-  .scope-house:not(.is-active) .scope-label,
-  .scope-house:not(.is-active) .scope-count,
-  .space-button:not(.is-active) .space-name {
-    display: none;
-  }
+.app.is-mobile .floorplan-controls {
+  flex: 1;
+  gap: 4px;
+}
+.app.is-mobile .floorplan-room-picker {
+  flex: 1;
 }
 .stage-tools {
   display: flex;
@@ -2406,6 +2549,7 @@ button.row:hover,
   color: var(--ink-3);
 }
 .room-tag {
+  pointer-events: none;
   display: flex;
   align-items: stretch;
   max-width: 260px;
@@ -2895,15 +3039,6 @@ button.avatar-tag {
 .add-pop.is-strip .add-grid button {
   flex: none;
   padding: 4px 10px 4px 8px;
-}
-/* 좁은 화면에서는 공간 추가를 아이콘만 남긴다. */
-.app.is-mobile .add-space {
-  width: 40px;
-  padding: 0;
-  justify-content: center;
-}
-.app.is-mobile .add-space span {
-  display: none;
 }
 .app.is-mobile .bar-btn.bar-pose span {
   display: none;

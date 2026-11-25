@@ -13,12 +13,9 @@ const frames = (page) =>
 async function openHouse(page, size) {
   if (size) await page.setViewportSize(size);
   await page.goto('/?model=off');
-  await page.waitForFunction(
-    () => window.__roomggu?.app.scenes.three || window.__roomggu?.app.view.webglError,
-  );
+  await page.waitForFunction(() => window.__roomggu?.ready());
   // 원룸 오른쪽에 화장실을 붙이고 집 전체 2D로 본다.
   await page.evaluate(() => window.__roomggu.store.attachBathroom());
-  await page.locator('[data-view="2d"]').click();
   await page.waitForFunction(() => window.__roomggu.app.scenes.house.scale > 0);
   await frames(page);
   const s = await stored(page);
@@ -36,20 +33,6 @@ async function doorAnchor(page, ids) {
   }
   return last;
 }
-// 집 전체 3D 모형에서 문 모형의 수와 벽을 따라 놓인 자리.
-const doors3d = (page) =>
-  page.evaluate(() => {
-    const out = [];
-    const sc = window.__roomggu.app.scenes.three;
-    sc.room.updateMatrixWorld(true);
-    sc.room.traverse((o) => {
-      if (!o.userData.opening) return;
-      const v = o.getWorldPosition(o.position.clone());
-      out.push({ x: v.x, z: v.z });
-    });
-    return out;
-  });
-
 for (const [width, height] of [
   [1440, 900],
   [1024, 900],
@@ -125,25 +108,20 @@ test('움직일 수 없는 가구의 자동 정리는 이전 실행 취소와 �
   expect((await stored(page)).items[0].angle).toBe(90);
 });
 
-for (const view of ['2d', '3d', 'house']) {
-  test(`${view}에서 끌기 취소 후 위치와 실행 취소 기록이 돌아온다`, async ({
+for (const target of ['furniture', 'room']) {
+  test(`평면도의 ${target} 끌기 취소 후 위치와 실행 취소 기록이 돌아온다`, async ({
     page,
     browserName,
   }) => {
     test.skip(browserName !== 'chromium', 'Chrome CDP 터치 취소 검사');
     const state = freshState();
     const chair = makeItem('chair');
-    const house = view === 'house';
-    Object.assign(state, {
-      view: house ? '2d' : view,
-      scope: house ? 'house' : 'room',
-      items: [chair],
-    });
+    const house = target === 'room';
+    if (!house) state.items = [chair];
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript((s) => localStorage.setItem('room-ggu-v2', JSON.stringify(s)), state);
     await page.goto('/?model=off');
-    const key = house ? 'house' : view === '2d' ? 'plan' : 'three';
-    const canvas = page.locator(`#viewport-${view} canvas`);
+    const canvas = page.locator('#viewport-house canvas');
     await expect(canvas).toBeVisible();
     const saved = async () => {
       const s = await stored(page);
@@ -157,11 +135,8 @@ for (const view of ['2d', '3d', 'house']) {
     const before = await saved();
     const anchor = async () =>
       page.evaluate(
-        ({ key, id }) => window.__roomggu.app.scenes[key].anchor(id, { center: true }),
-        {
-          key,
-          id: house ? state.roomId : chair.id,
-        },
+        (id) => window.__roomggu.app.scenes.house.anchor(id, { center: true }),
+        house ? state.roomId : chair.id,
       );
     const cdp = await page.context().newCDPSession(page);
     const send = (type, points = []) =>
@@ -197,9 +172,7 @@ for (const view of ['2d', '3d', 'house']) {
   });
 }
 
-test('문을 끌어 옮기고 폭·여는 방향을 바꾸면 2D·3D·방 편집 화면이 함께 바뀐다', async ({
-  page,
-}) => {
+test('평면도에서 문을 끌고 폭·여는 방향을 바꾼다', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const { studio, bath } = await openHouse(page);
@@ -243,48 +216,13 @@ test('문을 끌어 옮기고 폭·여는 방향을 바꾸면 2D·3D·방 편집
   await page.getByRole('button', { name: '문 여는 방향 바꾸기' }).click();
   s = await stored(page);
   expect(s.floorplan.doors[0]).toMatchObject({ width: 0.9, flip: true });
-  // 3D 집 모형의 문도 같은 자리에 있다.
-  await page.locator('[data-view="3d"]').click();
-  await frames(page);
-  const wallMid = s.floorplan.positions[bath].z;
-  let model = await doors3d(page);
-  expect(model).toHaveLength(1);
-  expect(model[0].z).toBeCloseTo(wallMid + s.floorplan.doors[0].offset, 1);
-  // 원룸 방 편집 2D에서도 같은 자리에 문이 비어 있고, 거기서도 끌어 옮길 수 있다.
-  await page.locator('[data-view="2d"]').click();
-  await page.locator(`[data-room-tag="${studio}"] .tag-main`).dblclick();
-  await frames(page);
-  const local = await page.evaluate((ids) => window.__roomggu.app.scenes.plan.doorAnchor(ids), ids);
-  const roomScale = await page.evaluate(() => window.__roomggu.app.scenes.plan.scale);
-  await expect(page.locator('.stage-hint')).toContainText('문을 끌어');
-  await page.mouse.move(local.x + 2, local.y - 0.3 * roomScale);
-  expect(
-    await page.evaluate(() => document.querySelector('#viewport-2d canvas').style.cursor),
-  ).toBe('ns-resize');
-  await page.mouse.down();
-  await page.mouse.move(local.x + 2, local.y - 0.7 * roomScale, { steps: 4 });
-  await page.mouse.move(local.x + 2, local.y - 1.0 * roomScale, { steps: 4 });
-  await page.mouse.up();
-  s = await stored(page);
-  // 위로 70cm 끌었으므로 벽 가운데에서 아래 50cm에 있던 문이 위 20cm로 간다.
-  expect(s.floorplan.doors[0].offset).toBeCloseTo(offset - 0.7, 1);
-  expect(s.floorplan.doors[0].width).toBe(0.9);
-  // 방 편집 3D의 문 호도 하나다.
-  await page.locator('[data-view="3d"]').click();
-  await frames(page);
-  expect(
-    await page.evaluate(() => {
-      let n = 0;
-      window.__roomggu.app.scenes.three.room.traverse((o) => o.userData.door && n++);
-      return n;
-    }),
-  ).toBe(1);
+  const changed = await doorAnchor(page, ids);
+  expect(changed.y - moved.y).toBeCloseTo((s.floorplan.doors[0].offset - offset) * scale, 1);
+  expect(changed.half).toBeCloseTo(0.45 * scale, 1);
   // 새로고침해도 문 설정이 남는다.
   const before = s.floorplan.doors;
   await page.reload();
-  await page.waitForFunction(
-    () => window.__roomggu?.app.scenes.three || window.__roomggu?.app.view.webglError,
-  );
+  await page.waitForFunction(() => window.__roomggu?.ready());
   expect((await stored(page)).floorplan.doors).toEqual(before);
   expect(errors).toEqual([]);
 });
@@ -300,11 +238,6 @@ test('문을 막으면 벽이 이어지고 집 전체 도구에서 다시 내거
   expect(s.floorplan.doors[0].closed).toBe(true);
   expect(await doorAnchor(page, ids)).toBeNull();
   await expect(page.locator('.event').last()).toContainText('문을 막았어요');
-  // 3D에도 문이 없다.
-  await page.locator('[data-view="3d"]').click();
-  await frames(page);
-  expect(await doors3d(page)).toHaveLength(0);
-  await page.locator('[data-view="2d"]').click();
   // 실행 취소로 되돌아오고, 다시 실행하면 막힌다.
   await page.locator('#undo').click();
   expect((await stored(page)).floorplan.doors).toBeUndefined();

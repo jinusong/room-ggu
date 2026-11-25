@@ -10,10 +10,7 @@ const INK = '#2a2824';
 export class HouseScene extends PlanScene {
   constructor(host, state, cb) {
     super(host, state, cb);
-    this.canvas.setAttribute(
-      'aria-label',
-      '집 전체 평면도. 공간과 문을 끌어 옮기고, 공간을 더블클릭하면 방을 편집해요.',
-    );
+    this.canvas.setAttribute('aria-label', '집 전체 평면도. 방, 가구와 문을 끌어 옮길 수 있어요.');
     for (const [event, fn] of [
       ['pointerdown', this.down],
       ['pointermove', this.move],
@@ -30,11 +27,26 @@ export class HouseScene extends PlanScene {
       houseLayout(state).openings.find((o) =>
         doorHit(o, p, this.scale, e?.pointerType === 'touch' ? 22 : 14),
       );
+    const itemAt = (p, room) => {
+      const at = (r) => {
+        if (!r) return null;
+        const pos = state.floorplan.positions[r.roomId];
+        const item = this.hit({ x: p.x - pos.x, z: p.z - pos.z }, { ...state, ...r });
+        return item && { item, room: r };
+      };
+      const home = avatarSpace(state, spaces(state));
+      if (home && home.roomId !== room?.roomId) {
+        const outside = at(home);
+        if (outside?.item.id === 'avatar') return outside;
+      }
+      return at(room);
+    };
     this.down = (e) => {
       if (e.button !== 0) return;
       const p = this.point(e),
-        door = this.doorAt(p, e),
-        r = this.spaceAt(p);
+        r = this.spaceAt(p),
+        hit = itemAt(p, r),
+        door = !hit && this.doorAt(p, e);
       if (door) {
         this.drag = {
           door,
@@ -43,10 +55,29 @@ export class HouseScene extends PlanScene {
           py: e.clientY,
           started: false,
         };
+        cb.select(null);
         this.canvas.setPointerCapture(e.pointerId);
         return;
       }
       cb.pickDoor?.(null);
+      if (hit) {
+        const { item, room } = hit;
+        cb.selectSpace(room.roomId);
+        if (item.id !== 'avatar') cb.select(item.id);
+        const pos = state.floorplan.positions[room.roomId];
+        this.drag = {
+          item: item.id,
+          dx: item.x + pos.x - p.x,
+          dz: item.z + pos.z - p.z,
+          px: e.clientX,
+          py: e.clientY,
+          fixed: item.fixed,
+          started: false,
+        };
+        this.canvas.setPointerCapture(e.pointerId);
+        return;
+      }
+      cb.select(null);
       if (!r) return;
       const pos = state.floorplan.positions[r.roomId];
       this.drag = {
@@ -63,17 +94,24 @@ export class HouseScene extends PlanScene {
     this.move = (e) => {
       if (!this.drag) {
         const at = this.point(e),
-          door = this.doorAt(at, e);
+          room = this.spaceAt(at),
+          item = itemAt(at, room)?.item,
+          door = !item && this.doorAt(at, e);
         this.canvas.style.cursor = door
           ? door.vertical
             ? 'ns-resize'
             : 'ew-resize'
-          : this.spaceAt(at)
-            ? 'grab'
-            : '';
+          : item?.fixed
+            ? 'pointer'
+            : item || room
+              ? 'grab'
+              : '';
         return;
       }
-      if (!this.drag.started && Math.hypot(e.clientX - this.drag.px, e.clientY - this.drag.py) < 4)
+      if (
+        this.drag.fixed ||
+        (!this.drag.started && Math.hypot(e.clientX - this.drag.px, e.clientY - this.drag.py) < 4)
+      )
         return;
       if (!this.drag.started) {
         this.drag.started = true;
@@ -86,21 +124,31 @@ export class HouseScene extends PlanScene {
         return;
       }
       this.canvas.style.cursor = 'grabbing';
+      if (this.drag.item) {
+        const { x, z } = state.floorplan.positions[state.roomId];
+        const local = [p.x + this.drag.dx - x, p.z + this.drag.dz - z];
+        if (this.drag.item === 'avatar') cb.moveAvatar(...local);
+        else cb.move(this.drag.item, ...local);
+        return;
+      }
       cb.moveSpace(this.drag.id, p.x + this.drag.dx, p.z + this.drag.dz);
     };
     this.up = (e) => {
       const moved = this.drag?.started,
-        door = this.drag?.door;
+        door = this.drag?.door,
+        item = this.drag?.item;
       const cancelled = e.type === 'pointercancel';
       this.drag = null;
       this.canvas.style.cursor = '';
       if (door && !cancelled) cb.pickDoor?.(door.roomIds);
       if (moved) cb.commit(cancelled);
+      else if (item === 'avatar' && !cancelled) cb.pickAvatar();
       this.draw();
     };
     this.double = (e) => {
-      const r = this.spaceAt(this.point(e));
-      if (r) cb.editSpace(r.roomId);
+      const p = this.point(e),
+        r = this.spaceAt(p);
+      if (r && !this.doorAt(p, e) && !itemAt(p, r)) cb.editSpace(r.roomId);
     };
     for (const [event, fn] of [
       ['pointerdown', this.down],
@@ -210,7 +258,13 @@ export class HouseScene extends PlanScene {
       this.ox = ox + p.x * scale;
       this.oy = oy + p.z * scale;
       for (const a of [...r.items].sort((a, b) => FLAT_TYPES.has(b.type) - FLAT_TYPES.has(a.type)))
-        this.item(c, a, { named: names });
+        this.item(c, a, {
+          named: names,
+          selected: a.id === this.selected,
+          warn: this.warnings.has(a.id),
+        });
+      if (r.roomId === this.state.roomId && this.ghostItem)
+        this.item(c, this.ghostItem, { ghost: true, named: names });
       this.ox = ox;
       this.oy = oy;
     }
@@ -367,7 +421,9 @@ export class HouseScene extends PlanScene {
       visible: true,
     };
   }
-  anchor(id) {
+  anchor(id, opts) {
+    const item = super.anchor(id, opts, this.state.floorplan.positions[this.state.roomId]);
+    if (item) return item;
     const r = spaces(this.state).find((r) => r.roomId === id),
       p = this.state.floorplan.positions[id];
     if (!r || !p) return null;
@@ -377,6 +433,12 @@ export class HouseScene extends PlanScene {
       y: rect.top + this.oy + p.z * this.scale,
       visible: true,
     };
+  }
+  windowFrames() {
+    return super.windowFrames(this.state.floorplan.positions[this.state.roomId]);
+  }
+  windowPoint(e, wall) {
+    return super.windowPoint(e, wall, this.state.floorplan.positions[this.state.roomId]);
   }
   dispose() {
     this.canvas.removeEventListener('dblclick', this.double);
