@@ -70,6 +70,25 @@ test('집 전체 명령은 단일 방·가구·집 전체 보기와 구분하고
   assert.equal(designSchema(designRequest('100평 집 전체 인테리어해줘')).required.length, 13);
 });
 
+test('작은 집은 샤워부스가 들어갈 자리를 확보하고 직접 요청한 공간을 유지한다', () => {
+  for (const [text, skipped] of [
+    ['40m² 집 전체를 재팬디로 꾸며줘', ['다용도실', '드레스룸']],
+    ['14평 집 전체를 드레스룸 넣어서 재팬디로 꾸며줘', ['다용도실']],
+  ]) {
+    const request = designRequest(text);
+    const out = buildDesign(freshState(), templateDesign(request));
+    const rooms = spaces(out.state);
+    const bathroom = rooms.find((r) => r.room.type === 'bathroom');
+    assert.ok(bathroom.items.some((i) => i.type === 'shower'));
+    assert.ok(rooms.every((r) => r.items.length > 0 && layoutWarnings(r).all.size === 0));
+    const area = rooms.reduce((total, { room }) => total + room.w * room.d, 0);
+    assert.ok(Math.abs(area - request.areaM2) / request.areaM2 < 0.002);
+    assert.deepEqual([...out.skipped].sort(), skipped);
+    assert.equal(floorplanWarnings(rooms, out.state.floorplan).size, 0);
+    if (skipped.length === 1) assert.ok(rooms.some((r) => r.name === '드레스룸'));
+  }
+});
+
 test('명시한 침실·욕실 수, 필수 공간과 가구 누락·잘못된 출력은 적용하지 않는다', () => {
   const request = designRequest('100평 집 전체를 꾸며줘'),
     spec = templateDesign(request);

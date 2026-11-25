@@ -53,7 +53,7 @@ import {
 } from '../floorplan.js';
 import { bathroomFixtures } from '../house-geometry.js';
 import { josa } from './text.js';
-import { THEMES } from './design.js';
+import { roomEssentials, THEMES } from './design.js';
 import { layoutHouse } from './house-layout.js';
 
 // 일괄 상담도 이 경계에서만 실제 상태로 바꾼다. 완성한 별도 상태를 검증한 뒤 store가 한 번에 적용한다.
@@ -71,27 +71,44 @@ export function buildDesign(state, spec) {
     }
     return { state: validateState(next), omitted: [], skipped: [] };
   }
+  if (spec.rooms.length < 2 || spec.rooms.length > 12)
+    throw Error('공간 구성을 다시 요청해 주세요.');
+  let rooms = [...spec.rooms].sort((a, b) => b.weight - a.weight);
+  let best = null;
+  const skipped = [];
+  // 필수 가구가 빠졌거나 선택 공간이 비면 면적을 다시 나눠 본다.
+  for (;;) {
+    let layout;
+    try {
+      layout = layoutHouse(rooms, spec.areaM2);
+    } catch (e) {
+      if (!best && !rooms.some((r) => r.optional)) throw e;
+    }
+    let empty = [];
+    if (layout) {
+      const result = furnishHouse(state, theme, rooms, layout);
+      empty = result.empty;
+      if (
+        !best ||
+        result.missing < best.missing ||
+        (result.missing === best.missing && empty.length < best.empty.length)
+      ) {
+        best = { ...result, skipped: [...skipped] };
+      }
+      if (!result.missing && !empty.length) break;
+    }
+    const drop = empty.at(-1) || rooms.findLast((r) => r.optional);
+    if (!drop) break;
+    rooms = rooms.filter((r) => r !== drop);
+    skipped.unshift(drop.name);
+  }
+  return { state: best.state, omitted: best.omitted, skipped: best.skipped };
+}
+
+function furnishHouse(state, theme, rooms, layout) {
   const next = freshState(),
     omitted = [],
     list = [];
-  if (spec.rooms.length < 2 || spec.rooms.length > 12)
-    throw Error('공간 구성을 다시 요청해 주세요.');
-  // 방 크기와 자리, 열어 둘 문은 house-layout이 문 규칙을 지키는 배치 가운데에서 고른다.
-  let rooms = [...spec.rooms].sort((a, b) => b.weight - a.weight),
-    layout = null;
-  const skipped = [];
-  // 배치가 나오지 않으면 직접 말하지 않은 드레스룸, 다용도실, 현관을 가벼운 것부터 하나씩 빼고 다시 나눈다.
-  for (;;) {
-    try {
-      layout = layoutHouse(rooms, spec.areaM2);
-      break;
-    } catch (e) {
-      const drop = rooms.findLast((r) => r.optional);
-      if (!drop) throw e;
-      rooms = rooms.filter((r) => r !== drop);
-      skipped.unshift(drop.name);
-    }
-  }
   for (const [i, r] of rooms.entries()) {
     const { w, d, x, z } = layout.rooms[i],
       room = makeRoom(r.type),
@@ -206,7 +223,17 @@ export function buildDesign(state, spec) {
     }
     r.items.push(...local.items.slice(keepouts.length));
   }
-  return { state: validateState(next), omitted, skipped };
+  const empty = rooms.filter((r, i) => r.optional && !list[i].items.length);
+  const missing = rooms.reduce((count, r, i) => {
+    if (r.optional) return count;
+    return (
+      count +
+      roomEssentials(r.type, r.name).filter(
+        (type) => !list[i].items.some((item) => item.type === type),
+      ).length
+    );
+  }, 0);
+  return { state: validateState(next), omitted, missing, empty };
 }
 
 export const round2 = (n) => Math.round(n * 100) / 100;

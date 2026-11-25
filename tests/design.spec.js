@@ -52,6 +52,25 @@ for (const width of [1440, 1024, 900, 390, 320])
     expect(errors).toEqual([]);
   });
 
+test('작은 집 초안은 욕실 설비를 넣고 생략한 공간을 알린다', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await start(page);
+  const before = await state(page);
+  await say(page, '40m² 집 전체를 재팬디로 꾸며줘');
+  const panel = page.locator('[data-surface=design]');
+  const bath = panel.locator('.design-rooms li').filter({ hasText: '공용 욕실' });
+  await expect(bath).toContainText('샤워부스');
+  const notice = panel.getByRole('status').filter({ hasText: '면적이 모자라 뺀 공간' });
+  await expect(notice).toContainText(/드레스룸.*다용도실|다용도실.*드레스룸/);
+  expect(await state(page)).toEqual(before);
+  await panel.getByRole('button', { name: '초안 적용' }).click();
+  const applied = list(await state(page));
+  expect(applied).toHaveLength(4);
+  expect(applied.find((r) => r.name === '공용 욕실').items.map((i) => i.type)).toContain('shower');
+  await page.evaluate(() => window.__roomggu.store.undo());
+  expect(await state(page)).toEqual(before);
+});
+
 test('초안은 새로고침 뒤에도 적용할 수 있고, 배치 편집 뒤에는 오래된 초안으로 덮어쓰지 않는다', async ({
   page,
 }) => {
