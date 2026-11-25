@@ -1,4 +1,4 @@
-import { sizeFields } from './dimensions.js';
+import { isSpaceSizeAnswer, sizeFields } from './dimensions.js';
 import { UI_SURFACES } from './ui-schema.js';
 import { detectType } from './estimator.js';
 import { ROOM_TYPES, makeRoom, retypeRoom } from './catalog.js';
@@ -118,6 +118,25 @@ export function spaceTypeAnswer(text) {
   const [, rejected, wanted] =
     answer.match(/^(.+?)(?:은|는|이|가|을|를)?\s*(?:말고|대신|빼고)\s*(.+)$/u) || [];
   return rejected && exactSpaceType(rejected.trim()) ? exactSpaceType(wanted.trim()) : null;
+}
+export function spaceFollowup(text) {
+  const choice = spaceTypeAnswer(text);
+  if (choice) return { choice };
+  if (isSpaceSizeAnswer(text)) return { sizeText: text };
+
+  for (const separator of text.matchAll(/\s+(?:하고(?:\s*[,，])?|그리고)\s*|\s*[,，]\s*/gu)) {
+    const left = text.slice(0, separator.index).trim();
+    const right = text.slice(separator.index + separator[0].length).trim();
+    for (const [typeText, sizeText] of [
+      [left, right],
+      [right, left],
+    ]) {
+      if (!isSpaceSizeAnswer(sizeText)) continue;
+      const choice = spaceTypeAnswer(typeText);
+      if (choice) return { choice, sizeText };
+    }
+  }
+  return null;
 }
 // 어떤 뜻으로든 공간 이름이 나왔는지. 방 이야기인지 가를 때 쓴다.
 export const mentionsRoom = (text) => roomMentions(text).length > 0;

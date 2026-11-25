@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 const read = (page) =>
   page.evaluate(() => ({
     room: window.__roomggu.app.state.room,
@@ -69,6 +70,18 @@ test('창문 이동 취소·키보드 이동·뷰 전환 취소는 배치와 기
   await page.mouse.move(p.x, p.y);
   await page.mouse.down();
   await page.mouse.move(p.x + 25, p.y, { steps: 4 });
+  expect((await read(page)).room.windows).not.toEqual(before.room.windows);
+  const saved = await page.evaluate(() => {
+    const { store } = window.__roomggu;
+    store.toggle('grid');
+    return JSON.parse(localStorage.getItem(store.KEY)).room.windows;
+  });
+  expect(saved).toEqual(before.room.windows);
+  const ready = page.waitForEvent('download');
+  await page.evaluate(() => window.__roomggu.store.exportJSON());
+  const download = await ready;
+  const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
+  expect(exported.room.windows).toEqual(before.room.windows);
   await page.keyboard.press('Escape');
   await page.mouse.up();
   expect(await read(page)).toEqual(before);

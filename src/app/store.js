@@ -24,8 +24,7 @@ import {
 } from './consult-context.js';
 import { furnitureMentions } from '../estimator.js';
 import { planFromModel } from './interpret.js';
-import { parseRoomDimensions, spaceTypeAnswer } from '../room-consult.js';
-import { isSpaceSizeAnswer } from '../dimensions.js';
+import { parseRoomDimensions, spaceFollowup, spaceTypeAnswer } from '../room-consult.js';
 import { photoCandidates, PHOTO_CONFIDENT } from './photo.js';
 import { josa, dimsText } from './text.js';
 import { parseComparisonCommand, avatarLayout, poseAccepts, standAt } from '../avatar.js';
@@ -187,7 +186,7 @@ export function dismissToast() {
 // ---------- 저장 ----------
 export function persist() {
   try {
-    localStorage.setItem(KEY, JSON.stringify(app.state));
+    localStorage.setItem(KEY, JSON.stringify(savedLayout()));
     app.view.saveStatus = '이 기기에 저장됨';
   } catch {
     app.view.saveStatus = '자동 저장 불가, 파일로 저장해 주세요';
@@ -220,6 +219,8 @@ function sanitizeTurn(t) {
     turn.note = cleanText(t.note, 300) || undefined;
     if (t.spaceRequest) {
       turn.spaceRequest = cleanText(t.spaceRequest, 1500);
+      const choice = spaceTypeAnswer(cleanText(t.spaceChoice, 40));
+      if (choice && !choice.unsupported) turn.spaceChoice = choice.name;
       const dims = Object.fromEntries(
         ['w', 'd', 'h'].flatMap((key) => {
           const n = t.spaceDims?.[key];
@@ -338,12 +339,17 @@ export function snapshot() {
   return recordSnapshot(JSON.stringify(app.state));
 }
 let sceneBefore = null;
+let windowGesture = null;
 const movableState = ({ items, avatar, floorplan }) => ({ items, avatar, floorplan });
+function savedLayout() {
+  const state = sceneBefore ? { ...app.state, ...sceneBefore.movable } : app.state;
+  if (windowGesture?.roomId !== state.roomId) return state;
+  return { ...state, room: { ...state.room, windows: windowGesture.room.windows } };
+}
 function settleSceneGesture(cancel = false) {
   if (sceneBefore === null) return false;
-  const json = sceneBefore;
+  const { json, movable: before } = sceneBefore;
   sceneBefore = null;
-  const before = movableState(JSON.parse(json));
   if (JSON.stringify(before) !== JSON.stringify(movableState(app.state))) {
     if (cancel) Object.assign(app.state, before);
     else recordSnapshot(json);
@@ -838,7 +844,7 @@ function applyPlan(plan, turn) {
         where
           ? `${where}에 ${josa(s.name, '을/를')} 붙였어요.`
           : `${josa(s.name, '을/를')} 새로 만들었어요.`,
-        `가로 ${s.room.w}m, 세로 ${s.room.d}m예요. 크기를 알려주면 바로 맞출게요.`,
+        `가로 ${s.room.w}m, 세로 ${s.room.d}m예요.`,
       );
       turn.text = lines.join(' ');
     }
@@ -944,6 +950,7 @@ function finishTurn(turn, plan, meta) {
   });
   if (plan.spaceRequest) turn.spaceRequest = plan.spaceRequest;
   if (plan.spaceDims) turn.spaceDims = plan.spaceDims;
+  if (plan.spaceChoice) turn.spaceChoice = plan.spaceChoice;
   if (plan.recommendation) turn.recommendation = plan.recommendation;
   if (plan.confirmation) turn.confirmation = plan.confirmation;
   if (plan.note) turn.note = plan.note;
@@ -1030,45 +1037,58 @@ export async function send(raw) {
     return;
   }
   if (last?.spaceRequest && last.roomId === app.state.roomId) {
-    const answer = spaceTypeAnswer(text);
-    if (answer?.unsupported) {
-      finishTurn(
-        turn,
-        { ...unsupportedSpacePlan(answer.name, last.spaceRequest), spaceDims: last.spaceDims },
-        { engine: 'app' },
-      );
-      return;
-    }
-    if (answer)
-      return respondToText(
-        `${last.spaceRequest}. 거기는 ${answer.name}임`,
-        turn,
-        history,
-        extra,
-        last.spaceDims,
-      );
-    if (isSpaceSizeAnswer(text)) {
-      const plan = {
-        spaceRequest: last.spaceRequest,
-        spaceDims: last.spaceDims,
-        suggestions: last.suggestions,
-      };
-      try {
-        const dims = parseRoomDimensions(text);
-        const labels = { w: '가로', d: '세로', h: '천장 높이' };
-        const said = Object.entries(dims)
-          .map(([key, value]) => `${labels[key]} ${value}m`)
-          .join(', ');
-        plan.spaceDims = { ...last.spaceDims, ...dims };
-        plan.reply = `${said}로 적어 뒀어요. 어떤 공간을 추가할까요?`;
-      } catch (e) {
+    const answer = spaceFollowup(text);
+    if (answer) return respondToSpaceFollowup(answer, last, turn, history, extra);
+  }
+  return respondToText(text, turn, history, extra);
+}
+
+function respondToSpaceFollowup(answer, last, turn, history, extra) {
+  const { sizeText } = answer;
+  const choice = answer.choice || spaceTypeAnswer(last.spaceChoice || '');
+  const plan = {
+    spaceRequest: last.spaceRequest,
+    spaceDims: last.spaceDims,
+    suggestions: last.suggestions,
+  };
+  if (sizeText) {
+    try {
+      const dims = parseRoomDimensions(sizeText);
+      const labels = { w: '가로', d: '세로', h: '천장 높이' };
+      const said = Object.entries(dims)
+        .map(([key, value]) => `${labels[key]} ${value}m`)
+        .join(', ');
+      plan.spaceDims = { ...last.spaceDims, ...dims };
+      plan.reply = `${said}로 적어 뒀어요. 어떤 공간을 추가할까요?`;
+    } catch (e) {
+      if (choice && !choice.unsupported) {
+        plan.spaceChoice = choice.name;
+        plan.suggestions = [];
+        plan.reply = `${josa(choice.name, '으로/로')} 기억해 둘게요. ${e.message}`;
+      } else {
         plan.reply = `${e.message} 새로 붙일 방 종류도 알려 주세요.`;
       }
       finishTurn(turn, plan, { engine: 'app' });
       return;
     }
   }
-  return respondToText(text, turn, history, extra);
+  if (choice?.unsupported) {
+    finishTurn(
+      turn,
+      { ...unsupportedSpacePlan(choice.name, last.spaceRequest), spaceDims: plan.spaceDims },
+      { engine: 'app' },
+    );
+    return;
+  }
+  if (choice)
+    return respondToText(
+      `${last.spaceRequest}. 거기는 ${choice.name}임`,
+      turn,
+      history,
+      extra,
+      plan.spaceDims,
+    );
+  finishTurn(turn, plan, { engine: 'app' });
 }
 
 async function respondToText(text, turn, history, extra = [], spaceDims) {
@@ -1769,9 +1789,14 @@ export function createDraft(type, { via = 'catalog' } = {}) {
     toast('사진을 보낸 공간으로 돌아온 뒤 종류를 골라 주세요.');
     return;
   }
+  const previous = photo && app.draft?.id === photo.draftId ? app.draft : null;
+  if (previous?.type === type) {
+    photo.chosenType = type;
+    emit();
+    return;
+  }
   if (app.busy?.kind === 'vision') cancelModel();
   const item = makeItem(type);
-  const previous = photo && app.draft?.id === photo.draftId ? app.draft : null;
   if (previous) {
     for (let i = 0; i < 3; i++)
       if (String(previous.sources[i]).startsWith('사용자')) {
@@ -1884,7 +1909,6 @@ export const addWindow = (wall) => editWindow((s) => ops.addWindow(s, wall));
 export const setWindow = (id, patch, opts) => editWindow((s) => ops.setWindow(s, id, patch), opts);
 export const removeWindow = (id) => editWindow((s) => ops.removeWindow(s, id));
 // 포인터 한 번의 조작을 실행 취소 한 번으로 묶고, 취소·무효 이동은 기록을 남기지 않는다.
-let windowGesture = null;
 export function beginWindowGesture(id) {
   finishSceneGesture(true);
   finishWindowGesture(true);
@@ -2191,7 +2215,7 @@ function download(url, name) {
 }
 export function exportJSON() {
   const url = URL.createObjectURL(
-    new Blob([JSON.stringify(app.state, null, 2)], { type: 'application/json' }),
+    new Blob([JSON.stringify(savedLayout(), null, 2)], { type: 'application/json' }),
   );
   download(url, `${app.state.name || '룸꾸'}-배치.json`);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -2901,7 +2925,9 @@ export const sceneCallbacks = {
   },
   select: (id) => select(id),
   start: () => {
-    sceneBefore ??= JSON.stringify(app.state);
+    if (sceneBefore) return;
+    const json = JSON.stringify(app.state);
+    sceneBefore = { json, movable: movableState(JSON.parse(json)) };
   },
   move: (id, x, z) => {
     if (!sceneBefore) return;

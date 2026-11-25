@@ -583,6 +583,27 @@ test('사진 종류를 직접 고른 뒤 판별해도 초안은 확인할 때까
   await expect(page.locator('#chat-input')).toBeInViewport();
 });
 
+test('사진에서 같은 가구 종류를 다시 골라도 초안 이름과 규격을 유지한다', async ({ page }) => {
+  await start(page);
+  await sendPhoto(page, '');
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => window.__finishPhoto('bed'));
+  await expect.poll(async () => (await snapshot(page)).draft?.type).toBe('bed');
+  const initial = (await snapshot(page)).draft;
+  await page.locator('[data-surface=furniture-size] .size-card[aria-pressed=false]').last().click();
+  await page.evaluate(() => {
+    window.__roomggu.store.setItemName({ type: 'draft' }, '창가 침대');
+  });
+  const edited = (await snapshot(page)).draft;
+  expect(edited.name).toBe('창가 침대');
+  expect(edited.dims).not.toEqual(initial.dims);
+
+  await page.getByRole('button', { name: '사진 종류 다시 고르기' }).click();
+  await page.locator('.photo-kind-grid').getByRole('button', { name: '침대', exact: true }).click();
+  expect((await snapshot(page)).draft).toEqual(edited);
+  expect((await snapshot(page)).photo.chosenType).toBe('bed');
+});
+
 test('사진 설명을 반영하는 동안 종류 변경과 배치는 기다린다', async ({ page }) => {
   await start(page);
   await page.evaluate(() => {

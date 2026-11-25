@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { makeItem, freshState, spaces } from '../src/data.js';
 import { roomOpenings } from '../src/floorplan.js';
 import { addSpace, switchSpace } from '../src/app/ops.js';
@@ -172,6 +173,14 @@ for (const view of ['2d', '3d', 'house']) {
     await send('touchStart', [p]);
     await send('touchMove', [{ x: p.x + 24, y: p.y + 10 }]);
     await expect.poll(live).not.toEqual(before);
+    expect(await saved()).toEqual(before);
+    if (house) {
+      const ready = page.waitForEvent('download');
+      await page.evaluate(() => window.__roomggu.store.exportJSON());
+      const download = await ready;
+      const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
+      expect(exported.floorplan.positions).toEqual(before);
+    }
     await send('touchCancel');
     expect(await saved()).toEqual(before);
     expect(await page.evaluate(() => window.__roomggu.app.history)).toHaveLength(0);
