@@ -24,7 +24,8 @@ import {
 } from './consult-context.js';
 import { furnitureMentions } from '../estimator.js';
 import { planFromModel } from './interpret.js';
-import { spaceTypeAnswer } from '../room-consult.js';
+import { parseRoomDimensions, spaceTypeAnswer } from '../room-consult.js';
+import { isSpaceSizeAnswer } from '../dimensions.js';
 import { photoCandidates, PHOTO_CONFIDENT } from './photo.js';
 import { josa, dimsText } from './text.js';
 import { parseComparisonCommand, avatarLayout, poseAccepts, standAt } from '../avatar.js';
@@ -153,9 +154,9 @@ export function subscribe(fn) {
   subs.add(fn);
   return () => subs.delete(fn);
 }
-export function emit() {
+export function emit(kind) {
   app.rev++;
-  for (const fn of subs) fn();
+  for (const fn of subs) fn(kind);
 }
 
 let toastTimer;
@@ -217,7 +218,16 @@ function sanitizeTurn(t) {
       .map((f) => cleanText(f, 80))
       .filter(Boolean);
     turn.note = cleanText(t.note, 300) || undefined;
-    if (t.spaceRequest) turn.spaceRequest = cleanText(t.spaceRequest, 1500);
+    if (t.spaceRequest) {
+      turn.spaceRequest = cleanText(t.spaceRequest, 1500);
+      const dims = Object.fromEntries(
+        ['w', 'd', 'h'].flatMap((key) => {
+          const n = t.spaceDims?.[key];
+          return Number.isFinite(n) && n >= 1 && n <= 15 ? [[key, n]] : [];
+        }),
+      );
+      if (Object.keys(dims).length) turn.spaceDims = dims;
+    }
     turn.tone = t.tone === 'error' ? 'error' : undefined;
     turn.photoScores = cleanText(t.photoScores, 120) || undefined;
     turn.surfaces = (Array.isArray(t.surfaces) ? t.surfaces : [])
@@ -317,12 +327,34 @@ let seq = 0;
 export function turnId() {
   return `t${Date.now().toString(36)}${(seq++).toString(36)}`;
 }
-export function snapshot() {
-  const json = JSON.stringify(app.state);
+function recordSnapshot(json) {
   if (app.history.at(-1) !== json) app.history.push(json);
   if (app.history.length > 40) app.history.shift();
   app.future = [];
   return app.history.length;
+}
+export function snapshot() {
+  settleSceneGesture();
+  return recordSnapshot(JSON.stringify(app.state));
+}
+let sceneBefore = null;
+const movableState = ({ items, avatar, floorplan }) => ({ items, avatar, floorplan });
+function settleSceneGesture(cancel = false) {
+  if (sceneBefore === null) return false;
+  const json = sceneBefore;
+  sceneBefore = null;
+  const before = movableState(JSON.parse(json));
+  if (JSON.stringify(before) !== JSON.stringify(movableState(app.state))) {
+    if (cancel) Object.assign(app.state, before);
+    else recordSnapshot(json);
+  }
+  return true;
+}
+function finishSceneGesture(cancel = false) {
+  if (!settleSceneGesture(cancel)) return false;
+  persist();
+  emit(cancel ? 'restore-move' : undefined);
+  return true;
 }
 function restore(json) {
   const roomBefore = app.state.roomId;
@@ -381,7 +413,7 @@ export function describeRestore(before, after) {
 // opts.quiet: 대화에서 부른 되돌리기는 답 문장에 결과를 쓰므로 알림을 띄우지 않는다.
 // 단추의 onClick으로 불리면 첫 인자가 이벤트라 quiet가 아니다.
 export function undo(opts) {
-  if (finishWindowGesture(true)) return true;
+  if (finishSceneGesture(true) || finishWindowGesture(true)) return true;
   if (!app.history.length) return false;
   const before = structuredClone(app.state);
   app.future.push(JSON.stringify(app.state));
@@ -393,7 +425,7 @@ export function undo(opts) {
   return said;
 }
 export function redo(opts) {
-  if (finishWindowGesture(true)) return true;
+  if (finishSceneGesture(true) || finishWindowGesture(true)) return true;
   if (!app.future.length) return false;
   const before = structuredClone(app.state);
   app.history.push(JSON.stringify(app.state));
@@ -911,6 +943,7 @@ function finishTurn(turn, plan, meta) {
     ...meta,
   });
   if (plan.spaceRequest) turn.spaceRequest = plan.spaceRequest;
+  if (plan.spaceDims) turn.spaceDims = plan.spaceDims;
   if (plan.recommendation) turn.recommendation = plan.recommendation;
   if (plan.confirmation) turn.confirmation = plan.confirmation;
   if (plan.note) turn.note = plan.note;
@@ -999,16 +1032,46 @@ export async function send(raw) {
   if (last?.spaceRequest && last.roomId === app.state.roomId) {
     const answer = spaceTypeAnswer(text);
     if (answer?.unsupported) {
-      finishTurn(turn, unsupportedSpacePlan(answer.name, last.spaceRequest), { engine: 'app' });
+      finishTurn(
+        turn,
+        { ...unsupportedSpacePlan(answer.name, last.spaceRequest), spaceDims: last.spaceDims },
+        { engine: 'app' },
+      );
       return;
     }
     if (answer)
-      return respondToText(`${last.spaceRequest}. 거기는 ${answer.name}임`, turn, history, extra);
+      return respondToText(
+        `${last.spaceRequest}. 거기는 ${answer.name}임`,
+        turn,
+        history,
+        extra,
+        last.spaceDims,
+      );
+    if (isSpaceSizeAnswer(text)) {
+      const plan = {
+        spaceRequest: last.spaceRequest,
+        spaceDims: last.spaceDims,
+        suggestions: last.suggestions,
+      };
+      try {
+        const dims = parseRoomDimensions(text);
+        const labels = { w: '가로', d: '세로', h: '천장 높이' };
+        const said = Object.entries(dims)
+          .map(([key, value]) => `${labels[key]} ${value}m`)
+          .join(', ');
+        plan.spaceDims = { ...last.spaceDims, ...dims };
+        plan.reply = `${said}로 적어 뒀어요. 어떤 공간을 추가할까요?`;
+      } catch (e) {
+        plan.reply = `${e.message} 새로 붙일 방 종류도 알려 주세요.`;
+      }
+      finishTurn(turn, plan, { engine: 'app' });
+      return;
+    }
   }
   return respondToText(text, turn, history, extra);
 }
 
-async function respondToText(text, turn, history, extra = []) {
+async function respondToText(text, turn, history, extra = [], spaceDims) {
   if (
     app.design &&
     /^(?:이대로\s*)?(?:초안\s*|집\s*전체\s*)?(?:적용|반영)(?:해\s*줘|해줘|해|하자|할게|해요)?[.!]?$/u.test(
@@ -1098,6 +1161,7 @@ async function respondToText(text, turn, history, extra = []) {
     return;
   }
   const ctx = context();
+  if (spaceDims) ctx.spaceDims = spaceDims;
   if (named?.room) {
     text = named.text;
     if (named.room.roomId !== app.state.roomId) {
@@ -1136,7 +1200,11 @@ async function respondToText(text, turn, history, extra = []) {
   const stale = () => epoch !== roomEpoch || base !== consultationBase();
   turn.status = 'thinking';
   turn.engine = engineName();
-  app.busy = { kind: 'model', turnId: turn.id };
+  app.busy = {
+    kind: 'model',
+    turnId: turn.id,
+    photoDraftId: turn.photoId ? app.draft?.id : undefined,
+  };
   pending = { version, turn };
   emit();
   let plan, meta, timer;
@@ -1505,6 +1573,7 @@ export function closeAvatarBar() {
   emit();
 }
 export function setScope(scope) {
+  finishSceneGesture(true);
   finishWindowGesture(true);
   app.state.scope = scope === 'house' ? 'house' : 'room';
   app.selected = null;
@@ -1677,7 +1746,7 @@ export function chooseRecommendation(surfaceId, type) {
 }
 
 export function placeDraft(label = '방에 놓기', action = 'place') {
-  if (photoCaptionBusy() && app.draft?.id === app.photo.draftId) return;
+  if (photoCaptionBusy() && app.draft?.id === app.busy.photoDraftId) return;
   push({ role: 'user', text: label, action: true });
   const turn = push({ role: 'assistant', text: '' });
   try {
@@ -1817,6 +1886,7 @@ export const removeWindow = (id) => editWindow((s) => ops.removeWindow(s, id));
 // 포인터 한 번의 조작을 실행 취소 한 번으로 묶고, 취소·무효 이동은 기록을 남기지 않는다.
 let windowGesture = null;
 export function beginWindowGesture(id) {
+  finishSceneGesture(true);
   finishWindowGesture(true);
   if (!app.state.room.windows?.some((w) => w.id === id)) return;
   windowGesture = {
@@ -1953,6 +2023,7 @@ export function removeById(id) {
 
 // ---------- 공간 ----------
 export function switchSpace(id) {
+  finishSceneGesture(true);
   finishWindowGesture(true);
   if (id === app.state.roomId) return;
   app.view.addSide = null;
@@ -2087,6 +2158,7 @@ export function loadExampleAction() {
 
 // ---------- 보기 설정 ----------
 export function setView(view) {
+  finishSceneGesture(true);
   finishWindowGesture(true);
   if (view === '3d' && app.view.webglError)
     return toast('이 기기에서 3D를 시작하지 못했어요. 2D 평면을 이용해주세요.');
@@ -2161,6 +2233,7 @@ export async function importJSON(file) {
     }
     if (app.busy?.kind === 'model') app.busy = null;
     if (app.busy?.kind === 'vision') cancelModel();
+    finishSceneGesture(true);
     finishWindowGesture(true);
     snapshot();
     Object.assign(app.state, next);
@@ -2286,8 +2359,7 @@ function makePhotoDraft(photo, type) {
   app.selected = null;
 }
 export function photoCaptionBusy() {
-  const id = app.photo?.captionTurnId;
-  return !!id && app.busy?.kind === 'model' && app.busy.turnId === id;
+  return app.busy?.kind === 'model' && !!app.busy.photoDraftId;
 }
 async function applyPhotoCaption(photo, turn) {
   if (!photo.captionPending || photo !== app.photo || photo.roomId !== app.state.roomId) return;
@@ -2295,12 +2367,7 @@ async function applyPhotoCaption(photo, turn) {
   turn.photoIntro = turn.text;
   const caption = photoCaption(requestedText(photo.caption, app.state), app.draft?.type);
   if (!caption) return;
-  photo.captionTurnId = turn.id;
-  try {
-    await respondToText(caption, turn, photo.history || historyForModel());
-  } finally {
-    delete photo.captionTurnId;
-  }
+  await respondToText(caption, turn, photo.history || historyForModel());
 }
 export async function analyzePhoto() {
   const photo = app.photo;
@@ -2819,16 +2886,25 @@ onAIStatus((data) => {
 export const sceneCallbacks = {
   pickAvatar: () => pickAvatar(),
   pickDoor: (ids) => pickDoor(ids),
-  moveDoor: (ids, center) => setDoor(ids[0], ids[1], { center }, { live: true }),
+  moveDoor: (ids, center) => {
+    if (sceneBefore) setDoor(ids[0], ids[1], { center }, { live: true });
+  },
+  moveSpace: (id, x, z) => {
+    if (sceneBefore) moveSpace(id, x, z, { live: true });
+  },
   // 아바타는 방 안팎 어디로든 끌 수 있다. 벽에 걸치는 자리는 가까운 쪽으로 붙는다.
   moveAvatar: (x, z) => {
+    if (!sceneBefore) return;
     const at = standAt(app.state.room, app.state.avatar.height, x, z);
     ops.setAvatar(app.state, { x: at.x, z: at.z });
     emit();
   },
   select: (id) => select(id),
-  start: () => snapshot(),
+  start: () => {
+    sceneBefore ??= JSON.stringify(app.state);
+  },
   move: (id, x, z) => {
+    if (!sceneBefore) return;
     const a = app.state.items.find((i) => i.id === id);
     if (!a) return;
     if (app.state.snap) {
@@ -2845,10 +2921,7 @@ export const sceneCallbacks = {
     app.rev++;
     for (const fn of subs) fn('move');
   },
-  commit: () => {
-    persist();
-    emit();
-  },
+  commit: finishSceneGesture,
 };
 
 export function warnings() {

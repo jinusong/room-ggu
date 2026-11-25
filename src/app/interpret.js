@@ -428,7 +428,7 @@ function pickRoomType(modelType, t, fixes) {
 function newSpacePlan(type, t, v, ctx) {
   const room = makeRoom(type),
     label = roomLabel(t, type);
-  for (const [k, n] of Object.entries(parseRoomDimensions(t))) {
+  for (const [k, n] of Object.entries(parseRoomDimensions(t, ctx.spaceDims))) {
     room[k] = n;
     room.sources[k] = '사용자 설정(대화)';
   }

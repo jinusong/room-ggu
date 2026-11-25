@@ -10,6 +10,12 @@ export const NOT_THIS = '(?:말고|말구|대신|아니(?:라|고))';
 const valuePattern = `(${NUMBER})\\s*(${UNIT})?`;
 const axisPattern = `(${Object.values(AXES).join('|')})`;
 const particles = '[는은가이을를:\\s]*';
+const absoluteField = `${axisPattern}${particles}${valuePattern}`;
+const SPACE_SIZE_ANSWER = new RegExp(
+  String.raw`^${absoluteField}(?:[\s,]+${absoluteField})*\s*(?:으로|로)?\s*(?:해\s*(?:줘요?|주세요)|할게요?)?[.!?]?$`,
+  'iu',
+);
+export const isSpaceSizeAnswer = (text) => SPACE_SIZE_ANSWER.test(text);
 const lengthCm = (n, unit) => {
   if (/^(?:m|미터)$/i.test(unit)) return n * 100;
   if (/^(?:mm|밀리미터)$/i.test(unit)) return n / 10;
@@ -39,7 +45,7 @@ export function sizeFields(text, room = false) {
     if (values[key] && values[key].value !== value) issue ||= { kind: 'conflict', axis };
     else values[key] = { value, number: n, unit, axis };
   };
-  const abs = new RegExp(`${axisPattern}${particles}${valuePattern}(?![\\d.])`, 'gi');
+  const abs = new RegExp(`${absoluteField}(?![\\d.])`, 'gi');
   const correction = new RegExp(
     `^\\s*(?:은|는|이|가|이건)?\\s*${NOT_THIS}\\s*(?:${axisPattern}${particles})?${valuePattern}`,
     'i',

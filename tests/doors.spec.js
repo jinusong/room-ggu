@@ -124,6 +124,70 @@ test('움직일 수 없는 가구의 자동 정리는 이전 실행 취소와 �
   expect((await stored(page)).items[0].angle).toBe(90);
 });
 
+for (const view of ['2d', '3d', 'house']) {
+  test(`${view}에서 끌기 취소 후 위치와 실행 취소 기록이 돌아온다`, async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', 'Chrome CDP 터치 취소 검사');
+    const state = freshState();
+    const chair = makeItem('chair');
+    const house = view === 'house';
+    Object.assign(state, {
+      view: house ? '2d' : view,
+      scope: house ? 'house' : 'room',
+      items: [chair],
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript((s) => localStorage.setItem('room-ggu-v2', JSON.stringify(s)), state);
+    await page.goto('/?model=off');
+    const key = house ? 'house' : view === '2d' ? 'plan' : 'three';
+    const canvas = page.locator(`#viewport-${view} canvas`);
+    await expect(canvas).toBeVisible();
+    const saved = async () => {
+      const s = await stored(page);
+      return house ? s.floorplan.positions : s.items;
+    };
+    const live = () =>
+      page.evaluate((house) => {
+        const s = window.__roomggu.app.state;
+        return house ? s.floorplan.positions : s.items;
+      }, house);
+    const before = await saved();
+    const anchor = async () =>
+      page.evaluate(
+        ({ key, id }) => window.__roomggu.app.scenes[key].anchor(id, { center: true }),
+        {
+          key,
+          id: house ? state.roomId : chair.id,
+        },
+      );
+    const cdp = await page.context().newCDPSession(page);
+    const send = (type, points = []) =>
+      cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: points.map(({ x, y }) => ({ x, y, id: 1 })),
+      });
+    const p = await anchor();
+    await send('touchStart', [p]);
+    await send('touchMove', [{ x: p.x + 24, y: p.y + 10 }]);
+    await expect.poll(live).not.toEqual(before);
+    await send('touchCancel');
+    expect(await saved()).toEqual(before);
+    expect(await page.evaluate(() => window.__roomggu.app.history)).toHaveLength(0);
+    await frames(page);
+    const next = await anchor();
+    await send('touchStart', [next]);
+    await send('touchMove', [{ x: next.x + 24, y: next.y + 10 }]);
+    await expect.poll(live).not.toEqual(before);
+    await send('touchEnd');
+    expect(await saved()).not.toEqual(before);
+    await page.getByRole('button', { name: '실행 취소', exact: true }).click();
+    expect(await saved()).toEqual(before);
+    await cdp.detach();
+  });
+}
+
 test('문을 끌어 옮기고 폭·여는 방향을 바꾸면 2D·3D·방 편집 화면이 함께 바뀐다', async ({
   page,
 }) => {

@@ -272,13 +272,15 @@ export class PlanScene {
       if (this.drag.id === 'avatar') this.cb.moveAvatar?.(p.x + this.drag.dx, p.z + this.drag.dz);
       else this.cb.move(this.drag.id, p.x + this.drag.dx, p.z + this.drag.dz);
     };
-    this.up = () => {
+    this.up = (e) => {
       if (this.drag) {
         const { started, id, door } = this.drag;
+        const cancelled = e.type === 'pointercancel';
         this.drag = null;
         this.canvas.style.cursor = '';
-        if (started && id === 'avatar') this.draw();
-        if (started) this.cb.commit();
+        if (started && id === 'avatar' && !cancelled) this.draw();
+        if (started) this.cb.commit(cancelled);
+        else if (cancelled) return;
         else if (door) this.cb.pickDoor?.([this.state.roomId, door.roomId]);
         else if (id === 'avatar') this.cb.pickAvatar?.();
       }

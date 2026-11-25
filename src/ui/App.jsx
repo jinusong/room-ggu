@@ -94,7 +94,7 @@ function useShortcuts() {
         e.preventDefault();
         const a = app.state.items.find((x) => x.id === app.selected);
         const step = e.shiftKey ? 0.25 : 0.05;
-        store.snapshot();
+        store.sceneCallbacks.start();
         store.sceneCallbacks.move(a.id, a.x + v[0] * step, a.z + v[1] * step);
         store.sceneCallbacks.commit();
       }

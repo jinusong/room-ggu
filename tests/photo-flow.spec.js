@@ -628,3 +628,37 @@ test('사진 설명을 반영하는 동안 종류 변경과 배치는 기다린�
     color: '#3f4d63',
   });
 });
+
+test('다음 사진을 첨부해도 이전 사진 초안은 설명을 반영할 때까지 놓지 않는다', async ({ page }) => {
+  await start(page);
+  await page.evaluate(() => {
+    window.__pauseCaption = true;
+    Object.assign(window.__roomggu.app.ai, {
+      text: 'ready',
+      model: 'gemma-4-E2B-it-q4f16_1-MLC',
+    });
+  });
+  await sendPhoto(page, '가로 123cm 깊이 67cm 높이 77cm');
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => window.__finishPhoto('bed'));
+  await page.waitForFunction(() => window.__captionJob);
+  const before = (await snapshot(page)).draft;
+  await page.locator('#photo-file').setInputFiles({ ...file, name: 'next.png' });
+  await expect(page.locator('.photo-tray img')).toBeVisible();
+  const place = page.locator('.draft-note').getByRole('button', { name: '놓기', exact: true });
+  await expect(place).toBeDisabled();
+  await page.evaluate(() => window.__roomggu.store.placeDraft());
+  expect((await snapshot(page)).draft).toEqual(before);
+  await page.evaluate(() => {
+    const job = window.__captionJob;
+    job.worker.onmessage({
+      data: {
+        id: job.id,
+        result: JSON.stringify({ intent: 'furniture', action: 'none', furniture: 'bed' }),
+      },
+    });
+  });
+  await expect(place).toBeEnabled();
+  expect((await snapshot(page)).draft.dims).toEqual([123, 77, 67]);
+  await expect(page.locator('.photo-tray img')).toBeVisible();
+});

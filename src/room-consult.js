@@ -155,20 +155,23 @@ export function consultationScope(text, requested = 'auto') {
   return isRoomIntent(text) && !detectType(text) ? 'room' : 'furniture';
 }
 const round = (n) => Math.round(n * 100) / 100;
-export function parseRoomDimensions(text) {
+export function parseRoomDimensions(text, overrides) {
   const { values, issue } = sizeFields(text, true);
   if (issue?.kind === 'range') throw Error('방 치수는 1~15m 범위로 알려주세요.');
   if (issue?.kind === 'conflict')
     throw Error('같은 치수에 숫자가 두 개 있어요. 어느 값으로 맞출까요?');
-  return Object.fromEntries(Object.entries(values).map(([k, x]) => [k, x.value]));
+  return {
+    ...Object.fromEntries(Object.entries(values).map(([k, x]) => [k, x.value])),
+    ...overrides,
+  };
 }
-export function consultRoom(text, previous) {
+export function consultRoom(text, previous, overrides) {
   const mentions = roomMentions(text),
     type = assertedType(mentions),
     wantsAdd = wantsNewSpace(text, mentions),
     add = wantsAdd && !!type;
   let room = add ? makeRoom(type) : structuredClone(previous);
-  const explicit = parseRoomDimensions(text);
+  const explicit = parseRoomDimensions(text, overrides);
   let changed = false,
     areaSaid = null;
   const set = (key, value, source) => {

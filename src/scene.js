@@ -253,8 +253,9 @@ export class RoomScene {
       else this.cb.move(this.drag.id, p.x + this.drag.dx, p.z + this.drag.dz);
     };
     this.up = (e) => {
+      const cancelled = e.type === 'pointercancel';
       if (this.press?.house) {
-        if (Math.hypot(e.clientX - this.press.x, e.clientY - this.press.y) < 5) {
+        if (!cancelled && Math.hypot(e.clientX - this.press.x, e.clientY - this.press.y) < 5) {
           const id = this.pickRoom(e);
           if (id) this.cb.selectSpace?.(id);
         }
@@ -262,23 +263,20 @@ export class RoomScene {
         return;
       }
       const tapped =
-        this.press && Math.hypot(e.clientX - this.press.x, e.clientY - this.press.y) < 5;
+        !cancelled &&
+        this.press &&
+        Math.hypot(e.clientX - this.press.x, e.clientY - this.press.y) < 5;
       if (this.drag) {
         const started = this.drag.started,
           avatar = this.drag.id === 'avatar';
         this.drag = null;
         this.controls.enabled = true;
         this.renderer.domElement.style.cursor = '';
-        if (started && avatar) this.fitAvatar();
-        if (started) this.cb.commit();
+        if (started && avatar && !cancelled) this.fitAvatar();
+        if (started) this.cb.commit(cancelled);
         else if (this.press?.avatar && tapped) this.cb.pickAvatar?.();
       } else if (this.press?.avatar && tapped) this.cb.pickAvatar?.();
-      else if (
-        this.press &&
-        !this.press.hit &&
-        Math.hypot(e.clientX - this.press.x, e.clientY - this.press.y) < 5
-      )
-        this.cb.select(null);
+      else if (tapped && !this.press.hit) this.cb.select(null);
       this.press = null;
     };
     this.double = (e) => {

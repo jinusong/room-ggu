@@ -316,3 +316,32 @@ for (const [unavailable, answer] of [
     expect(after.otherRooms.find((r) => r.roomId === before.roomId).room).toEqual(before.room);
   });
 }
+
+test('방 종류를 고르기 전에 치수를 고쳐도 기준 방은 유지한다', async ({ page }) => {
+  await page.goto('/?model=off');
+  await page.waitForFunction(() => window.__roomggu?.ready());
+  const chat = page.locator('#chat-input');
+  const send = async (message) => {
+    await chat.fill(message);
+    await chat.press('Enter');
+  };
+  const read = () => page.evaluate(() => window.__roomggu.app.state);
+  await send('화장실 하나 추가해줘');
+  const before = await read();
+  await send('화장실 오른쪽에 가로 3m 세로 2.5m짜리 방 하나 추가해줘');
+  await send('가로 50cm로 해줘');
+  await expect(page.locator('.msg.assistant').last()).toContainText('1~15m');
+  expect(await read()).toEqual(before);
+  await send('가로 3.2m로 해줘');
+  await expect(page.locator('.msg.assistant').last()).toContainText('가로 3.2m로 적어 뒀어요');
+  expect(await read()).toEqual(before);
+  await send('현관으로 해줘');
+  await page.reload();
+  await page.waitForFunction(() => window.__roomggu?.ready());
+  await send('부엌으로 해줘');
+  const after = await read();
+  expect(after.room).toMatchObject({ type: 'kitchen', w: 3.2, d: 2.5 });
+  expect(after.roomOrder).toHaveLength(before.roomOrder.length + 1);
+  expect(after.floorplan.positions[after.roomId].x).toBeCloseTo(5.4);
+  expect(after.otherRooms.find((r) => r.roomId === before.roomId).room).toEqual(before.room);
+});

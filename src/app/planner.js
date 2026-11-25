@@ -299,7 +299,7 @@ export function planRoom(t, ctx) {
   const { state } = ctx;
   let r;
   try {
-    r = consultRoom(t, state.room);
+    r = consultRoom(t, state.room, ctx.spaceDims);
   } catch (e) {
     return {
       intent: 'room',

@@ -978,14 +978,11 @@ export function Stage({ mobile, sheetRef }) {
     app.scenes.plan = new PlanScene(host2d.current, app.state, store.sceneCallbacks);
     app.scenes.house = new HouseScene(hostHouse.current, app.state, {
       ...houseCallbacks,
-      start: store.snapshot,
-      moveSpace: (id, x, z) => store.moveSpace(id, x, z, { live: true }),
+      start: store.sceneCallbacks.start,
+      moveSpace: store.sceneCallbacks.moveSpace,
       moveDoor: store.sceneCallbacks.moveDoor,
       pickDoor: store.pickDoor,
-      commit: () => {
-        store.persist();
-        store.emit();
-      },
+      commit: store.sceneCallbacks.commit,
     });
     // 저장하는 이미지에도 화면의 이름표를 같은 자리에 그린다.
     app.scenes.tags = () => {
@@ -1031,6 +1028,8 @@ export function Stage({ mobile, sheetRef }) {
     syncScenes(true);
     const unsub = store.subscribe((kind) => {
       if (kind === 'move') return place();
+      // 끄는 동안 바로 옮긴 장면도 원래 상태로 그려야 한다.
+      if (kind === 'restore-move') last.items = null;
       syncScenes();
       requestAnimationFrame(place);
     });

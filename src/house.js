@@ -88,13 +88,14 @@ export class HouseScene extends PlanScene {
       this.canvas.style.cursor = 'grabbing';
       cb.moveSpace(this.drag.id, p.x + this.drag.dx, p.z + this.drag.dz);
     };
-    this.up = () => {
+    this.up = (e) => {
       const moved = this.drag?.started,
         door = this.drag?.door;
+      const cancelled = e.type === 'pointercancel';
       this.drag = null;
       this.canvas.style.cursor = '';
-      if (door) cb.pickDoor?.(door.roomIds);
-      if (moved) cb.commit();
+      if (door && !cancelled) cb.pickDoor?.(door.roomIds);
+      if (moved) cb.commit(cancelled);
       this.draw();
     };
     this.double = (e) => {
