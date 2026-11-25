@@ -101,6 +101,29 @@ for (const [width, height] of [
   });
 }
 
+test('움직일 수 없는 가구의 자동 정리는 이전 실행 취소와 다시 실행을 보존한다', async ({
+  page,
+}) => {
+  const state = freshState();
+  const tall = { ...makeItem('wardrobe'), dims: [100, 270, 55], name: '높은 옷장' };
+  Object.assign(state, { view: '2d', items: [tall] });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript((s) => localStorage.setItem('room-ggu-v2', JSON.stringify(s)), state);
+  await page.goto('/?model=off');
+  const warning = page.locator('#warning');
+  await warning.getByRole('button', { name: '방을 넘는 가구 찾기' }).click();
+  await page.getByRole('button', { name: '90도 회전', exact: true }).click();
+  expect((await stored(page)).items[0].angle).toBe(90);
+  const tidy = warning.getByRole('button', { name: '자동 정리' });
+  await tidy.click();
+  await expect(page.locator('.msg.assistant').last()).toContainText('옮길 빈자리가 없어요');
+  await page.getByRole('button', { name: '실행 취소', exact: true }).click();
+  expect((await stored(page)).items[0].angle).toBe(0);
+  await tidy.click();
+  await page.getByRole('button', { name: '다시 실행', exact: true }).click();
+  expect((await stored(page)).items[0].angle).toBe(90);
+});
+
 test('문을 끌어 옮기고 폭·여는 방향을 바꾸면 2D·3D·방 편집 화면이 함께 바뀐다', async ({
   page,
 }) => {

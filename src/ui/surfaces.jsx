@@ -742,7 +742,11 @@ function PlaceFoot({ target, item }) {
   return (
     <footer class="surface-foot">
       <span class="foot-note">방 안의 점선이 놓일 자리예요</span>
-      <button class="btn primary" onClick={() => store.placeDraft()}>
+      <button
+        class="btn primary"
+        disabled={store.photoCaptionBusy()}
+        onClick={() => store.placeDraft()}
+      >
         <Icon name="corner-down-right" size={16} />
         방에 놓기
       </button>
@@ -1348,6 +1352,7 @@ function Photo({ spec }) {
       </>
     );
   const loading = app.busy?.kind === 'vision';
+  const captionBusy = store.photoCaptionBusy();
   return (
     <>
       <Head icon="image" title="가구 사진" meta={p.analyzed ? '판별함' : '판별 전'} />
@@ -1374,6 +1379,7 @@ function Photo({ spec }) {
                     <li key={c.type}>
                       <button
                         class="link"
+                        disabled={captionBusy}
                         onClick={() => store.createDraft(c.type, { via: 'photo' })}
                       >
                         {TYPES[c.type].name}
@@ -1438,7 +1444,12 @@ function Photo({ spec }) {
       )}
       <div class="chips-row is-wrap" aria-label="직접 종류 고르기">
         {['sofa', 'bed', 'desk', 'dining', 'chair', 'wardrobe', 'shelf', 'cabinet'].map((k) => (
-          <button key={k} class="chip" onClick={() => store.createDraft(k, { via: 'photo' })}>
+          <button
+            key={k}
+            class="chip"
+            disabled={captionBusy}
+            onClick={() => store.createDraft(k, { via: 'photo' })}
+          >
             <Icon name={TYPES[k].icon} size={14} />
             {TYPES[k].name}
           </button>
@@ -1446,6 +1457,7 @@ function Photo({ spec }) {
         <button
           class="chip"
           aria-expanded={allKinds}
+          disabled={captionBusy}
           onClick={(e) => {
             p.kindSearch = allKinds ? 0 : 1;
             if (allKinds) e.currentTarget.focus();
@@ -1471,7 +1483,12 @@ function Photo({ spec }) {
             {Object.entries(TYPES)
               .filter(([k]) => catalogMatches(k, query))
               .map(([k, t]) => (
-                <button class="chip" key={k} onClick={() => store.createDraft(k, { via: 'photo' })}>
+                <button
+                  class="chip"
+                  key={k}
+                  disabled={captionBusy}
+                  onClick={() => store.createDraft(k, { via: 'photo' })}
+                >
                   {t.name}
                 </button>
               ))}

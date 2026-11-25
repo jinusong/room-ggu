@@ -267,6 +267,7 @@ test('거실 기본 가구는 지정한 방에 한 번만 놓고, 한 번에 되
 for (const [unavailable, answer] of [
   ['현관 추가해줘', '아니, 공부방 만들어주세요'],
   ['현관으로 해주세요', '주방'],
+  ['현관으로 해주세요', '거실은 말고 부엌으로 해줘'],
 ]) {
   test(`지원하지 않는 방 종류 뒤에 다시 골라도 처음 위치와 치수를 유지한다 (${answer})`, async ({
     page,
@@ -293,7 +294,7 @@ for (const [unavailable, answer] of [
     await page.reload();
     await page.waitForFunction(() => window.__roomggu?.ready());
     const isOffice = answer.includes('공부방');
-    if (isOffice) {
+    if (answer !== '주방') {
       await chat.fill(answer);
       await chat.press('Enter');
     } else {

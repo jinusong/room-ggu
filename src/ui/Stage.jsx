@@ -1193,7 +1193,11 @@ export function Stage({ mobile, sheetRef }) {
         <div class="draft-note" role="status">
           <span class="tape is-draft">점선</span>
           {TYPES[app.draft.type].name} 초안을 아직 놓지 않았어요
-          <button class="link" onClick={() => store.placeDraft()}>
+          <button
+            class="link"
+            disabled={store.photoCaptionBusy()}
+            onClick={() => store.placeDraft()}
+          >
             놓기
           </button>
         </div>

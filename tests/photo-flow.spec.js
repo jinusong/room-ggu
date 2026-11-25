@@ -42,8 +42,10 @@ async function start(page, { mobile = false } = {}) {
             window.__textProgress(); // 응답을 끝내지 않아 Gemma 다운로드를 계속 진행 중으로 둔다.
           }
           if (data.task === 'classify') window.__photoJob = job;
-          if (data.task === 'interpret')
-            throw Error('다운로드 중에는 텍스트 추론을 기다리면 안 됨');
+          if (data.task === 'interpret') {
+            if (!window.__pauseCaption) throw Error('다운로드 중에는 텍스트 추론을 기다리면 안 됨');
+            window.__captionJob = job;
+          }
         }
         terminate() {
           this.terminated = true;
@@ -579,4 +581,50 @@ test('사진 종류를 직접 고른 뒤 판별해도 초안은 확인할 때까
     color: before.color,
   });
   await expect(page.locator('#chat-input')).toBeInViewport();
+});
+
+test('사진 설명을 반영하는 동안 종류 변경과 배치는 기다린다', async ({ page }) => {
+  await start(page);
+  await page.evaluate(() => {
+    window.__pauseCaption = true;
+    Object.assign(window.__roomggu.app.ai, {
+      text: 'ready',
+      model: 'gemma-4-E2B-it-q4f16_1-MLC',
+    });
+  });
+  await sendPhoto(page, '이거 가로 123cm 깊이 67cm 높이 77cm 네이비로 바꿔줘');
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => window.__finishPhoto('bed'));
+  await page.waitForFunction(() => window.__captionJob);
+  const change = page.getByRole('button', { name: '사진 종류 다시 고르기', exact: true });
+  await expect(change).toBeDisabled();
+  await expect(
+    page.locator('.draft-note').getByRole('button', { name: '놓기', exact: true }),
+  ).toBeDisabled();
+  const before = (await snapshot(page)).draft;
+  await page.evaluate(() => {
+    const { store } = window.__roomggu;
+    store.createDraft('desk', { via: 'photo' });
+    store.placeDraft();
+  });
+  expect((await snapshot(page)).draft).toEqual(before);
+  await page.evaluate(() => {
+    const job = window.__captionJob;
+    job.worker.onmessage({
+      data: {
+        id: job.id,
+        result: JSON.stringify({ intent: 'furniture', action: 'none', furniture: 'bed' }),
+      },
+    });
+  });
+  await expect(change).toBeEnabled();
+  await change.click();
+  const field = page.getByRole('textbox', { name: '사진의 가구 종류 검색' });
+  await field.fill('책상');
+  await page.locator('.photo-kind-grid').getByRole('button', { name: '책상', exact: true }).click();
+  expect((await snapshot(page)).draft).toMatchObject({
+    type: 'desk',
+    dims: [123, 77, 67],
+    color: '#3f4d63',
+  });
 });

@@ -136,7 +136,11 @@ function Thinking() {
         <i />
         <i />
       </span>
-      <span>{store.modelName(app.ai.model)}가 이 기기에서 문장을 해석하는 중</span>
+      <span>
+        {store.photoCaptionBusy()
+          ? '사진에 보낸 설명을 반영하는 중'
+          : `${store.modelName(app.ai.model)}가 이 기기에서 문장을 해석하는 중`}
+      </span>
       <button class="link" onClick={() => store.cancelModel()}>
         취소
       </button>
@@ -181,7 +185,11 @@ function Turn({ turn, live, latest, canUndo, showMeta }) {
         )}
         {turn.status === 'thinking' && <Thinking />}
         {latest && turn.photoId && turn.photoId === app.photo?.surfaceId && (
-          <button class="chip photo-edit-kind" onClick={() => store.openPhotoKinds(turn.photoId)}>
+          <button
+            class="chip photo-edit-kind"
+            disabled={store.photoCaptionBusy()}
+            onClick={() => store.openPhotoKinds(turn.photoId)}
+          >
             사진 종류 다시 고르기
           </button>
         )}
@@ -203,6 +211,7 @@ function Turn({ turn, live, latest, canUndo, showMeta }) {
               <button
                 key={s.label}
                 class={`chip ${s.primary ? 'is-primary' : ''}`}
+                disabled={!!turn.photoId && store.photoCaptionBusy()}
                 onClick={() => store.runSuggestion(s)}
               >
                 {s.primary && <Icon name="corner-down-right" size={14} />}

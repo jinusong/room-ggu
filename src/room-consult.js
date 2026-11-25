@@ -99,8 +99,13 @@ export function assertedType(mentions) {
   return (wanted.filter((m) => m.strong).at(-1) || wanted[0])?.type || null;
 }
 export const detectRoomType = (text) => assertedType(roomMentions(text));
+function exactSpaceType(name) {
+  if (UNSUPPORTED_SPACE_NAME.test(name)) return { name, unsupported: true };
+  const [mention] = roomMentions(name);
+  return mention?.name === name ? { name, unsupported: false } : null;
+}
 export function spaceTypeAnswer(text) {
-  const name = text
+  const answer = text
     .trim()
     .replace(/^(?:아니|네|응)(?:\s*[,，]\s*|\s+)/u, '')
     .replace(
@@ -108,9 +113,11 @@ export function spaceTypeAnswer(text) {
       '',
     )
     .trim();
-  if (UNSUPPORTED_SPACE_NAME.test(name)) return { name, unsupported: true };
-  const [mention] = roomMentions(name);
-  return mention?.name === name ? { name, unsupported: false } : null;
+  const direct = exactSpaceType(answer);
+  if (direct) return direct;
+  const [, rejected, wanted] =
+    answer.match(/^(.+?)(?:은|는|이|가|을|를)?\s*(?:말고|대신|빼고)\s*(.+)$/u) || [];
+  return rejected && exactSpaceType(rejected.trim()) ? exactSpaceType(wanted.trim()) : null;
 }
 // 어떤 뜻으로든 공간 이름이 나왔는지. 방 이야기인지 가를 때 쓴다.
 export const mentionsRoom = (text) => roomMentions(text).length > 0;

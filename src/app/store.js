@@ -644,13 +644,17 @@ function runAction(action, arg, turn) {
       turn.surfaces.push({ kind: 'room-size', target: roomTarget() });
       break;
     case 'relocate': {
-      snapshot();
       // 겹친 것이 공간일 수도, 가구일 수도 있다. 공간부터 떼어 놓고 가구를 정리한다.
-      const sp = ops.separateSpaces(s),
-        r = ops.relocateConflicts(s),
+      const next = structuredClone(s),
+        sp = ops.separateSpaces(next),
+        r = ops.relocateConflicts(next),
         lines = [],
         both = (names) =>
           [...new Set(names)].map((n, i, a) => (i < a.length - 1 ? josa(n, '과/와') : n)).join(' ');
+      if (sp.moved.length || r.moved) {
+        snapshot();
+        Object.assign(s, next);
+      }
       if (sp.overlapped.length)
         lines.push(
           sp.remaining
@@ -1673,6 +1677,7 @@ export function chooseRecommendation(surfaceId, type) {
 }
 
 export function placeDraft(label = '방에 놓기', action = 'place') {
+  if (photoCaptionBusy() && app.draft?.id === app.photo.draftId) return;
   push({ role: 'user', text: label, action: true });
   const turn = push({ role: 'assistant', text: '' });
   try {
@@ -1690,6 +1695,7 @@ export function placeDraft(label = '방에 놓기', action = 'place') {
 export function createDraft(type, { via = 'catalog' } = {}) {
   if (!Object.hasOwn(TYPES, type)) return;
   const photo = via === 'photo' ? app.photo : null;
+  if (photo && photoCaptionBusy()) return;
   if (photo?.roomId && photo.roomId !== app.state.roomId) {
     toast('사진을 보낸 공간으로 돌아온 뒤 종류를 골라 주세요.');
     return;
@@ -2223,7 +2229,7 @@ export function pickPhoto() {
   photoInput?.click();
 }
 export function openPhotoKinds(id) {
-  if (!id || id !== app.photo?.surfaceId) return;
+  if (!id || id !== app.photo?.surfaceId || photoCaptionBusy()) return;
   const card = app.thread.flatMap((t) => t.surfaces || []).find((s) => s.id === id);
   if (!card) return;
   card.open = true;
@@ -2279,13 +2285,22 @@ function makePhotoDraft(photo, type) {
   app.target = { type: 'draft' };
   app.selected = null;
 }
+export function photoCaptionBusy() {
+  const id = app.photo?.captionTurnId;
+  return !!id && app.busy?.kind === 'model' && app.busy.turnId === id;
+}
 async function applyPhotoCaption(photo, turn) {
   if (!photo.captionPending || photo !== app.photo || photo.roomId !== app.state.roomId) return;
   photo.captionPending = false;
   turn.photoIntro = turn.text;
   const caption = photoCaption(requestedText(photo.caption, app.state), app.draft?.type);
   if (!caption) return;
-  await respondToText(caption, turn, photo.history || historyForModel());
+  photo.captionTurnId = turn.id;
+  try {
+    await respondToText(caption, turn, photo.history || historyForModel());
+  } finally {
+    delete photo.captionTurnId;
+  }
 }
 export async function analyzePhoto() {
   const photo = app.photo;

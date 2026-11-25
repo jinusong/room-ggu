@@ -602,7 +602,7 @@ export function relocateConflicts(state) {
     if (!layoutWarnings(state).all.has(id)) continue;
     const a = state.items.find((x) => x.id === id);
     const spot = findFreeSpot({ ...state, items: state.items.filter((x) => x.id !== id) }, a);
-    if (spot.free) {
+    if (spot.free && (spot.x !== a.x || spot.z !== a.z || spot.angle !== a.angle)) {
       a.x = spot.x;
       a.z = spot.z;
       a.angle = spot.angle;
