@@ -555,3 +555,28 @@ test('사진 Worker 오류 뒤 직접 고른 종류에 원래 설명의 치수�
   await page.locator('.photo-kind-grid').getByRole('button', { name: '책상', exact: true }).click();
   expect((await snapshot(page)).draft).toMatchObject({ type: 'desk', dims: [130, 74, 67] });
 });
+
+test('사진 종류를 직접 고른 뒤 판별해도 초안은 확인할 때까지 그대로 둔다', async ({ page }) => {
+  await start(page, { mobile: true });
+  await page.locator('#ask-later').click();
+  await sendPhoto(page, '이거 가로 123cm 깊이 67cm 높이 77cm 네이비로 바꿔줘');
+  const photo = page.locator('[data-surface=photo]');
+  await photo.getByRole('button', { name: '책상', exact: true }).click();
+  const before = (await snapshot(page)).draft;
+  expect(before).toMatchObject({ type: 'desk', dims: [123, 77, 67], color: '#3f4d63' });
+
+  await page.getByRole('button', { name: '사진 종류 다시 고르기' }).click();
+  await photo.getByRole('button', { name: '사진으로 종류 확인' }).click();
+  await page.waitForFunction(() => window.__photoJob);
+  await page.evaluate(() => window.__finishPhoto('bed'));
+  await expect(page.locator('.msg.assistant').last()).toContainText('책상 초안은 그대로');
+  expect((await snapshot(page)).draft).toEqual(before);
+
+  await page.getByRole('button', { name: '침대로 잡기', exact: true }).click();
+  expect((await snapshot(page)).draft).toMatchObject({
+    type: 'bed',
+    dims: before.dims,
+    color: before.color,
+  });
+  await expect(page.locator('#chat-input')).toBeInViewport();
+});

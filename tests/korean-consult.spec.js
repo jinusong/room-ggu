@@ -264,7 +264,10 @@ test('거실 기본 가구는 지정한 방에 한 번만 놓고, 한 번에 되
   );
 });
 
-for (const answer of ['아니, 공부방으로 해주세요', '주방']) {
+for (const [unavailable, answer] of [
+  ['현관 추가해줘', '아니, 공부방 만들어주세요'],
+  ['현관으로 해주세요', '주방'],
+]) {
   test(`지원하지 않는 방 종류 뒤에 다시 골라도 처음 위치와 치수를 유지한다 (${answer})`, async ({
     page,
   }) => {
@@ -281,7 +284,7 @@ for (const answer of ['아니, 공부방으로 해주세요', '주방']) {
     }
     await expect(page.locator('.msg.assistant').last()).toContainText('어떤 공간을 추가할까요');
     const before = await read();
-    await chat.fill('현관으로 해주세요');
+    await chat.fill(unavailable);
     await chat.press('Enter');
     await expect(page.locator('.msg.assistant').last()).toContainText(
       '현관은 아직 공간 종류에 없어요',

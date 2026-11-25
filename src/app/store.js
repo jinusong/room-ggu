@@ -2336,13 +2336,28 @@ export async function analyzePhoto() {
     const sure = !!top && top.p >= PHOTO_CONFIDENT && !conflict;
     const sameRoom = photo.roomId === app.state.roomId;
     const unchanged = sameRoom && before === editStamp();
+    const chosen = photo.chosenType && TYPES[photo.chosenType].name;
+    const keepDraft = unchanged && chosen && app.draft?.id === photo.draftId;
+    const usePrediction = sure && unchanged && !chosen;
     const pct = (c) => `${Math.round(c.p * 100)}%`;
     photo.type = sure ? top.type : null;
-    if (sure && unchanged) makePhotoDraft(photo, top.type);
+    if (usePrediction) makePhotoDraft(photo, top.type);
     const names = candidates.map((c) => TYPES[c.type].name);
     const choices = [
       ...new Set([...(conflict ? [top.type, described[0]] : []), ...candidates.map((c) => c.type)]),
     ].slice(0, 3);
+    const place = { label: '방에 놓기', action: 'place', primary: true };
+    const choicesWithActions = choices.map((type, i) => ({
+      label: `${josa(TYPES[type].name, '으로/로')} 잡기`,
+      action: 'draft',
+      arg: type,
+      photoId: photo.surfaceId,
+      primary: !keepDraft && i === 0,
+    }));
+    if (keepDraft) choicesWithActions.unshift(place);
+    const predicted = top
+      ? `사진의 첫 후보는 ${josa(names[0], '이에요/예요')}.`
+      : '사진에서 가구 종류를 읽지 못했어요.';
     const turn = push({
       role: 'assistant',
       engine: 'siglip',
@@ -2351,41 +2366,37 @@ export async function analyzePhoto() {
         ? '사진 판별 중 공간이 바뀌어 초안을 만들지 않았어요. 사진을 보낸 공간으로 돌아온 뒤 종류를 골라 주세요.'
         : !unchanged
           ? '사진 판별 중 직접 바꾼 배치를 유지했어요. 사진의 후보를 고르면 새 초안을 만들고 함께 보낸 설명을 반영해요.'
-          : conflict
-            ? `사진은 ${TYPES[top.type].name}, 설명은 ${TYPES[described[0]].name}을 가리켜요. 어느 쪽인지 골라 주세요. 치수와 색은 고른 가구에 반영할게요.`
-            : sure
-              ? `사진은 ${josa(names[0], '으로/로')} 보여요. 사진만으로는 치수를 잴 수 없어요.`
-              : top
-                ? `사진만으로는 종류를 확신하기 어려워요. 가까운 후보는 ${josa(names.join(', '), '이에요/예요')}. 맞는 것을 고르면 함께 보낸 설명도 반영해요.`
-                : '사진에서 가구 종류를 읽지 못했어요. 아래에서 종류를 골라 주세요. 함께 보낸 설명은 보관하고 있어요.',
+          : chosen
+            ? `${predicted} ${keepDraft ? `직접 고른 ${chosen} 초안은 그대로 뒀어요.` : `직접 고른 종류는 ${josa(chosen, '이에요/예요')}.`}`
+            : conflict
+              ? `사진은 ${TYPES[top.type].name}, 설명은 ${TYPES[described[0]].name}을 가리켜요. 어느 쪽인지 골라 주세요. 치수와 색은 고른 가구에 반영할게요.`
+              : sure
+                ? `사진은 ${josa(names[0], '으로/로')} 보여요. 사진만으로는 치수를 잴 수 없어요.`
+                : top
+                  ? `사진만으로는 종류를 확신하기 어려워요. 가까운 후보는 ${josa(names.join(', '), '이에요/예요')}. 맞는 것을 고르면 함께 보낸 설명도 반영해요.`
+                  : '사진에서 가구 종류를 읽지 못했어요. 아래에서 종류를 골라 주세요. 함께 보낸 설명은 보관하고 있어요.',
       photoScores: candidates.map((c) => `${TYPES[c.type].name} ${pct(c)}`).join(', ') || undefined,
       surfaces:
-        sure && unchanged
+        usePrediction || keepDraft
           ? [{ kind: 'furniture-size', target: { type: 'draft', id: app.draft.id } }]
           : [],
-      receipt:
-        sure && unchanged ? [{ label: '사진 판별', to: names[0], tag: `SigLIP ${pct(top)}` }] : [],
-      suggestions:
-        sure && unchanged
-          ? [
-              { label: '방에 놓기', action: 'place', primary: true },
-              ...candidates.slice(1).map((c) => ({
-                label: `${josa(TYPES[c.type].name, '이었/였')}나요?`,
-                action: 'draft',
-                arg: c.type,
-                photoId: photo.surfaceId,
-              })),
-            ]
-          : choices.map((type, i) => ({
-              label: `${josa(TYPES[type].name, '으로/로')} 잡기`,
+      receipt: usePrediction
+        ? [{ label: '사진 판별', to: names[0], tag: `SigLIP ${pct(top)}` }]
+        : [],
+      suggestions: usePrediction
+        ? [
+            place,
+            ...candidates.slice(1).map((c) => ({
+              label: `${josa(TYPES[c.type].name, '이었/였')}나요?`,
               action: 'draft',
-              arg: type,
+              arg: c.type,
               photoId: photo.surfaceId,
-              primary: i === 0,
             })),
+          ]
+        : choicesWithActions,
     });
     app.busy = null;
-    if (sure && unchanged) await applyPhotoCaption(photo, turn);
+    if (usePrediction) await applyPhotoCaption(photo, turn);
   } catch (e) {
     if (app.photo !== photo || app.busy !== job) return;
     app.ai.vision = 'error';
