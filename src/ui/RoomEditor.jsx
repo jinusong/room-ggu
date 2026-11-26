@@ -60,7 +60,7 @@ export function RoomEditor({ room, name }) {
               type="number"
               min="1"
               max="15"
-              step="0.01"
+              step={room[key] === Number(room[key].toFixed(2)) ? '0.01' : 'any'}
               defaultValue={room[key]}
               required
             />

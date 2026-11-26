@@ -688,6 +688,7 @@ export function sideSlot(state, side, size, anchorId = state.roomId) {
   if (reach < 0) return null;
   const offsets = [start, 0, -start];
   for (let t = 0.25; t <= reach + 1e-9; t += 0.25) offsets.push(start + t, start - t);
+  const candidate = { room: size };
   for (const t of offsets) {
     if (Math.abs(t) > reach + 1e-9) continue;
     const p = vertical
@@ -698,11 +699,9 @@ export function sideSlot(state, side, size, anchorId = state.roomId) {
       Math.abs(p.z) <= 200 &&
       list.every(
         (r) =>
-          !rectanglesOverlap(
-            roomBounds({ room: size }, p),
-            roomBounds(r, plan.positions[r.roomId]),
-          ),
-      )
+          !rectanglesOverlap(roomBounds(candidate, p), roomBounds(r, plan.positions[r.roomId])),
+      ) &&
+      sharedOpening(anchor, origin, candidate, p)
     )
       return p;
   }

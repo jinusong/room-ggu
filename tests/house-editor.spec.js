@@ -1,7 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { exampleState, freshState, makeRoom } from '../src/data.js';
 import { connections } from '../src/floorplan.js';
-import { addSpace, renameSpace, setRoom, SIDES, switchSpace } from '../src/app/ops.js';
+import {
+  addSpace,
+  addWindow,
+  renameSpace,
+  setRoom,
+  setWindow,
+  SIDES,
+  switchSpace,
+} from '../src/app/ops.js';
 
 const read = (page) => page.evaluate(() => structuredClone(window.__roomggu.app.state));
 const editor = (page) => page.getByRole('main', { name: '집 전체 평면도 편집기' });
@@ -39,21 +47,33 @@ for (const [width, height] of [
       (initial.room.w + added.room.w) / 2,
     );
     expect(connections([added, ...added.otherRooms], added.floorplan)).toHaveLength(1);
+    const selectedRoom = editor(page).getByLabel('선택한 방');
+    await selectedRoom.selectOption(initial.roomId);
+    expect((await read(page)).roomId).toBe(initial.roomId);
+    await selectedRoom.selectOption(added.roomId);
     await edit.click();
     const form = editor(page).getByRole('form', { name: '방 편집', exact: true });
-    await form.getByLabel('방 이름').fill('작은 욕실');
+    await form.getByLabel('방 이름').fill('조용한 작업실');
+    await form.getByLabel('방 종류').selectOption('office');
     await form.getByLabel('가로 (m)', { exact: true }).fill('2.2');
     await form.getByLabel('세로 (m)', { exact: true }).fill('2.6');
     await form.getByRole('button', { name: '저장', exact: true }).click();
     const edited = await read(page);
-    expect(edited).toMatchObject({ name: '작은 욕실', room: { w: 2.2, d: 2.6 } });
+    expect(edited).toMatchObject({
+      name: '조용한 작업실',
+      room: { type: 'office', w: 2.2, d: 2.6 },
+    });
     await editor(page).getByRole('button', { name: '실행 취소', exact: true }).click();
     expect(await read(page)).toEqual(added);
     await editor(page).getByRole('button', { name: '다시 실행', exact: true }).click();
     expect(await read(page)).toEqual(edited);
     await remove.click();
     const confirmation = editor(page).getByRole('group', { name: '방 삭제 확인' });
-    await expect(confirmation.getByText('작은 욕실을 삭제할까요?')).toBeVisible();
+    await expect(confirmation.getByText('조용한 작업실을 삭제할까요?')).toBeVisible();
+    await confirmation.getByRole('button', { name: '취소', exact: true }).click();
+    await expect(confirmation).toHaveCount(0);
+    expect(await read(page)).toEqual(edited);
+    await remove.click();
     await confirmation.getByRole('button', { name: '삭제', exact: true }).click();
     expect((await read(page)).roomOrder).toHaveLength(1);
     await editor(page).getByRole('button', { name: '실행 취소', exact: true }).click();
@@ -102,6 +122,62 @@ test('방 이름만 고치면 기존 종류를 유지하고 직접 고른 종류
   expect(await read(page)).toMatchObject({ name: '창가 방', room: { type: 'office' } });
   await editor(page).getByRole('button', { name: '실행 취소', exact: true }).click();
   expect(await read(page)).toEqual(renamed);
+});
+
+test('이전 배치 파일의 소수점 셋째 자리 치수도 이름을 바꿀 때 보존한다', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto('/?model=off');
+  await expect(plan(page)).toBeVisible();
+  const old = exampleState();
+  old.version = 4;
+  old.room.w = 4.125;
+  await page.locator('#layout-file').setInputFiles({
+    name: 'legacy.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(old)),
+  });
+  await expect.poll(async () => (await read(page)).room.w).toBe(old.room.w);
+  const imported = await read(page);
+  await editor(page).getByRole('button', { name: '방 편집', exact: true }).click();
+  const form = editor(page).getByRole('form', { name: '방 편집' });
+  await form.getByLabel('방 이름').fill('창가 방');
+  await form.getByRole('button', { name: '저장', exact: true }).click();
+  expect(await read(page)).toEqual({ ...imported, name: '창가 방' });
+  await page.reload();
+  await expect(plan(page)).toBeVisible();
+  expect(await read(page)).toEqual({ ...imported, name: '창가 방' });
+});
+
+test('창문이 연결 문을 막으면 추가 메뉴가 그 벽을 빼고 상담은 빈 벽을 찾는다', async ({ page }) => {
+  const state = freshState();
+  const bath = state.roomId;
+  setRoom(state, makeRoom('bathroom'));
+  renameSpace(state, '기준 화장실');
+  const window = addWindow(state, 'right');
+  setWindow(state, window, { width: state.room.d - 0.1 });
+  await page.addInitScript(
+    (seed) => localStorage.setItem('room-ggu-v2', JSON.stringify(seed)),
+    state,
+  );
+  await page.goto('/?model=off');
+  await expect(plan(page)).toBeVisible();
+  await editor(page).getByRole('button', { name: '방 추가', exact: true }).click();
+  const picker = editor(page).getByRole('group', { name: '방 추가', exact: true });
+  await expect(picker.locator('option[value=right]')).toHaveCount(0);
+  await picker.getByRole('button', { name: '방 추가 닫기' }).click();
+  const chat = page.locator('#chat-input');
+  await chat.fill('화장실 오른쪽에 가로 3m 세로 2.5m 침실 추가해줘');
+  await chat.press('Enter');
+  const reply = page.locator('.msg.assistant').last();
+  await expect(reply).toContainText('오른쪽에는 자리가 없어 다른 벽에 붙였어요');
+  await expect(reply).toContainText('기준 화장실 왼쪽에');
+  const added = await read(page);
+  expect(added.room).toMatchObject({ type: 'bedroom', w: 3, d: 2.5 });
+  expect(added.otherRooms.find(({ roomId }) => roomId === bath).room.windows).toEqual(
+    state.room.windows,
+  );
+  const [link] = connections([added, ...added.otherRooms], added.floorplan);
+  expect(link?.opening).toBeTruthy();
 });
 
 test('현재 방 옆과 다른 화장실 옆에 말로 새 공간을 붙인다', async ({ page }) => {
