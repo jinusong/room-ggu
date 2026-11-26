@@ -448,7 +448,13 @@ function AddRoomPop({ side, sides }) {
           ))}
         </select>
       </label>
-      <div class="add-grid" onPointerLeave={() => store.previewSpace(null)}>
+      <div
+        class="add-grid"
+        onPointerLeave={() => store.previewSpace(null)}
+        onFocusOut={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) store.previewSpace(null);
+        }}
+      >
         {Object.entries(ROOM_TYPES).map(([type, info]) => {
           const fits = store.spaceFits(type, side);
           return (

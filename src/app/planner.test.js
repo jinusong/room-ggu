@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { exampleState, freshState, makeItem, spaces } from '../data.js';
+import { exampleState, freshState, makeItem, spaces, TYPES } from '../data.js';
 import { planTurn, resolveScope, parseFurnitureColor, splitRequest, objectsOf } from './planner.js';
 import { setRoom, roomWithType, addSpace, switchSpace } from './ops.js';
 import { roomMentions } from '../room-consult.js';
@@ -211,6 +211,12 @@ test('목록의 가구는 그대로 처리하고 함께 말한 목록에 없는 
     planTurn('피아노 치는 방으로 꾸며줘', { state: s, target: room }).unlisted,
     undefined,
   );
+});
+test('카탈로그에 표시된 이름으로 93종의 가구 초안을 요청한다', () => {
+  const ctx = { state: freshState(), target: room };
+  for (const [type, { name }] of Object.entries(TYPES)) {
+    assert.equal(planTurn(`${name} 하나 추가해줘`, ctx).changes?.draft?.type, type, name);
+  }
 });
 test('새 가구는 띄어 쓴 이름이나 공간 이름이 들어간 이름으로 말해도 그 가구 초안을 만든다', () => {
   const s = freshState();

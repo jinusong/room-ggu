@@ -5,6 +5,7 @@ import { Icon } from './icons.js';
 
 export function RoomEditor({ room, name }) {
   const [error, setError] = useState('');
+  const [type, setType] = useState(room.type);
   const field = useRef(null);
   useLayoutEffect(() => field.current?.focus({ preventScroll: true }), []);
   const close = () => {
@@ -16,7 +17,7 @@ export function RoomEditor({ room, name }) {
     const data = new FormData(event.currentTarget);
     const error = store.updateSpace({
       name: data.get('name'),
-      type: data.get('type'),
+      type,
       dims: Object.fromEntries(['w', 'd', 'h'].map((key) => [key, Number(data.get(key))])),
     });
     if (error) setError(error);
@@ -37,9 +38,9 @@ export function RoomEditor({ room, name }) {
         </label>
         <label>
           방 종류
-          <select name="type" defaultValue={room.type}>
-            {Object.entries(ROOM_TYPES).map(([type, info]) => (
-              <option key={type} value={type}>
+          <select name="type" value={type} onChange={(event) => setType(event.currentTarget.value)}>
+            {Object.entries(ROOM_TYPES).map(([key, info]) => (
+              <option key={key} value={key}>
                 {info.name}
               </option>
             ))}

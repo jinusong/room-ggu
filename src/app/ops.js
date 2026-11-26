@@ -724,6 +724,7 @@ export function addSpace(
   const size = room || makeRoom(type),
     from = spaces(state).find((r) => r.roomId === anchor) || null,
     anchorId = from?.roomId || state.roomId;
+  if (anchor && !from) throw Error('기준 공간이 평면도에 없어요. 붙일 공간을 다시 골라 주세요.');
   for (const k of ['w', 'd', 'h'])
     if (!validRoomNumber(size[k])) throw Error('방 치수는 1~15m 범위로 알려주세요.');
   let slot = side ? sideSlot(state, side, size, anchorId) : null;
@@ -731,7 +732,18 @@ export function addSpace(
     throw Error(
       `${SIDES[side] || '그쪽'}에는 ${josa(ROOM_TYPES[type].name, '을/를')} 붙일 자리가 없어요. 다른 벽을 고르거나 공간을 먼저 옮겨 주세요.`,
     );
-  slot ||= adjacentSlot(state, size, 'start', anchorId);
+  if (!slot && from) {
+    for (const wall of Object.keys(SIDES)) {
+      if (wall === side) continue;
+      slot = sideSlot(state, wall, size, anchorId);
+      if (slot) break;
+    }
+    if (!slot)
+      throw Error(
+        `${from.name} 둘레에 ${josa(ROOM_TYPES[type].name, '을/를')} 붙일 자리가 없어요. 주변 방을 옮기거나 새 방의 크기를 줄여 주세요.`,
+      );
+  }
+  slot ||= adjacentSlot(state, size);
   const id = addRoom(state, type);
   if (room) state.room = { ...structuredClone(room), type };
   // 공부방, 드레스룸처럼 따로 유형이 없는 공간은 가까운 유형으로 만들고 말한 이름을 쓴다.

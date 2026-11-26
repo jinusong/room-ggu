@@ -791,6 +791,7 @@ function applyPlan(plan, turn) {
   const c = plan.changes || {};
   const s = app.state;
   const remote =
+    !c.addSpace &&
     plan.destination &&
     plan.destination !== s.roomId &&
     (c.room ||
@@ -819,15 +820,19 @@ function applyPlan(plan, turn) {
     turn.receipt.push({ label: '대상 공간', to: s.name });
   }
   if (c.addSpace) {
-    snapshot();
     // "화장실 옆에"처럼 기준 공간을 말했으면 그 공간의 벽에, 아니면 지금 방의 벽에 붙인다.
-    const near = c.near || null;
-    ops.addSpace(s, c.addSpace, near?.side || null, {
+    const near = c.near || null,
+      next = structuredClone(s);
+    ops.addSpace(next, c.addSpace, near?.side || null, {
       room: c.room,
       anchor: near?.roomId || null,
       strict: false,
       label: c.label || null,
     });
+    snapshot();
+    Object.assign(s, next);
+    app.view.addSide = null;
+    app.view.ghostRoom = null;
     app.selected = null;
     app.target = app.draft ? { type: 'draft' } : { type: 'room' };
     const at = ops.attachedTo(s, s.roomId, near?.roomId || null),
@@ -967,6 +972,10 @@ function finishTurn(turn, plan, meta) {
   } catch (e) {
     turn.text = e.message;
     turn.tone = 'error';
+    if (plan.changes?.addSpace) {
+      turn.surfaces = [];
+      turn.suggestions = [];
+    }
   }
   fixRoomTargets(turn);
   persist();
