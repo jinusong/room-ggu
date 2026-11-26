@@ -683,24 +683,31 @@ export function sideSlot(state, side, size, anchorId = state.roomId) {
     sign = side === 'right' || side === 'front' ? 1 : -1,
     span = vertical ? d : w,
     length = vertical ? size.d : size.w,
-    reach = (span + length) / 2 - 0.9,
+    reach = (span + length) / 2 - (DOOR.width + DOOR.margin * 2),
     start = -(span - length) / 2;
   if (reach < 0) return null;
   const offsets = [start, 0, -start];
   for (let t = 0.25; t <= reach + 1e-9; t += 0.25) offsets.push(start + t, start - t);
+  // 25cm 간격 사이에만 들어가는 방은 이웃 공간의 끝에 맞춰 본다.
+  const along = vertical ? origin.z : origin.x;
+  const occupied = list.map((room) => roomBounds(room, plan.positions[room.roomId]));
+  for (const bounds of occupied) {
+    const low = (vertical ? bounds.top : bounds.left) - length / 2;
+    const high = (vertical ? bounds.bottom : bounds.right) + length / 2;
+    offsets.push(Math.floor(low * 100 + 1e-9) / 100 - along);
+    offsets.push(Math.ceil(high * 100 - 1e-9) / 100 - along);
+  }
   const candidate = { room: size };
   for (const t of offsets) {
     if (Math.abs(t) > reach + 1e-9) continue;
     const p = vertical
       ? { x: round2(origin.x + (sign * (w + size.w)) / 2), z: round2(origin.z + t) }
       : { x: round2(origin.x + t), z: round2(origin.z + (sign * (d + size.d)) / 2) };
+    const bounds = roomBounds(candidate, p);
     if (
       Math.abs(p.x) <= 200 &&
       Math.abs(p.z) <= 200 &&
-      list.every(
-        (r) =>
-          !rectanglesOverlap(roomBounds(candidate, p), roomBounds(r, plan.positions[r.roomId])),
-      ) &&
+      occupied.every((room) => !rectanglesOverlap(bounds, room)) &&
       sharedOpening(anchor, origin, candidate, p)
     )
       return p;

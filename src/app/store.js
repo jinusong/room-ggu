@@ -822,10 +822,11 @@ function applyPlan(plan, turn) {
   if (c.addSpace) {
     // "화장실 옆에"처럼 기준 공간을 말했으면 그 공간의 벽에, 아니면 지금 방의 벽에 붙인다.
     const near = c.near || null,
+      anchor = near?.roomId || s.roomId,
       next = structuredClone(s);
     ops.addSpace(next, c.addSpace, near?.side || null, {
       room: c.room,
-      anchor: near?.roomId || null,
+      anchor,
       strict: false,
       label: c.label || null,
     });
@@ -835,7 +836,7 @@ function applyPlan(plan, turn) {
     app.view.ghostRoom = null;
     app.selected = null;
     app.target = app.draft ? { type: 'draft' } : { type: 'room' };
-    const at = ops.attachedTo(s, s.roomId, near?.roomId || null),
+    const at = ops.attachedTo(s, s.roomId, anchor),
       where = at ? `${at.name} ${ops.SIDES[at.side]}` : '';
     turn.receipt.push({ label: '새 공간', to: s.name });
     if (where) turn.receipt.push({ label: '자리', to: where });
@@ -2165,7 +2166,7 @@ export function addSpace(type, { side = null } = {}) {
   try {
     const from = app.state.name;
     const next = structuredClone(app.state);
-    ops.addSpace(next, type, side);
+    ops.addSpace(next, type, side, { anchor: next.roomId });
     snapshot();
     Object.assign(app.state, next);
     app.selected = null;

@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { exampleState, freshState, makeRoom } from '../src/data.js';
-import { connections } from '../src/floorplan.js';
+import { exampleState, freshState, makeRoom, spaces } from '../src/data.js';
+import { connections, floorplanWarnings } from '../src/floorplan.js';
 import {
   addSpace,
   addWindow,
+  moveSpace,
   renameSpace,
   setRoom,
   setWindow,
@@ -178,6 +179,45 @@ test('창문이 연결 문을 막으면 추가 메뉴가 그 벽을 빼고 상�
   );
   const [link] = connections([added, ...added.otherRooms], added.floorplan);
   expect(link?.opening).toBeTruthy();
+  await editor(page).getByRole('button', { name: '실행 취소', exact: true }).click();
+  await chat.fill('서재를 추가해줘');
+  await chat.press('Enter');
+  await expect(reply).toContainText('기준 화장실 왼쪽에');
+  expect((await read(page)).room.type).toBe('office');
+});
+
+test('25cm 단위 사이에 있는 좁은 자리에 요청한 벽을 따라 붙인다', async ({ page }) => {
+  const state = freshState();
+  const studio = state.roomId;
+  const room = { ...makeRoom('studio'), w: 1.8, d: 1.8 };
+  const top = addSpace(state, 'studio', 'right', { room });
+  moveSpace(state, top, 2.9, -1.05, { snap: false });
+  switchSpace(state, studio);
+  const bottom = addSpace(state, 'studio', 'front', { room });
+  moveSpace(state, bottom, 2.9, 1.85, { snap: false });
+  switchSpace(state, studio);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(
+    (seed) => localStorage.setItem('room-ggu-v2', JSON.stringify(seed)),
+    state,
+  );
+  await page.goto('/?model=off');
+  await expect(plan(page)).toBeVisible();
+  const chat = page.locator('#chat-input');
+  await chat.fill('내 방 오른쪽에 가로 2m 세로 1m 침실 추가해줘');
+  await chat.press('Enter');
+  const reply = page.locator('.msg.assistant').last();
+  await expect(reply).toContainText(`${state.name} 오른쪽에`);
+  const added = await read(page);
+  expect(added.room).toMatchObject({ w: 2, d: 1, type: 'bedroom' });
+  expect(added.floorplan.positions[added.roomId].x).toBe(3);
+  expect(floorplanWarnings(spaces(added), added.floorplan).size).toBe(0);
+  expect(
+    connections(spaces(added), added.floorplan).some(
+      ({ ids, opening }) => opening && ids.includes(studio) && ids.includes(added.roomId),
+    ),
+  ).toBe(true);
 });
 
 test('현재 방 옆과 다른 화장실 옆에 말로 새 공간을 붙인다', async ({ page }) => {
@@ -259,6 +299,18 @@ test('기준 화장실 사방이 막혀 있으면 배치와 다시 실행을 지
   await expect(reply).toContainText('기준 화장실 둘레에 침실을 붙일 자리가 없어요');
   await expect(reply.locator('[data-surface]')).toHaveCount(0);
   expect(await read(page)).toEqual(before);
+  await area.getByLabel('선택한 방').selectOption(bath);
+  const selected = await read(page);
+  await chat.fill('침실을 추가해줘');
+  await chat.press('Enter');
+  await expect(reply).toContainText('기준 화장실 둘레에 침실을 붙일 자리가 없어요');
+  expect(await read(page)).toEqual(selected);
+  await page.evaluate(() => window.__roomggu.store.openTool('spaces'));
+  await page.locator('.new-space').getByRole('button', { name: '침실', exact: true }).click();
+  await expect(page.locator('#toast')).toContainText(
+    '기준 화장실 둘레에 침실을 붙일 자리가 없어요',
+  );
+  expect(await read(page)).toEqual(selected);
   await redo.click();
   expect((await read(page)).name).toBe('새 원룸 이름');
   await area.getByLabel('선택한 방').selectOption(right);
