@@ -388,6 +388,77 @@ test('한 문장의 방 이야기와 가구 여럿을 나눠 한 번에 처리�
   assert.deepEqual([r.changes.room.w, r.changes.room.d], [5, 4]);
   assert.equal(r.changes.draft.dims[0], 140);
 });
+
+test('가구 이름과 연결어 사이의 수량도 각 초안과 한도에 반영한다', () => {
+  const ctx = { state: freshState(), target: room };
+  for (const [text, expected] of [
+    ['침대 하나랑 책상 하나 놓아줘', ['bed', 'desk']],
+    ['의자 두 개랑 책상 하나 놓아줘', ['chair', 'chair', 'desk']],
+    ['책상 2개와 책장 하나 만들어줘', ['desk', 'desk', 'shelf']],
+  ]) {
+    const plan = planTurn(text, ctx);
+    assert.deepEqual(
+      [plan.changes.draft.type, ...(plan.changes.queue || []).map(({ type }) => type)],
+      expected,
+      text,
+    );
+  }
+  const tooMany = planTurn('의자 25개랑 책상 하나 놓아줘', ctx);
+  assert.equal(tooMany.batchLimit, true);
+  assert.equal(tooMany.changes, undefined);
+});
+
+test('연결어 앞의 치수는 자기 가구에만 반영한다', () => {
+  const ctx = { state: freshState(), target: room };
+  const beds = planTurn('침대 가로 140cm랑 책상 가로 120cm로 놓아줘', ctx);
+  assert.deepEqual(
+    [beds.changes?.draft, ...(beds.changes?.queue || [])].map((d) => [d?.type, d?.dims[0]]),
+    [
+      ['bed', 140],
+      ['desk', 120],
+    ],
+  );
+  const sofa = planTurn('소파 깊이 85cm하고 책장 높이 180cm 놓아줘', ctx);
+  assert.equal(sofa.changes.draft.type, 'sofa');
+  assert.equal(sofa.changes.draft.dims[2], 85);
+  assert.equal(sofa.changes.draft.dims[1], makeItem('sofa').dims[1]);
+  assert.equal(sofa.changes.queue[0].type, 'shelf');
+  assert.equal(sofa.changes.queue[0].dims[1], 180);
+});
+
+test('방과 함께 이름으로 지목한 기존 가구를 고치고 가구가 여럿이면 고르기를 기다린다', () => {
+  const state = exampleState();
+  const bed = state.items.find(({ type }) => type === 'bed');
+  const desk = state.items.find(({ type }) => type === 'desk');
+  const ctx = { state, target: { type: 'item', id: bed.id } };
+  const text = '내 방 가로 4.5m로 바꿔줘. 책상 가로 130cm로 바꿔줘';
+  const edit = planTurn(text, ctx);
+  assert.equal(edit.changes.room.w, 4.5);
+  assert.equal(edit.changes.item.id, desk.id);
+  assert.equal(edit.changes.item.next.dims[0], 130);
+  state.items.push(makeItem('desk'));
+  const ambiguous = planTurn(text, ctx);
+  assert.equal(ambiguous.ask, 'item');
+  assert.deepEqual(ambiguous.changes, {});
+});
+
+test('카탈로그의 이름 93개를 다른 가구와 함께 말해도 같은 종류로 읽는다', () => {
+  const ctx = { state: freshState(), target: room };
+  for (const [key, { name }] of Object.entries(TYPES)) {
+    const other = key === 'desk' ? 'chair' : 'desk';
+    for (const [text, expected] of [
+      [`${name} 하나랑 ${TYPES[other].name} 하나 놓아줘`, [key, other]],
+      [`${TYPES[other].name} 두 개랑 ${name} 하나 놓아줘`, [other, other, key]],
+    ]) {
+      const plan = planTurn(text, ctx);
+      assert.deepEqual(
+        [plan.changes?.draft?.type, ...(plan.changes?.queue || []).map(({ type }) => type)],
+        expected,
+        text,
+      );
+    }
+  }
+});
 test('자리를 가리키는 가구 이름이나 한 덩어리 이름은 여러 가구로 나누지 않는다', () => {
   assert.equal(splitRequest('침대 옆에 협탁 하나'), null);
   assert.equal(splitRequest('책상에 놓을 스탠드'), null);

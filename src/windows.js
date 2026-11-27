@@ -136,7 +136,7 @@ export function rotateWindows(room, before) {
     ...w,
     wall: turn[w.wall],
     offset: ['left', 'right'].includes(w.wall)
-      ? Math.round((wallLength(before, w.wall) - w.offset - w.width) * 1000) / 1000
+      ? Math.max(0.05, Number((wallLength(before, w.wall) - w.offset - w.width).toFixed(12)))
       : w.offset,
   }));
 }

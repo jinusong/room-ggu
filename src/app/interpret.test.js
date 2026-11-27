@@ -27,6 +27,31 @@ const model = (v) =>
     ...v,
   });
 
+test('선택한 침대가 있어도 새 침실의 가구와 기존 가구의 수정을 구분한다', () => {
+  const state = exampleState();
+  const bed = state.items.find(({ type }) => type === 'bed');
+  const ctx = { state, target: { type: 'item', id: bed.id } };
+  const create = planFromModel(
+    model({ intent: 'room', action: 'new_space', room_type: 'bedroom', furniture: 'bed' }),
+    '내 방 오른쪽에 가로 3m 세로 2.5m 침실 추가해줘. 침대도 넣어줘',
+    ctx,
+  );
+  assert.equal(create.changes.addSpace, 'bedroom');
+  assert.equal(create.changes.draft.type, 'bed');
+  assert.notEqual(create.changes.draft.id, bed.id);
+  assert.equal(create.changes.item, undefined);
+
+  const edit = planFromModel(
+    model({ intent: 'furniture', furniture: 'bed' }),
+    '내 방 가로 4.5m로 바꿔줘. 침대 가로 120cm로 바꿔줘',
+    ctx,
+  );
+  assert.equal(edit.changes.room.w, 4.5);
+  assert.equal(edit.changes.item.id, bed.id);
+  assert.equal(edit.changes.item.next.dims[0], 120);
+  assert.equal(edit.changes.draft, undefined);
+});
+
 test('모델이 가구와 크기 느낌을 정하면 그대로 초안을 만든다', () => {
   const s = freshState();
   const p = planFromModel(

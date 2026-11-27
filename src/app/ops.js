@@ -960,6 +960,8 @@ export function rotateSpace(state, id = state.roomId) {
   const { room } = space,
     before = { w: room.w, d: room.d };
   const turned = { ...room, w: before.d, d: before.w };
+  rotateWindows(turned, before);
+  turned.windows = validateWindows(turned.windows, turned);
   const next = { ...state };
   if (id === state.roomId) next.room = turned;
   else
@@ -970,7 +972,7 @@ export function rotateSpace(state, id = state.roomId) {
       doors: next.floorplan.doors.filter((d) => !d.rooms.includes(id)),
     };
   const moved = reseatSpace(next, id, before);
-  rotateWindows(room, before);
+  room.windows = turned.windows;
   [room.w, room.d] = [before.d, before.w];
   [room.sources.w, room.sources.d] = [room.sources.d, room.sources.w];
   const turn = (a) => {

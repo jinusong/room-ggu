@@ -535,8 +535,8 @@ function placeDraftInto(turn) {
     turn.surfaces.push({ kind: 'catalog', target: roomTarget() });
     return;
   }
-  snapshot();
-  const { item, free } = placeOne(d);
+  const { item, free } = placeItemWithUndo((state) => ops.placeItem(state, d));
+  linkPlacedDraft(d, item);
   turn.receipt.push({
     label: '배치',
     to: `${item.name} ${dimsText(item.dims)}cm`,
@@ -568,12 +568,14 @@ function placeDraftInto(turn) {
     ];
   }
 }
-// 초안 하나를 방에 놓고, 그 초안을 다루던 도구가 놓인 가구를 계속 다루게 한다.
-function placeOne(d) {
-  const placed = ops.placeItem(app.state, d);
-  linkPlacedDraft(d, placed.item);
+function placeItemWithUndo(place) {
+  const next = { ...app.state, items: [...app.state.items] };
+  const placed = place(next);
+  snapshot();
+  app.state.items = next.items;
   return placed;
 }
+// 놓인 가구를 초안의 기존 도구에서 계속 다룰 수 있게 한다.
 function linkPlacedDraft(d, item) {
   if (app.draft?.id === d.id) app.draft = null;
   for (const t of app.thread)
@@ -754,8 +756,7 @@ function runAction(action, arg, turn) {
       turn.text = `${josa(nameOf(item), '을/를')} 돌렸어요.`;
       break;
     case 'duplicate': {
-      snapshot();
-      const { item: copy, free } = ops.duplicateItem(s, item.id);
+      const { item: copy, free } = placeItemWithUndo((state) => ops.duplicateItem(state, item.id));
       app.selected = copy.id;
       app.target = { type: 'item', id: copy.id };
       turn.text = free
@@ -798,16 +799,23 @@ function applyPlan(plan, turn) {
       plan.ask === 'item' ||
       plan.recommendation ||
       plan.confirmation);
-  const staged = remote ? structuredClone(s) : null;
-  if (staged) ops.switchSpace(staged, plan.destination);
+  const staged = remote || (!c.addSpace && c.room && c.item) ? structuredClone(s) : null;
+  if (remote) ops.switchSpace(staged, plan.destination);
   let roomRows, itemRows;
-  // 방 이동과 편집을 함께 검증하고 성공한 배치에만 한 번의 실행 취소를 남긴다.
+  // 한 턴에 이뤄지는 방 이동과 편집을 먼저 검증한 뒤 실행 취소를 한 번 기록한다.
   if (staged) {
-    if (c.room && !c.addSpace) roomRows = ops.setRoom(staged, c.room);
+    if (c.room) roomRows = ops.setRoom(staged, c.room);
     if (c.item) itemRows = ops.updateItem(staged, c.item.id, c.item.next);
     if (c.draft) ops.sanitizeItem(c.draft);
     snapshot();
+    if (
+      !remote &&
+      (c.room.wallColor !== s.room.wallColor || c.room.floorColor !== s.room.floorColor)
+    )
+      rememberFinish(s.room);
     Object.assign(s, staged);
+  }
+  if (remote) {
     app.selected = null;
     app.target = { type: 'room' };
     if (plan.ask !== 'item' && !plan.recommendation && !plan.confirmation) {
@@ -840,7 +848,7 @@ function applyPlan(plan, turn) {
     if (where) turn.receipt.push({ label: '자리', to: where });
     turn.receipt.push({ label: '크기', to: `${s.room.w} × ${s.room.d} × ${s.room.h}m` });
     // 모델이 쓴 답이 아니면, 실제로 붙은 자리를 넣어 앱이 답을 쓴다.
-    if (plan.replyBy !== 'model' && plan.intent !== 'compound') {
+    if (plan.replyBy !== 'model') {
       const lines = [];
       if (near?.missing)
         lines.push(`${josa(near.missing, '이/가')} 아직 없어서 지금 방을 기준으로 잡았어요.`);
@@ -852,6 +860,7 @@ function applyPlan(plan, turn) {
           : `${josa(s.name, '을/를')} 새로 만들었어요.`,
         `가로 ${s.room.w}m, 세로 ${s.room.d}m예요.`,
       );
+      if (plan.intent === 'compound') lines.push(turn.text);
       turn.text = lines.join(' ');
     }
   } else if (c.room) {

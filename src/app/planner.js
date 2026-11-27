@@ -495,10 +495,22 @@ export function repairPlan(t, ctx) {
 
 // ---------- 한 문장의 여러 요청 ----------
 const ROOM_FACT = /\d\s*평|평수|m²|제곱미터/;
-const COUNT =
-  /([0-9]+|한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*(?:개|점)(?=만|를|가|씩|[^가-힣]|$)/;
 const KO_COUNTS = ['한', '두', '세', '네', '다섯', '여섯', '일곱', '여덟', '아홉', '열'];
-const COORDINATOR = /^\s*(?:이랑|랑|하고|과|와|및|그리고|\+|&|\/)\s*/;
+const COUNT_VALUE = `[0-9]+|${KO_COUNTS.join('|')}`;
+const COUNT = new RegExp(`(${COUNT_VALUE})\\s*(?:개|점)(?=만|를|가|씩|[^가-힣]|$)`);
+const JOIN_WORD = '(?:이랑|랑|하고|과|와|및|그리고|[+&/])';
+const COORDINATOR = new RegExp(
+  `^(\\s*(?:하나|(?:${COUNT_VALUE})\\s*(?:개|점))?\\s*)${JOIN_WORD}\\s*`,
+);
+const SIZED_COORDINATOR = new RegExp(`^(.+?)${JOIN_WORD}\\s*$`);
+export const NEW_ITEM =
+  /하나\s*(?:더|놓|두|사|들|있)|추가|새로|또\s|도\s*(?:하나|놓|넣|필요|두|사)/;
+function furnitureJoin(text, end, next) {
+  const simple = COORDINATOR.exec(text.slice(end));
+  if (simple) return simple;
+  const sized = SIZED_COORDINATOR.exec(text.slice(end, next));
+  return sized && Object.keys(extractDimensions(sized[1])).length ? sized : null;
+}
 // 문장을 방 이야기와 가구 이야기로 나누고, 가구가 여럿이면 하나씩 떼어 낸다.
 // 방과 가구가 서로 다른 마디에 있거나 가구가 둘 이상일 때만 값을 돌려준다. 아니면 null(보통 경로).
 export function splitRequest(text) {
@@ -526,10 +538,11 @@ export function splitRequest(text) {
     let from = 0;
     names.forEach((m, i) => {
       const next = names[i + 1],
-        joined = next && COORDINATOR.exec(part.slice(m.end));
+        joined = next && furnitureJoin(part, m.end, next.index);
       // 이름 사이를 "랑", "하고"로 이었을 때만 따로 놓을 가구로 본다("책상 의자"는 하나로 둔다).
       if (next && !joined) return;
-      pieces.push({ type: m.type, text: part.slice(from, next ? m.end : part.length).trim() });
+      const end = joined ? m.end + joined[1].length : part.length;
+      pieces.push({ type: m.type, text: part.slice(from, end).trim() });
       if (joined) from = m.end + joined[0].length;
     });
   }
@@ -548,18 +561,21 @@ export function splitRequest(text) {
   };
 }
 const roomChanged = (plan) => !!(plan?.changes?.room || plan?.changes?.addSpace);
+export function compoundSubject(room, pieces, ctx, item) {
+  if (!room?.changes?.room || room.changes.addSpace || pieces.length !== 1) return null;
+  const [piece] = pieces;
+  if (NEW_ITEM.test(piece.text)) return null;
+  return item?.type === piece.type ? { item } : editSubject(piece.text, ctx);
+}
+
 // 방 계획과 가구 초안들을 한 턴으로 합친다. drafts[0]이 방에 먼저 뜨고 나머지는 차례를 기다린다.
-export function mergePlans(roomPlan, drafts, ctx) {
+export function mergePlans(roomPlan, drafts, ctx, itemPlan) {
   const room = roomChanged(roomPlan) ? roomPlan : null,
     [first, ...queue] = drafts,
     names = drafts.map((d) => TYPES[d.type].name),
     lines = [];
-  if (room?.changes.addSpace) {
-    const r = room.changes.room;
-    lines.push(
-      `${josa(ROOM_TYPES[r.type].name, '을/를')} 가로 ${r.w}m, 세로 ${r.d}m로 새로 만들었어요.`,
-    );
-  } else if (room) {
+  // 추가한 방의 위치와 치수는 실제로 붙인 뒤 store가 답에 넣는다.
+  if (room && !room.changes.addSpace) {
     const r = room.changes.room,
       was = ctx.state.room,
       typed = r.type !== was.type,
@@ -571,6 +587,15 @@ export function mergePlans(roomPlan, drafts, ctx) {
         : '벽과 바닥을 바꿨어요.',
     );
   }
+  if (itemPlan)
+    return {
+      ...itemPlan,
+      intent: 'compound',
+      scope: 'room',
+      reply: [...lines, itemPlan.reply].join(' '),
+      changes: { ...room.changes, ...itemPlan.changes },
+      surfaces: [...itemPlan.surfaces, surface('room-size')],
+    };
   lines.push(
     queue.length
       ? `${names.map((n, i) => (i < names.length - 1 ? josa(n, '과/와') : n)).join(' ')} 초안을 준비했어요. ${names[0]}부터 규격을 골라 보세요. 놓으면 다음 초안이 이어져요.`
@@ -600,7 +625,7 @@ function draftFrom(piece) {
   if (color) next.color = color;
   return next;
 }
-function planCompound(req, ctx, item) {
+function planCompound(text, req, ctx, item) {
   if (!req) return null;
   if (req.limit)
     return {
@@ -613,9 +638,14 @@ function planCompound(req, ctx, item) {
     };
   const room = req.roomText ? planRoom(req.roomText, ctx) : null;
   if (room?.error) return room;
+  if (room?.ask === 'space-type' || room?.ask === 'space-anchor')
+    return room.spaceRequest ? { ...room, spaceRequest: text } : room;
   // 가구가 하나뿐이고 방에서 바뀔 것도 없으면 보통 경로가 더 잘 처리한다(선택한 가구 고치기 등).
   if (!roomChanged(room) && req.pieces.length < 2) return null;
-  if (req.pieces.length === 1 && item) return null;
+  const edit = compoundSubject(room, req.pieces, ctx, item);
+  if (edit?.plan) return edit.plan;
+  if (edit?.item)
+    return mergePlans(room, [], ctx, planFurniture(req.pieces[0].text, ctx, edit.item));
   return mergePlans(room, req.pieces.map(draftFrom), ctx);
 }
 
@@ -1050,7 +1080,7 @@ export function planTurn(text, ctx, request = splitRequest(text), ranked = null)
   const repair = repairPlan(t, ctx);
   if (repair) return repair;
   if (unlisted) return unlisted;
-  const compound = planCompound(request, ctx, item);
+  const compound = planCompound(t, request, ctx, item);
   if (compound) return compound;
   const edit = editSubject(t, ctx);
   if (edit?.plan) return edit.plan;

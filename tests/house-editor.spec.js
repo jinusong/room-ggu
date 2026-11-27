@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { exampleState, freshState, makeRoom, spaces } from '../src/data.js';
+import { exampleState, freshState, makeItem, makeRoom, spaces } from '../src/data.js';
 import { connections, DOOR, floorplanWarnings } from '../src/floorplan.js';
 import {
   addSpace,
@@ -149,6 +149,75 @@ test('이전 배치 파일의 소수점 셋째 자리 치수도 이름을 바꿀
   expect(await read(page)).toEqual({ ...imported, name: '창가 방' });
 });
 
+test('정밀한 창 위치가 담긴 이전 파일은 방을 돌려도 다시 열 수 있다', async ({ page }) => {
+  await page.goto('/?model=off');
+  await expect(plan(page)).toBeVisible();
+  const legacy = freshState();
+  legacy.version = 4;
+  legacy.room.d = 4.1236;
+  legacy.room.windows = [
+    { id: 'wide-window', wall: 'right', offset: 0.05, width: 4.023, height: 1, sill: 0.9 },
+  ];
+  await page.locator('#layout-file').setInputFiles({
+    name: 'precise-windows.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(legacy)),
+  });
+  await expect.poll(async () => (await read(page)).room.d).toBe(4.1236);
+  const before = await read(page);
+  const rotate = async () => {
+    await editor(page).getByRole('button', { name: '방 편집', exact: true }).click();
+    await editor(page).getByRole('button', { name: '선택한 방 90도 돌리기' }).click();
+  };
+  await rotate();
+  const rotated = await read(page);
+  expect(rotated.room.w).toBe(4.1236);
+  await page.reload();
+  await expect(plan(page)).toBeVisible();
+  expect(await read(page)).toEqual(rotated);
+  expect(rotated.room.windows[0]).toMatchObject({ wall: 'front', offset: 0.0506, width: 4.023 });
+  for (let i = 0; i < 3; i++) await rotate();
+  expect((await read(page)).room).toEqual(before.room);
+});
+
+test('가구 한도에서 배치와 복제에 실패해도 다시 실행이 남는다', async ({ page }) => {
+  const state = freshState();
+  const chair = makeItem('chair');
+  state.items = [chair, ...Array.from({ length: 99 }, () => makeItem('rug'))];
+  await page.addInitScript(
+    (seed) => localStorage.setItem('room-ggu-v2', JSON.stringify(seed)),
+    state,
+  );
+  await page.goto('/?model=off');
+  await expect(plan(page)).toBeVisible();
+  const area = editor(page);
+  await area.getByRole('button', { name: '방 편집', exact: true }).click();
+  const form = area.getByRole('form', { name: '방 편집' });
+  await form.getByLabel('방 이름').fill('다시 적용할 방 이름');
+  await form.getByRole('button', { name: '저장', exact: true }).click();
+  await area.getByRole('button', { name: '실행 취소', exact: true }).click();
+  const before = await read(page);
+  const redo = area.getByRole('button', { name: '다시 실행', exact: true });
+  const chat = page.locator('#chat-input');
+  await chat.fill('협탁 하나 놓아줘');
+  await chat.press('Enter');
+  const draft = () => page.evaluate(() => window.__roomggu.app.draft);
+  const pending = await draft();
+  expect(pending?.type).toBe('side');
+  await page.locator('.draft-note').getByRole('button', { name: '놓기', exact: true }).click();
+  await expect(page.locator('.msg.assistant').last()).toContainText('100개까지');
+  expect(await read(page)).toEqual(before);
+  expect(await draft()).toEqual(pending);
+  await expect(redo).toBeEnabled();
+  await page.evaluate((id) => window.__roomggu.store.select(id), chair.id);
+  await area.getByRole('button', { name: '가구 복제', exact: true }).click();
+  await expect(page.locator('#toast')).toContainText('100개까지');
+  expect(await read(page)).toEqual(before);
+  await expect(redo).toBeEnabled();
+  await redo.click();
+  expect((await read(page)).name).toBe('다시 적용할 방 이름');
+});
+
 test('좌표 범위를 넘기는 크기 변경과 회전은 저장값 및 다시 실행을 보존한다', async ({ page }) => {
   const state = freshState();
   const original = state.roomId;
@@ -199,6 +268,85 @@ test('좌표 범위를 넘기는 크기 변경과 회전은 저장값 및 다시
   expect(await read(page)).toEqual({ ...before, name: '다시 적용할 이름' });
 });
 
+test('방 종류를 답하기 전에는 기다리고 새로고침 뒤에도 가구 요청이 이어진다', async ({ page }) => {
+  const state = freshState();
+  const bath = addSpace(state, 'bathroom', 'right');
+  await page.addInitScript((seed) => {
+    if (!localStorage.getItem('room-ggu-v2'))
+      localStorage.setItem('room-ggu-v2', JSON.stringify(seed));
+  }, state);
+  await page.goto('/?model=off');
+  await expect(plan(page)).toBeVisible();
+  const before = await read(page);
+  const chat = page.locator('#chat-input');
+  await chat.fill('화장실 오른쪽에 가로 3m 세로 2.5m 방 하나 추가해줘. 침대랑 책상도 넣어줘');
+  await chat.press('Enter');
+  const reply = page.locator('.msg.assistant').last();
+  await expect(reply).toContainText('어떤 공간을 추가할까요');
+  await expect(page.locator('.draft-note')).toHaveCount(0);
+  expect(await read(page)).toEqual(before);
+  await page.reload();
+  await expect(plan(page)).toBeVisible();
+  await chat.fill('침실로 해줘');
+  await chat.press('Enter');
+  await expect(reply).toContainText('침대와 책상 초안을 준비했어요');
+  await expect(reply).toContainText('나의 화장실 오른쪽에');
+  const added = await read(page);
+  expect(added.room).toMatchObject({ type: 'bedroom', w: 3, d: 2.5 });
+  expect(added.roomOrder).toHaveLength(3);
+  expect(
+    connections(spaces(added), added.floorplan).some(
+      ({ ids, opening }) => opening && ids.includes(bath) && ids.includes(added.roomId),
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => {
+      const { app } = window.__roomggu;
+      return [app.draft?.type, ...app.queue.map(({ type }) => type)];
+    }),
+  ).toEqual(['bed', 'desk']);
+});
+
+test('가구를 선택한 채 새 방과 같은 가구를 요청하면 새 방의 초안을 만든다', async ({ page }) => {
+  await page.goto('/?model=off');
+  await expect(plan(page)).toBeVisible();
+  const before = await read(page);
+  const bed = before.items.find(({ type }) => type === 'bed');
+  const at = await page.evaluate((id) => window.__roomggu.anchor(id, { center: true }), bed.id);
+  await page.mouse.click(at.x, at.y);
+  await expect(page.getByRole('group', { name: '침대 도구' })).toBeVisible();
+  const chat = page.locator('#chat-input');
+  await chat.fill('내 방 오른쪽에 가로 3m 세로 2.5m 침실 추가해줘. 침대도 넣어줘');
+  await chat.press('Enter');
+  const reply = page.locator('.msg.assistant').last();
+  await expect(reply).toContainText('오른쪽에');
+  await expect(reply).toContainText('침대 초안');
+  const added = await read(page);
+  expect(added.room).toMatchObject({ type: 'bedroom', w: 3, d: 2.5 });
+  expect(added.otherRooms[0].items).toEqual(before.items);
+  expect(added.items).toEqual([]);
+});
+
+test('방과 선택한 가구의 치수를 각각 반영하고 한 번에 되돌린다', async ({ page }) => {
+  await page.goto('/?model=off');
+  await expect(plan(page)).toBeVisible();
+  const before = await read(page);
+  const bed = before.items.find(({ type }) => type === 'bed');
+  const at = await page.evaluate((id) => window.__roomggu.anchor(id, { center: true }), bed.id);
+  await page.mouse.click(at.x, at.y);
+  await expect(page.getByRole('group', { name: '침대 도구' })).toBeVisible();
+  const chat = page.locator('#chat-input');
+  await chat.fill('내 방 가로 4.5m로 바꿔줘. 침대 가로 120cm로 바꿔줘');
+  await chat.press('Enter');
+  const reply = page.locator('.msg.assistant').last();
+  await expect(reply).toContainText('가로 4.5m');
+  const edited = await read(page);
+  expect(edited.room.w).toBe(4.5);
+  expect(edited.items.find(({ id }) => id === bed.id).dims[0]).toBe(120);
+  await editor(page).getByRole('button', { name: '실행 취소', exact: true }).click();
+  expect(await read(page)).toEqual(before);
+});
+
 test('방 이름을 한글로 조합하는 도중의 Esc는 편집 창을 닫지 않는다', async ({ page }) => {
   await page.goto('/?model=off');
   await expect(plan(page)).toBeVisible();
@@ -234,11 +382,12 @@ test('창문이 연결 문을 막으면 추가 메뉴가 그 벽을 빼고 상�
   await expect(picker.locator('option[value=right]')).toHaveCount(0);
   await picker.getByRole('button', { name: '방 추가 닫기' }).click();
   const chat = page.locator('#chat-input');
-  await chat.fill('화장실 오른쪽에 가로 3m 세로 2.5m 침실 추가해줘');
+  await chat.fill('화장실 오른쪽에 가로 3m 세로 2.5m 침실 추가해줘. 침대도 넣어줘');
   await chat.press('Enter');
   const reply = page.locator('.msg.assistant').last();
   await expect(reply).toContainText('오른쪽에는 자리가 없어 다른 벽에 붙였어요');
   await expect(reply).toContainText('기준 화장실 왼쪽에');
+  await expect(reply).toContainText('침대 초안');
   const added = await read(page);
   expect(added.room).toMatchObject({ type: 'bedroom', w: 3, d: 2.5 });
   expect(added.otherRooms.find(({ roomId }) => roomId === bath).room.windows).toEqual(

@@ -43,6 +43,8 @@ import {
   parseFurnitureColor,
   splitRequest,
   mergePlans,
+  compoundSubject,
+  NEW_ITEM,
   refSpace,
   ROOM_REFERENCE,
   ROOM_TALK,
@@ -63,7 +65,6 @@ const COLOR_TALK = /색|컬러|톤|[가-힣]+색|(?:으로|로)\s*(?:바꿔|바�
 const MOOD_TALK = /느낌|분위기|톤/;
 const ROOM_SIZE_TALK = /아담|작|좁|컴팩트|넓|넉넉|크|큰|여유|널찍|답답|혼자|가족/;
 const LITERAL_ROOM_SIZE = /아담|작은|작게|좁은|컴팩트|넓은|넓게|넉넉|큰\s*방|크게/;
-const NEW_ITEM = /하나\s*(?:더|놓|두|사|들|있)|추가|새로|또\s|도\s*(?:하나|놓|필요|두|사)/;
 
 // 모델이 고른 동작은 문장에 그 동작을 뜻하는 말이 있을 때만 실행한다.
 const ACTION_EVIDENCE = {
@@ -253,7 +254,10 @@ export function planFromModel(raw, text, ctx) {
     });
   // 어떤 공간인지 말하지 않고 방을 추가하자고 했으면 만들지 않고 묻는다. 모델이 용도에서 유형을
   // 읽어 냈고 문장에 그 용도가 있으면("잠잘 방 하나 추가해줘") 모델을 따른다.
-  if (rule.ask === 'space-type' && !(v.action === 'new_space' && roomEvidence(v.roomType, t))) {
+  if (
+    rule.ask === 'space-type' &&
+    !(v.action === 'new_space' && roomEvidence(v.roomType, request?.roomText || t))
+  ) {
     if (v.roomType) fixes.push('문장에 근거가 없는 공간 유형은 고르지 않고 되물음');
     return done(rule);
   }
@@ -551,11 +555,20 @@ function compoundPlan(v, request, ctx, item, fixes) {
   if (roomText) {
     room = v.intent === 'room' ? roomPlan(v, roomText, ctx, fixes) : planRoom(roomText, ctx);
     if (room.error) return room;
+    if (room.ask === 'space-type' && v.action === 'new_space' && roomEvidence(v.roomType, roomText))
+      room = newSpacePlan(v.roomType, roomText, v, ctx);
     if (!room.changes?.room && !room.changes?.addSpace) room = null;
   }
   if (!room && pieces.length < 2) return null;
-  if (pieces.length === 1 && item) return null;
-  // 새 초안으로만 잡는다. 지금 고른 가구를 고치는 말은 보통 경로가 맡는다.
+  const edit = compoundSubject(room, pieces, ctx, item);
+  if (edit?.plan) return edit.plan;
+  if (edit?.item)
+    return mergePlans(
+      room,
+      [],
+      ctx,
+      furniturePlan(v, pieces[0].text, ctx, edit.item, [edit.item.type], fixes),
+    );
   const fresh = { ...ctx, target: { type: 'room' }, draft: null };
   const drafts = pieces.map((piece) => {
     const mine = piece.type === v.furniture || (pieces.length === 1 && !v.furniture);

@@ -104,6 +104,11 @@ export const aliases = {
 export function detectType(t) {
   return Object.entries(aliases).find(([, r]) => r.test(t))?.[0] || null;
 }
+const mentionPatterns = Object.entries(aliases).map(([type, alias]) => {
+  const label = TYPES[type].name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+  const flags = alias.global ? alias.flags : alias.flags + 'g';
+  return [type, new RegExp(`${label}|${alias.source}`, flags)];
+});
 // 문장에 나온 가구 이름을 나온 순서대로 찾는다. 긴 이름("소파 테이블")이 먼저 잡히면 그 자리는 가린다.
 // ref는 "침대 옆에", "책상에 놓을"처럼 자리나 짝을 가리킬 뿐 새로 놓을 가구가 아닌 이름이다.
 const FURNITURE_REF =
@@ -111,8 +116,7 @@ const FURNITURE_REF =
 export function furnitureMentions(t) {
   let rest = String(t);
   const found = [];
-  for (const [type, re] of Object.entries(aliases)) {
-    const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
+  for (const [type, g] of mentionPatterns) {
     for (const m of rest.matchAll(g)) {
       const end = m.index + m[0].length;
       found.push({
