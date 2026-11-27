@@ -352,3 +352,131 @@ for (const correction of ['한 문장으로 다시 답하기', '새로고침 후
     expect(after.otherRooms.find((r) => r.roomId === before.roomId)?.room).toEqual(before.room);
   });
 }
+
+for (const { width, height, direction } of [
+  { width: 1440, height: 900, direction: '아니, 아래쪽으로 해줘' },
+  { width: 320, height: 640, direction: '오른쪽 말고 아래쪽에 붙여줘' },
+]) {
+  test(`${width}px에서 방향을 정정하고 새로고침해도 기준 방과 치수를 유지한다`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto('/?model=off');
+    await page.waitForFunction(() => window.__roomggu?.ready());
+    const read = () => page.evaluate(() => window.__roomggu.app.state);
+    const say = async (text) => {
+      await page.locator('#chat-input').fill(text);
+      await page.locator('#chat-input').press('Enter');
+    };
+    const reply = page.locator('.msg.assistant').last();
+    const home = await read();
+    await say('내 방 오른쪽에 화장실 추가해줘');
+    await expect(reply).toContainText('나의 화장실을 붙였어요');
+    const bath = await read();
+    await page.getByLabel('선택한 방').selectOption(home.roomId);
+    const before = await read();
+    await say('화장실 오른쪽에 가로 3m 세로 2.5m 방 하나 추가해줘');
+    await expect(reply).toContainText('어떤 공간을 추가할까요');
+    await say(direction);
+    await expect(reply).toContainText('아래쪽');
+    await expect(reply).toContainText('어떤 공간을 추가할까요');
+    expect(await read()).toEqual(before);
+    await say('가로 3.2m로 해줘');
+    await expect(reply).toContainText('가로 3.2m');
+    await page.reload();
+    await page.waitForFunction(() => window.__roomggu?.ready());
+    await say('거실 말고 부엌으로 해줘');
+    await expect(reply).toContainText('나의 화장실 아래쪽에 나의 주방을 붙였어요');
+    const after = await read();
+    expect(after.room).toMatchObject({ type: 'kitchen', w: 3.2, d: 2.5 });
+    expect(after.floorplan.positions[after.roomId].z).toBeCloseTo(
+      bath.floorplan.positions[bath.roomId].z + (bath.room.d + after.room.d) / 2,
+    );
+    await page.getByRole('button', { name: '실행 취소', exact: true }).click();
+    expect(await read()).toEqual(before);
+  });
+}
+
+for (const [message, roomWidth, expected] of [
+  [
+    '책상 두 개랑 의자 하나 놓고 내 방 가로 4.5m로 바꿔줘',
+    4.5,
+    [
+      ['desk', 120],
+      ['desk', 120],
+      ['chair', 48],
+    ],
+  ],
+  [
+    '소파 두 개를 하고 책장 하나를 놓아줘',
+    null,
+    [
+      ['sofa', 180],
+      ['sofa', 180],
+      ['shelf', 90],
+    ],
+  ],
+]) {
+  test(`놓기 뒤의 방 요청과 목적격 조사에서 가구별 수량을 지킨다 (${message})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/?model=off');
+    await page.waitForFunction(() => window.__roomggu?.ready());
+    const read = () =>
+      page.evaluate(() => {
+        const { state, draft, queue } = window.__roomggu.app;
+        return {
+          state,
+          drafts: [draft, ...queue].filter(Boolean).map(({ type, dims }) => [type, dims[0]]),
+        };
+      });
+    const before = (await read()).state;
+    const chat = page.locator('#chat-input');
+    await chat.fill(message);
+    await chat.press('Enter');
+    await expect(page.locator('.msg.assistant').last()).toContainText('초안을 준비했어요');
+    const after = await read();
+    expect(after.state.room.w).toBe(roomWidth ?? before.room.w);
+    expect(after.drafts).toEqual(expected);
+    await page.getByRole('button', { name: '모두 놓기', exact: true }).click();
+    expect((await read()).state.items).toHaveLength(before.items.length + expected.length);
+    await page.getByRole('button', { name: '실행 취소', exact: true }).click();
+    expect((await read()).state).toEqual(after.state);
+  });
+}
+
+test('기준 방을 고르기 전에 정한 방향과 치수를 함께 보관한다', async ({ page }) => {
+  await page.goto('/?model=off');
+  await page.waitForFunction(() => window.__roomggu?.ready());
+  const read = () => page.evaluate(() => window.__roomggu.app.state);
+  const say = async (text) => {
+    await page.locator('#chat-input').fill(text);
+    await page.locator('#chat-input').press('Enter');
+  };
+  const reply = page.locator('.msg.assistant').last();
+  const home = await read();
+  const selected = page.getByLabel('선택한 방');
+  await say('내 방 오른쪽에 화장실 추가해줘');
+  await selected.selectOption(home.roomId);
+  await say('내 방 왼쪽에 화장실 추가해줘');
+  const bath = await read();
+  await selected.selectOption(home.roomId);
+  const before = await read();
+  await say('화장실 오른쪽에 가로 3m 세로 2.5m 방 하나 추가해줘');
+  await expect(reply).toContainText('어느 화장실');
+  await say('위쪽으로 하고 가로 3.2m로 해줘');
+  await expect(reply).toContainText('기준으로 삼을 방을 골라 주세요');
+  expect(await read()).toEqual(before);
+  await page.reload();
+  await page.waitForFunction(() => window.__roomggu?.ready());
+  await say('두 번째');
+  await expect(reply).toContainText('나의 화장실 2 위쪽에 어떤 공간을 추가할까요');
+  await say('침실로 해줘');
+  await expect(reply).toContainText('나의 화장실 2 위쪽에 나의 침실을 붙였어요');
+  const after = await read();
+  expect(after.room).toMatchObject({ type: 'bedroom', w: 3.2, d: 2.5 });
+  expect(after.floorplan.positions[after.roomId].z).toBeCloseTo(
+    bath.floorplan.positions[bath.roomId].z - (bath.room.d + after.room.d) / 2,
+  );
+});

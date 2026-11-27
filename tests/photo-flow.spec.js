@@ -729,3 +729,57 @@ test('다음 사진을 첨부해도 이전 사진 초안은 설명을 반영할 
   expect((await snapshot(page)).draft.dims).toEqual([123, 77, 67]);
   await expect(page.locator('.photo-tray img')).toBeVisible();
 });
+
+for (const useModel of [false, true]) {
+  test(`확신이 낮은 사진에서 치수와 함께 적은 색을 유지한다 (상담 모델 ${useModel})`, async ({
+    page,
+  }) => {
+    await start(page);
+    if (useModel) {
+      await page.evaluate(() => {
+        window.__pauseCaption = true;
+        Object.assign(window.__roomggu.app.ai, {
+          text: 'ready',
+          model: 'gemma-4-E2B-it-q4f16_1-MLC',
+        });
+      });
+    }
+    await sendPhoto(page, '가로 155cm 깊이 210cm 높이 45cm 네이비');
+    await page.waitForFunction(() => window.__photoJob);
+    await page.evaluate(() => window.__finishPhoto('bed', true));
+    await expect.poll(async () => (await snapshot(page)).vision).toBe('ready');
+    expect((await snapshot(page)).draft).toBeNull();
+    await page.getByRole('button', { name: '침대로 잡기', exact: true }).click();
+    if (useModel) {
+      await page.waitForFunction(() => window.__captionJob);
+      await page.evaluate(() => {
+        const job = window.__captionJob;
+        job.worker.onmessage({
+          data: {
+            id: job.id,
+            result: JSON.stringify({ intent: 'furniture', action: 'none', furniture: 'bed' }),
+          },
+        });
+      });
+      await expect.poll(async () => (await snapshot(page)).busy).toBeUndefined();
+    }
+    const chosen = (await snapshot(page)).draft;
+    expect(chosen).toMatchObject({ type: 'bed', dims: [155, 45, 210], color: '#3f4d63' });
+    await page.getByRole('button', { name: '사진 종류 다시 고르기', exact: true }).click();
+    await page
+      .locator('.photo-kind-grid')
+      .getByRole('button', { name: '침대', exact: true })
+      .click();
+    expect((await snapshot(page)).draft).toEqual(chosen);
+    const read = () => page.evaluate(() => window.__roomggu.app.state.items);
+    const before = await read();
+    await page.locator('.draft-note').getByRole('button', { name: '놓기', exact: true }).click();
+    expect((await read()).at(-1)).toMatchObject({
+      type: 'bed',
+      dims: [155, 45, 210],
+      color: '#3f4d63',
+    });
+    await page.getByRole('button', { name: '실행 취소', exact: true }).click();
+    expect(await read()).toEqual(before);
+  });
+}

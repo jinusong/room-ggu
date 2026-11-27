@@ -135,12 +135,24 @@ export function spaceTypeAnswer(text) {
     answer.match(/^(.+?)(?:은|는|이|가|을|를)?\s*(?:말고|대신|빼고)\s*(.+)$/u) || [];
   return rejected && exactSpaceType(rejected.trim()) ? exactSpaceType(wanted.trim()) : null;
 }
-export function spaceFollowup(text) {
+const FOLLOWUP_SEPARATOR = /\s+(?:하고(?:\s*[,，])?|그리고)\s*|\s*[,，]\s*/gu;
+const SIDE_WORD = '오른쪽|왼쪽|위쪽|아래쪽|뒤쪽|앞쪽|위|아래|뒤|앞';
+const SIDE_ANSWER = new RegExp(
+  `^(?:(?:아니|네|응)(?:\\s*[,，]\\s*|\\s+))?(?:(?:${SIDE_WORD})\\s*말고\\s*)?(${SIDE_WORD})(?:으로|로|에)?(?:\\s*(?:해|붙여|바꿔)\\s*(?:줘요?|주세요|줄래요?|달라))?[.!?]?$`,
+  'u',
+);
+
+function spaceSideAnswer(text) {
+  const word = text.trim().match(SIDE_ANSWER)?.[1];
+  return word && spaceReferenceTail(`${word}에`)?.side;
+}
+
+function spaceTypeOrSizeAnswer(text) {
   const choice = spaceTypeAnswer(text);
   if (choice) return { choice };
   if (isSpaceSizeAnswer(text)) return { sizeText: text };
 
-  for (const separator of text.matchAll(/\s+(?:하고(?:\s*[,，])?|그리고)\s*|\s*[,，]\s*/gu)) {
+  for (const separator of text.matchAll(FOLLOWUP_SEPARATOR)) {
     const left = text.slice(0, separator.index).trim();
     const right = text.slice(separator.index + separator[0].length).trim();
     for (const [typeText, sizeText] of [
@@ -150,6 +162,26 @@ export function spaceFollowup(text) {
       if (!isSpaceSizeAnswer(sizeText)) continue;
       const choice = spaceTypeAnswer(typeText);
       if (choice) return { choice, sizeText };
+    }
+  }
+  return null;
+}
+
+export function spaceFollowup(text) {
+  const side = spaceSideAnswer(text);
+  if (side) return { side };
+  const plain = spaceTypeOrSizeAnswer(text);
+  if (plain) return plain;
+  for (const separator of text.matchAll(FOLLOWUP_SEPARATOR)) {
+    const left = text.slice(0, separator.index);
+    const right = text.slice(separator.index + separator[0].length);
+    for (const [sideText, rest] of [
+      [left, right],
+      [right, left],
+    ]) {
+      const side = spaceSideAnswer(sideText);
+      const answer = side && spaceTypeOrSizeAnswer(rest.trim());
+      if (answer) return { ...answer, side };
     }
   }
   return null;

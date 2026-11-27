@@ -317,7 +317,7 @@ export function planRoom(t, ctx) {
       .filter((k) => !skip.includes(k))
       .slice(0, 4)
       .map((k) => say(ROOM_TYPES[k].name, phrase(ROOM_TYPES[k].name)));
-  const near = r.askType || r.add ? refSpace(t, state, ctx.spaceAnchor) : null;
+  const near = r.askType || r.add ? refSpace(t, state, ctx.spaceAnchor, ctx.spaceSide) : null;
   if (near?.missing || near?.choices) {
     return {
       intent: 'room',
@@ -331,7 +331,11 @@ export function planRoom(t, ctx) {
       spaceRequest: near.choices ? t : undefined,
       spaceAnchors: near.choices?.map((room) => room.roomId),
       suggestions: near.choices
-        ? near.choices.slice(0, 5).map((room, i) => say(room.name, `${i + 1}번`))
+        ? near.choices.slice(0, 5).map((room, i) => {
+            const number = `${i + 1}번`;
+            const duplicate = near.choices.some((r) => r !== room && r.name === room.name);
+            return say(duplicate ? `${number} ${room.name}` : room.name, number);
+          })
         : [],
     };
   }
@@ -345,6 +349,8 @@ export function planRoom(t, ctx) {
       ask: 'space-type',
       spaceRequest: t,
       spaceAnchor: near?.roomId,
+      spaceSide: ctx.spaceSide,
+      spaceDims: ctx.spaceDims,
       reply: `${where}어떤 공간을 추가할까요? “거실”처럼 방 종류를 알려 주세요.`,
       changes: {},
       surfaces: [],
@@ -417,23 +423,40 @@ export function planRoom(t, ctx) {
 export const COMPLAINT = /왜|아니\s|아니[,.]|라니까|잖아|했잖|냐고|하냐|!!|ㅡㅡ|;;|틀렸|잘못/;
 
 // "화장실 옆에", "이 방 오른쪽에"처럼 새 공간을 붙일 기준 공간과 벽. 말하지 않았으면 null.
-export function refSpace(text, state, anchorId) {
+export function refSpace(text, state, anchorId, side) {
   const list = spaces(state),
     ref = roomMentions(text).find((m) => m.role === 'ref'),
     here = currentSpaceReference(text);
+  const named = list
+    .flatMap((room) => {
+      const match = roomNameSpan(text, room.name);
+      if (!match) return [];
+      const tail = spaceReferenceTail(text.slice(match.index + match[0].length));
+      return tail ? [{ room, side: tail.side, start: match.index, length: match[0].length }] : [];
+    })
+    .sort((a, b) => a.start - b.start || b.length - a.length);
   if (anchorId) {
     const room = list.find((r) => r.roomId === anchorId);
     if (!room) return { missing: ref ? ROOM_TYPES[ref.type].name : '기준 공간' };
-    return { roomId: room.roomId, name: room.name, side: ref?.side ?? here?.side ?? null };
+    const namedSide = named.find((hit) => hit.room.roomId === anchorId)?.side;
+    return {
+      roomId: room.roomId,
+      name: room.name,
+      side: side ?? namedSide ?? ref?.side ?? here?.side ?? null,
+    };
   }
-  for (const room of list) {
-    const match = roomNameSpan(text, room.name);
-    if (!match) continue;
-    const tail = spaceReferenceTail(text.slice(match.index + match[0].length));
-    if (tail) return { roomId: room.roomId, name: room.name, side: tail.side };
+  if (named.length) {
+    const first = named[0];
+    const choices = named
+      .filter((hit) => hit.start === first.start && hit.length === first.length)
+      .map((hit) => hit.room);
+    if (choices.length > 1) return { name: first.room.name, choices };
+    return { roomId: first.room.roomId, name: first.room.name, side: side ?? first.side };
   }
   if (!ref) {
-    return here ? { roomId: state.roomId, name: state.name, side: here.side } : null;
+    return here || side
+      ? { roomId: state.roomId, name: state.name, side: side ?? here.side }
+      : null;
   }
   const same = list.filter((r) => r.room.type === ref.type);
   const name = ROOM_TYPES[ref.type].name;
@@ -442,7 +465,7 @@ export function refSpace(text, state, anchorId) {
     same.length === 1
       ? same[0]
       : explicitCurrent && same.find((room) => room.roomId === state.roomId);
-  if (hit) return { roomId: hit.roomId, name: hit.name, side: ref.side };
+  if (hit) return { roomId: hit.roomId, name: hit.name, side: side ?? ref.side };
   return same.length ? { name, choices: same } : { missing: name };
 }
 
@@ -500,7 +523,7 @@ const COUNT_VALUE = `[0-9]+|${KO_COUNTS.join('|')}`;
 const COUNT = new RegExp(`(${COUNT_VALUE})\\s*(?:개|점)(?=만|를|가|씩|[^가-힣]|$)`);
 const JOIN_WORD = '(?:이랑|랑|하고|과|와|및|그리고|[+&/])';
 const COORDINATOR = new RegExp(
-  `^(\\s*(?:하나|(?:${COUNT_VALUE})\\s*(?:개|점))?\\s*)${JOIN_WORD}\\s*`,
+  `^(\\s*(?:(?:하나|(?:${COUNT_VALUE})\\s*(?:개|점))(?:씩)?(?:을|를)?)?\\s*)${JOIN_WORD}\\s*`,
 );
 const SIZED_COORDINATOR = new RegExp(`^(.+?)${JOIN_WORD}\\s*$`);
 export const NEW_ITEM =
@@ -515,7 +538,10 @@ function furnitureJoin(text, end, next) {
 // 방과 가구가 서로 다른 마디에 있거나 가구가 둘 이상일 때만 값을 돌려준다. 아니면 null(보통 경로).
 export function splitRequest(text) {
   const clauses = String(text)
-    .replace(/((?:바꾸|바꿔\s?주|만들|추가하|넓히|줄이|늘리|정하|잡|해\s?주)고)\s+/g, '$1\n')
+    .replace(
+      /((?:바꾸|바꿔\s?주|만들|추가하|넓히|줄이|늘리|정하|잡|해\s?주|놓(?:아\s?주)?|넣(?:어\s?주)?|배치하)고)\s+/g,
+      '$1\n',
+    )
     .split(/\.(?!\d)|[!?\n]+|,\s*|\s+그리고(?:\s+|$)/)
     .map((c) => c.trim())
     .filter(Boolean);
@@ -670,7 +696,12 @@ function planFurniture(t, ctx, item) {
     color = parseFurnitureColor(t);
   // “네이비”, “네이비로”처럼 색 이름만 말해도 색 이야기다.
   const bareColor = color && t.split(/\s+/).length <= 2;
-  if (color && (bareColor || /색|컬러|톤|(?:으로|로)\s*(?:바꿔|바꾸|해)|[가-힣]+색/.test(t)))
+  if (
+    color &&
+    (bareColor ||
+      (mode === 'draft' && ctx.photoCaption) ||
+      /색|컬러|톤|(?:으로|로)\s*(?:바꿔|바꾸|해)|[가-힣]+색/.test(t))
+  )
     next.color = color;
   else if (color && mode === 'new') next.color = color;
   // 색만 바꿨으면 치수 이야기를 되풀이하지 않고 바뀐 색을 말한다.
@@ -747,7 +778,7 @@ export function objectsOf(t) {
   // “책상 위에”처럼 띄어 쓴 놓을 곳도 건너뛴다.
   while (
     i >= 0 &&
-    (SKIP_WORD.test(words[i].replace(/만$/, '')) ||
+    (SKIP_WORD.test(words[i].replace(/(?:을|를|만)$/, '')) ||
       KO_COUNTS.includes(words[i]) ||
       COUNT.test(words[i]) ||
       PLACE_WORD.test(words[i + 1] || ''))
