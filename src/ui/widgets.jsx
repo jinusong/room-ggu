@@ -386,17 +386,24 @@ export function FitBadge({ fit }) {
 }
 
 export function useOutside(ref, onClose, active) {
+  const close = useRef(onClose);
+  close.current = onClose;
   useLayoutEffect(() => {
     if (!active) return;
     const h = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose(e);
+      if (ref.current && !ref.current.contains(e.target)) close.current(e);
     };
     const k = (e) => {
-      if (e.key !== 'Escape' || e.defaultPrevented || e.target.closest?.('[aria-modal="true"]'))
+      if (
+        e.key !== 'Escape' ||
+        e.defaultPrevented ||
+        isComposingKey(e) ||
+        e.target.closest?.('[aria-modal="true"]')
+      )
         return;
       e.preventDefault();
       e.stopPropagation();
-      onClose(e);
+      close.current(e);
     };
     document.addEventListener('pointerdown', h);
     document.addEventListener('keydown', k, true);

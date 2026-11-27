@@ -44,6 +44,7 @@ import {
   rectanglesOverlap,
   sharedWall,
   sharedOpening,
+  doorGaps,
   doorPlacement,
   findDoor,
   roomOpenings,
@@ -697,6 +698,30 @@ export function sideSlot(state, side, size, anchorId = state.roomId) {
     offsets.push(Math.floor(low * 100 + 1e-9) / 100 - along);
     offsets.push(Math.ceil(high * 100 - 1e-9) / 100 - along);
   }
+  if (anchor.room.windows?.length || size.windows?.length) {
+    const anchorWall = {
+      vertical,
+      at: vertical ? origin.x + (sign * w) / 2 : origin.z + (sign * d) / 2,
+      start: along - span / 2,
+      end: along + span / 2,
+    };
+    const newWall = {
+      vertical,
+      at: (-sign * (vertical ? size.w : size.d)) / 2,
+      start: -length / 2,
+      end: length / 2,
+    };
+    const anchorGaps = doorGaps(anchorWall, windowOpenings(anchor.room, origin));
+    const newGaps = doorGaps(newWall, windowOpenings(size));
+    // 두 빈 구간이 문 폭만큼 겹치기 시작하는 양 끝 위치를 검사한다.
+    for (const [lo, hi] of anchorGaps) {
+      for (const [newLo, newHi] of newGaps) {
+        const min = Math.ceil((lo + DOOR.width - newHi) * 100 - 1e-9) / 100;
+        const max = Math.floor((hi - DOOR.width - newLo) * 100 + 1e-9) / 100;
+        if (min <= max) offsets.push(min - along, max - along);
+      }
+    }
+  }
   const candidate = { room: size };
   for (const t of offsets) {
     if (Math.abs(t) > reach + 1e-9) continue;
@@ -835,7 +860,9 @@ function pushApart(list, pos, first) {
         ['z', -(B.bottom - A.top)],
         ['z', A.bottom - B.top],
       ].sort((m, n) => Math.abs(m[1]) - Math.abs(n[1]));
-      const [axis, by] = moves[0];
+      const move = moves.find(([axis, by]) => Math.abs(round3(pos[b.roomId][axis] + by)) <= 200);
+      if (!move) continue;
+      const [axis, by] = move;
       pos[b.roomId][axis] = round3(pos[b.roomId][axis] + by);
       moved.add(b.roomId);
       queue.push(b);
@@ -905,7 +932,7 @@ export function reseatSpace(state, id, before) {
     for (const r of others) pos[r.roomId] = { ...start[r.roomId] };
     pushApart(list, pos, [id]);
   }
-  state.floorplan = plan;
+  state.floorplan = normalizeFloorplan(plan, list);
   return others
     .filter((r) => pos[r.roomId].x !== start[r.roomId].x || pos[r.roomId].z !== start[r.roomId].z)
     .map((r) => r.roomId);
@@ -932,6 +959,17 @@ export function rotateSpace(state, id = state.roomId) {
   if (!space) throw Error('공간을 찾지 못했어요.');
   const { room } = space,
     before = { w: room.w, d: room.d };
+  const turned = { ...room, w: before.d, d: before.w };
+  const next = { ...state };
+  if (id === state.roomId) next.room = turned;
+  else
+    next.otherRooms = state.otherRooms.map((r) => (r.roomId === id ? { ...r, room: turned } : r));
+  if (next.floorplan?.doors)
+    next.floorplan = {
+      ...next.floorplan,
+      doors: next.floorplan.doors.filter((d) => !d.rooms.includes(id)),
+    };
+  const moved = reseatSpace(next, id, before);
   rotateWindows(room, before);
   [room.w, room.d] = [before.d, before.w];
   [room.sources.w, room.sources.d] = [room.sources.d, room.sources.w];
@@ -945,12 +983,7 @@ export function rotateSpace(state, id = state.roomId) {
   }
   const av = state.avatar;
   if (av && (av.roomId ? av.roomId === id : id === state.roomId)) turn(av);
-  if (state.floorplan?.doors)
-    state.floorplan = {
-      ...state.floorplan,
-      doors: state.floorplan.doors.filter((d) => !d.rooms.includes(id)),
-    };
-  const moved = reseatSpace(state, id, before);
+  state.floorplan = next.floorplan;
   return { name: space.name, w: room.w, d: room.d, moved };
 }
 

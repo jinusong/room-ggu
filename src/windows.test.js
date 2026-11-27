@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { freshState, validateState, makeItem, spaces, layoutWarnings } from './data.js';
+import { freshState, validateState, makeItem, makeRoom, spaces, layoutWarnings } from './data.js';
 import {
   addWindow,
   setWindow,
@@ -17,7 +17,7 @@ import { houseStructure } from './house-three.js';
 import { furniture, disposeGroup } from './furniture.js';
 import { detectType, catalogMatches } from './estimator.js';
 import { planTurn } from './app/planner.js';
-import { roomOpenings, connections } from './floorplan.js';
+import { roomOpenings, connections, sharedOpening } from './floorplan.js';
 
 test('창문 추가·편집·삭제·저장 왕복과 이전 배치 호환', () => {
   const s = freshState();
@@ -103,6 +103,19 @@ test('자동 연결 문은 창문을 피하고 직접 옮긴 문이 창과 겹�
   const before = JSON.stringify(s);
   assert.throws(() => setDoor(s, ...link.ids, { center, exact: true }));
   assert.equal(JSON.stringify(s), before);
+});
+
+test('맞닿은 벽 밖의 창문 사이에는 자동 연결 문을 내지 않는다', () => {
+  const base = freshState();
+  const first = addWindow(base, 'right');
+  setWindow(base, first, { offset: 0.05, width: 0.8 });
+  const second = addWindow(base, 'right');
+  setWindow(base, second, { offset: 2.5, width: 1 });
+  const next = { room: { ...makeRoom('bedroom'), w: 2, d: 1.1 } };
+  const basePosition = { x: 0, z: 0 };
+  const nextPosition = { x: 3, z: -1.45 };
+  assert.equal(sharedOpening(base, basePosition, next, nextPosition), null);
+  assert.equal(sharedOpening(next, nextPosition, base, basePosition), null);
 });
 test('추가된 가구는 별칭·상담·실제 형상·검색에 연결되고 빈 결과는 구별된다', () => {
   const cases = {

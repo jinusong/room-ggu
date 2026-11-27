@@ -190,6 +190,26 @@ test('방을 돌리면 가로·세로와 가구·아바타가 함께 돌고 네 
   assert.equal(s.floorplan.doors, undefined);
   assert.equal(floorplanWarnings(spaces(s), s.floorplan).size, 0);
 });
+test('좌표 경계에서 크기와 회전은 원자적으로 거절하고 겹침은 범위 안에서 푼다', () => {
+  for (const sign of [-1, 1]) {
+    const s = freshState();
+    const id = s.roomId;
+    setRoom(s, roomWithDims(s.room, { w: 2, d: 4 }));
+    s.floorplan.positions[id].x = sign * 199.5;
+    const other = addSpace(s, 'studio', sign > 0 ? 'left' : 'right', {
+      room: { ...makeRoom('studio'), w: 2, d: 4 },
+    });
+    switchSpace(s, id);
+    const before = structuredClone(s);
+    assert.throws(() => setRoom(s, roomWithDims(s.room, { w: 4 })), /200m/);
+    assert.deepEqual(s, before);
+    assert.throws(() => rotateSpace(s), /200m/);
+    assert.deepEqual(s, before);
+    s.floorplan.positions[other].x = sign * 199.9;
+    assert.equal(separateSpaces(s).remaining, 0);
+    assert.doesNotThrow(() => validateState(JSON.parse(JSON.stringify(s))));
+  }
+});
 test('공간 유형을 바꾸면 기본 이름·바닥·설비가 따라 바뀌고 직접 지은 이름은 남는다', () => {
   const s = freshState();
   const first = s.roomId;

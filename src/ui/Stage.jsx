@@ -366,7 +366,7 @@ function DoorBar() {
 
 const SIDE_NAMES = { right: '오른쪽', left: '왼쪽', back: '위쪽', front: '아래쪽' };
 // 집 전체 위쪽의 공간 추가 버튼. 고른 공간에서 비어 있는 첫 벽의 고르기 창을 연다.
-function AddSpaceButton() {
+function AddSpaceButton({ trigger }) {
   const sides = store.freeSides(),
     full = spaces(app.state).length >= 12,
     open = !!app.view.addSide;
@@ -384,7 +384,10 @@ function AddSpaceButton() {
             ? `${app.state.name} 옆에 공간 붙이기`
             : '고른 공간 둘레에 붙일 자리가 없어요. 다른 공간을 고르거나 옮겨 주세요'
       }
-      onClick={() => store.pickAddSide(open ? null : sides[0])}
+      onClick={(event) => {
+        trigger.current = event.currentTarget;
+        store.pickAddSide(open ? null : sides[0]);
+      }}
     >
       <Icon name="plus" size={16} />
       <span>추가</span>
@@ -392,7 +395,7 @@ function AddSpaceButton() {
   );
 }
 // 집 전체에서 고른 공간의 벽 바깥에 뜨는 + 손잡이. 누르면 그 벽에 붙일 공간을 고른다.
-function AddHandles() {
+function AddHandles({ trigger }) {
   const s = app.state;
   const sides = store.freeSides(),
     picked = app.view.addSide;
@@ -406,7 +409,10 @@ function AddHandles() {
           aria-label={`${s.name} ${SIDE_NAMES[side]}에 공간 붙이기`}
           aria-expanded={picked === side}
           title={`${SIDE_NAMES[side]}에 공간 붙이기`}
-          onClick={() => store.pickAddSide(picked === side ? null : side)}
+          onClick={(event) => {
+            trigger.current = event.currentTarget;
+            store.pickAddSide(picked === side ? null : side);
+          }}
         >
           <Icon name="plus" size={16} />
         </button>
@@ -416,21 +422,14 @@ function AddHandles() {
 }
 // 그 벽에 붙일 공간 고르기. 가리키거나 초점을 두면 도면에 자리와 크기가 점선으로 보인다.
 // 좁은 화면에서는 모형을 가리지 않게 방 아래 도구 줄 위에 옆으로 넘기는 줄로 깐다.
-function AddRoomPop({ side, sides }) {
+function AddRoomPop({ side, sides, onClose }) {
   const ref = useRef(null);
   useLayoutEffect(() => ref.current?.focus({ preventScroll: true }), []);
   return (
     <div class="editor-pop add-pop-standalone" data-add-list role="group" aria-label="방 추가">
       <div class="editor-pop-head">
         <strong>방 추가</strong>
-        <button
-          class="icon-btn"
-          aria-label="방 추가 닫기"
-          onClick={() => {
-            store.pickAddSide(null);
-            document.getElementById('add-space')?.focus();
-          }}
-        >
+        <button class="icon-btn" aria-label="방 추가 닫기" onClick={onClose}>
           <Icon name="x" size={16} />
         </button>
       </div>
@@ -480,7 +479,7 @@ function AddRoomPop({ side, sides }) {
   );
 }
 
-function FloorplanControls() {
+function FloorplanControls({ addTrigger }) {
   const ref = useRef(null);
   const cancel = useRef(null);
   const [confirm, setConfirm] = useState(false);
@@ -489,13 +488,19 @@ function FloorplanControls() {
   const side = app.view.addSide;
   const editing = app.view.roomEditor;
   const deleting = confirm && !side && !editing;
+  const closeAdd = (restoreFocus) => {
+    store.pickAddSide(null);
+    if (!restoreFocus) return;
+    const trigger = addTrigger.current?.isConnected
+      ? addTrigger.current
+      : document.getElementById('add-space');
+    trigger?.focus({ preventScroll: true });
+  };
   const close = (event) => {
-    if (event?.target?.closest?.('[data-add-side]')) return;
-    if (event?.key === 'Escape')
-      document
-        .getElementById(editing ? 'edit-space' : side ? 'add-space' : 'delete-space')
-        ?.focus();
-    if (side) store.pickAddSide(null);
+    const escape = event?.key === 'Escape';
+    if (!escape && event?.target?.closest?.('[data-add-side]')) return;
+    if (side) closeAdd(escape);
+    else if (escape) document.getElementById(editing ? 'edit-space' : 'delete-space')?.focus();
     if (editing) store.setRoomEditor(false);
     if (confirm) setConfirm(false);
   };
@@ -523,7 +528,7 @@ function FloorplanControls() {
           ))}
         </select>
       </label>
-      <AddSpaceButton />
+      <AddSpaceButton trigger={addTrigger} />
       <button
         id="edit-space"
         class="editor-command on-stage"
@@ -554,7 +559,7 @@ function FloorplanControls() {
         <span>삭제</span>
       </button>
       {editing && <RoomEditor key={state.roomId} room={state.room} name={state.name} />}
-      {side && <AddRoomPop side={side} sides={store.freeSides()} />}
+      {side && <AddRoomPop side={side} sides={store.freeSides()} onClose={() => closeAdd(true)} />}
       {deleting && (
         <div class="editor-pop delete-room-pop" role="group" aria-label="방 삭제 확인">
           <strong>{josa(state.name, '을/를')} 삭제할까요?</strong>
@@ -618,7 +623,8 @@ export function Stage({ mobile, sheetRef }) {
   const hostHouse = useRef(null),
     stageRef = useRef(null),
     barRef = useRef(null),
-    tagsRef = useRef(null);
+    tagsRef = useRef(null),
+    addTrigger = useRef(null);
   const bounds = () => {
     const css = getComputedStyle(document.documentElement),
       r = stageRef.current.getBoundingClientRect();
@@ -910,13 +916,13 @@ export function Stage({ mobile, sheetRef }) {
       <div id="viewport-house" class="viewport" ref={hostHouse} />
       <div class="stage-tags" ref={tagsRef}>
         <RoomTags />
-        <AddHandles />
+        <AddHandles trigger={addTrigger} />
         <DoorBar />
         <AvatarTag mobile={mobile} />
       </div>
       <WindowControls />
       <div class="stage-top">
-        <FloorplanControls />
+        <FloorplanControls addTrigger={addTrigger} />
         <div class="stage-tools">
           {!mobile && history}
           <MoreMenu mobile={mobile} />

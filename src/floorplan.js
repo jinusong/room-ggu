@@ -129,6 +129,30 @@ export function doorPlacement(wall, door = {}) {
     length,
   };
 }
+
+// 벽 끝의 여백과 창을 뺀 뒤 문 폭이 들어가는 구간을 돌려준다.
+export function doorGaps(wall, windows, width = DOOR.width) {
+  const blocked = windows
+    .filter(
+      (o) =>
+        o.vertical === wall.vertical &&
+        o.sill < 2.05 &&
+        Math.abs((o.vertical ? o.x : o.z) - wall.at) < 0.02,
+    )
+    .map((o) => [(o.vertical ? o.z : o.x) - o.width / 2, (o.vertical ? o.z : o.x) + o.width / 2])
+    .sort((a, b) => a[0] - b[0]);
+  const slots = [];
+  const limit = wall.end - DOOR.margin;
+  let at = wall.start + DOOR.margin;
+  for (const [start, end] of blocked) {
+    if (start >= limit) break;
+    if (start - at >= width - 1e-6) slots.push([at, start]);
+    at = Math.max(at, end);
+  }
+  if (limit - at >= width - 1e-6) slots.push([at, limit]);
+  return slots;
+}
+
 // 맞닿은 벽의 문. 폭을 정하지 않았으면 80cm 가정이고 위치를 정하지 않았으면 구간 가운데다.
 // side는 문짝이 열리는 쪽(+1: +x 또는 +z, -1: 반대)이며 기본은 더 넓은 공간 쪽이다.
 export function sharedOpening(a, ap, b, bp, door = {}) {
@@ -136,36 +160,15 @@ export function sharedOpening(a, ap, b, bp, door = {}) {
     place = wall && !door.closed ? doorPlacement(wall, door) : null;
   if (!place) return null;
   // 자동 문은 창문을 피한 빈 구간으로 옮긴다. 직접 정한 문은 ops에서 충돌을 거절한다.
-  if (door.offset === undefined) {
-    const blocked = [
-      [a, ap],
-      [b, bp],
-    ]
-      .flatMap(([r, p]) => windowOpenings(r.room, p))
-      .filter(
-        (o) =>
-          o.vertical === wall.vertical &&
-          o.sill < 2.05 &&
-          Math.abs((o.vertical ? o.x : o.z) - wall.at) < 0.02,
+  if (door.offset === undefined && (a.room.windows?.length || b.room.windows?.length)) {
+    const windows = [...windowOpenings(a.room, ap), ...windowOpenings(b.room, bp)];
+    const slots = doorGaps(wall, windows, place.width);
+    if (!slots.length) return null;
+    place.center = slots
+      .map(([lo, hi]) =>
+        Math.max(lo + place.width / 2, Math.min(hi - place.width / 2, place.center)),
       )
-      .map((o) => [(o.vertical ? o.z : o.x) - o.width / 2, (o.vertical ? o.z : o.x) + o.width / 2])
-      .sort((a, b) => a[0] - b[0]);
-    if (blocked.length) {
-      const slots = [];
-      let at = wall.start + DOOR.margin;
-      for (const [start, end] of blocked) {
-        if (start - at >= place.width - 1e-6) slots.push([at, start]);
-        at = Math.max(at, end);
-      }
-      if (wall.end - DOOR.margin - at >= place.width - 1e-6)
-        slots.push([at, wall.end - DOOR.margin]);
-      if (!slots.length) return null;
-      place.center = slots
-        .map(([lo, hi]) =>
-          Math.max(lo + place.width / 2, Math.min(hi - place.width / 2, place.center)),
-        )
-        .sort((x, y) => Math.abs(x - place.center) - Math.abs(y - place.center))[0];
-    }
+      .sort((x, y) => Math.abs(x - place.center) - Math.abs(y - place.center))[0];
   }
   // 넓이가 같으면 왼쪽·위쪽 공간으로 연다. 두 공간의 순서를 바꿔 불러도 결과가 같다.
   const areaA = a.room.w * a.room.d,

@@ -142,3 +142,19 @@ test('방 삭제를 Esc로 취소하거나 확인한 뒤 되돌릴 수 있다', 
   await frames(page);
   await expect(page.locator('[data-room-delete]')).toBeDisabled();
 });
+
+test('벽의 +에서 연 방 추가를 닫으면 그 벽의 손잡이로 초점이 돌아온다', async ({ page }) => {
+  await openHouse(page);
+  const handle = page.getByRole('button', { name: /오른쪽에 공간 붙이기/ });
+  const picker = page.getByRole('group', { name: '방 추가', exact: true });
+  await handle.click();
+  await expect(picker.getByLabel('붙일 위치')).toBeFocused();
+  await picker.getByLabel('붙일 위치').selectOption('left');
+  await page.keyboard.press('Escape');
+  await expect(picker).toHaveCount(0);
+  await expect(handle).toBeFocused();
+  await handle.press('Enter');
+  await picker.getByRole('button', { name: '방 추가 닫기', exact: true }).click();
+  await expect(picker).toHaveCount(0);
+  await expect(handle).toBeFocused();
+});

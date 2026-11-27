@@ -487,8 +487,7 @@ export function clearThread() {
   app.draft = null;
   app.queue = [];
   app.photo = null;
-  photoReadSeq++;
-  app.photoLoading = false;
+  endPhotoRead();
   app.photoError = '';
   fileReadSeq++;
   app.fileLoading = false;
@@ -718,8 +717,7 @@ function runAction(action, arg, turn) {
       break;
     }
     case 'rotate-space': {
-      snapshot();
-      const r = ops.rotateSpace(s, arg?.id || s.roomId);
+      const r = rotateLayout(arg?.id || s.roomId);
       turn.text = `${josa(r.name, '을/를')} 오른쪽으로 90° 돌렸어요. 이제 가로 ${r.w}m, 세로 ${r.d}m이고 가구도 함께 돌렸어요.${r.moved.length ? ' 옆 공간은 겹치지 않게 옮겼어요.' : ''}`;
       turn.receipt.push({ label: '방 돌리기', from: `${r.d} × ${r.w}m`, to: `${r.w} × ${r.d}m` });
       turn.suggestions = [
@@ -858,11 +856,14 @@ function applyPlan(plan, turn) {
     }
   } else if (c.room) {
     if (!staged) {
+      const next = structuredClone(s);
+      roomRows = ops.setRoom(next, c.room);
       snapshot();
       if (c.room.wallColor !== s.room.wallColor || c.room.floorColor !== s.room.floorColor)
         rememberFinish(s.room);
+      Object.assign(s, next);
     }
-    turn.receipt.push(...(roomRows || ops.setRoom(s, c.room)));
+    turn.receipt.push(...roomRows);
   }
   if (c.item) {
     if (!staged) snapshot();
@@ -2196,19 +2197,25 @@ export function addSpace(type, { side = null } = {}) {
   }
 }
 // 집 전체에서 고른 공간을 통째로 90° 돌린다. 가구와 아바타가 함께 돌고, 옆 공간은 겹치지 않게 비킨다.
+function rotateLayout(id) {
+  const next = structuredClone(app.state);
+  const result = ops.rotateSpace(next, id);
+  snapshot();
+  Object.assign(app.state, next);
+  app.view.door = null;
+  return result;
+}
 export function rotateSpace(id = app.state.roomId) {
   try {
-    snapshot();
-    const r = ops.rotateSpace(app.state, id);
-    app.view.door = null;
+    const r = rotateLayout(id);
     event(
       `${josa(r.name, '을/를')} 90° 돌렸어요. 가로 ${r.w}m, 세로 ${r.d}m${r.moved.length ? '. 옆 공간은 겹치지 않게 옮겼어요' : ''}`,
     );
     persist();
     emit();
   } catch (e) {
-    app.history.pop();
     toast(e.message);
+    return e.message;
   }
 }
 export function deleteSpace(id) {
@@ -2322,8 +2329,7 @@ export async function importJSON(file) {
     app.design = null;
     app.target = { type: 'room' };
     app.photo = null;
-    photoReadSeq++;
-    app.photoLoading = false;
+    endPhotoRead();
     app.photoError = '';
     Object.assign(app.view, {
       preview: null,
@@ -2366,7 +2372,17 @@ export function exportPNG() {
 
 // ---------- 사진 ----------
 let photoInput = null;
-let photoReadSeq = 0;
+let photoRead = null;
+function endPhotoRead() {
+  const read = photoRead;
+  photoRead = null;
+  app.photoLoading = false;
+  read?.finish();
+}
+async function waitForPhotoRead(job) {
+  while (app.busy === job && photoRead) await photoRead.ready;
+  return app.busy === job && app.photo === job.photo;
+}
 export function registerPhotoInput(el) {
   photoInput = el;
 }
@@ -2383,27 +2399,30 @@ export function openPhotoKinds(id) {
 }
 export async function attachPhoto(file) {
   if (!file) return;
-  const seq = ++photoReadSeq;
+  endPhotoRead();
+  let finish;
+  const ready = new Promise((resolve) => (finish = resolve));
+  const read = { ready, finish };
+  photoRead = read;
   app.photoLoading = true;
   app.photoError = '';
   emit();
   try {
     const data = await imageData(file);
-    if (seq !== photoReadSeq) return;
+    if (photoRead !== read) return;
     if (app.busy?.kind === 'vision') cancelModel();
     app.photo = { data, caption: '', analyzed: false, sent: false, type: null };
   } catch (e) {
-    if (seq === photoReadSeq) app.photoError = e.message;
+    if (photoRead === read) app.photoError = e.message;
   } finally {
-    if (seq === photoReadSeq) {
-      app.photoLoading = false;
+    if (photoRead === read) {
+      endPhotoRead();
       emit();
     }
   }
 }
 export function removePhoto() {
-  photoReadSeq++;
-  app.photoLoading = false;
+  endPhotoRead();
   app.photoError = '';
   if (app.photo && !app.photo.sent) app.photo = null;
   emit();
@@ -2470,7 +2489,8 @@ export async function analyzePhoto() {
   emit();
   try {
     const raw = await runAI('classify', { image: photo.data, device: app.ai.device });
-    if (app.photo !== photo || app.busy !== job) return;
+    // 새 첨부를 읽는 중이면 교체가 끝나거나 취소될 때까지 기존 판별을 화면에 반영하지 않는다.
+    if (!(await waitForPhotoRead(job))) return;
     const candidates = photoCandidates(raw?.scores);
     app.ai.vision = 'ready';
     finishDownload('vision');
@@ -2552,7 +2572,7 @@ export async function analyzePhoto() {
     app.busy = null;
     if (usePrediction) await applyPhotoCaption(photo, turn);
   } catch (e) {
-    if (app.photo !== photo || app.busy !== job) return;
+    if (!(await waitForPhotoRead(job))) return;
     app.ai.vision = 'error';
     app.ai.visionError = explainLoadError(e.message);
     photo.error = app.ai.visionError;

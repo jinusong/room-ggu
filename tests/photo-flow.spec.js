@@ -435,6 +435,52 @@ test('새 사진을 붙이면 이전 사진의 늦은 결과가 새 초안을 �
   expect((await snapshot(page)).textTerminated).toBe(false);
 });
 
+for (const cancel of [false, true]) {
+  test(`새 사진을 읽는 중 이전 판별이 끝나면 교체 결정을 기다린다 (취소 ${cancel})`, async ({
+    page,
+  }) => {
+    await start(page);
+    await sendPhoto(page, '가로 120cm');
+    await page.waitForFunction(() => window.__photoJob);
+    const first = (await snapshot(page)).photo.surfaceId;
+    await page.evaluate(() => {
+      const decode = createImageBitmap.bind(window);
+      window.createImageBitmap = async (...args) => {
+        await new Promise((resolve) => {
+          window.__resumePhotoDecode = resolve;
+        });
+        return decode(...args);
+      };
+    });
+    await page.locator('#photo-file').setInputFiles({ ...file, name: 'replacement.png' });
+    await page.waitForFunction(() => window.__resumePhotoDecode);
+    await page.evaluate(async () => {
+      window.__finishPhoto();
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+    expect((await snapshot(page)).draft).toBeNull();
+
+    if (cancel) {
+      await page.getByRole('button', { name: '사진 준비 취소' }).click();
+      await expect.poll(async () => (await snapshot(page)).draft?.type).toBe('bed');
+      expect((await snapshot(page)).photo.surfaceId).toBe(first);
+      await page.evaluate(() => window.__resumePhotoDecode());
+    } else {
+      await page.evaluate(() => window.__resumePhotoDecode());
+      await expect(page.locator('.photo-tray img')).toBeVisible();
+      expect((await snapshot(page)).draft).toBeNull();
+      await page.locator('#chat-input').fill('가로 60cm 깊이 60cm 높이 90cm');
+      await page.getByRole('button', { name: '설명 보내기' }).click();
+      await expect
+        .poll(async () => (await snapshot(page)).jobs.filter((task) => task === 'classify').length)
+        .toBe(2);
+      await page.evaluate(() => window.__finishPhoto('chair'));
+      await expect.poll(async () => (await snapshot(page)).draft?.type).toBe('chair');
+      expect((await snapshot(page)).draft.dims).toEqual([60, 90, 60]);
+    }
+  });
+}
+
 test('휴대 기기는 사진+설명도 동의 전에는 받지 않고, 사진 판별을 누르면 설명까지 반영한다', async ({
   page,
 }) => {

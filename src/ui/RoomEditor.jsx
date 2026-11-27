@@ -79,8 +79,7 @@ export function RoomEditor({ room, name }) {
           data-room-turn
           aria-label="선택한 방 90도 돌리기"
           onClick={() => {
-            store.rotateSpace();
-            store.setRoomEditor(false);
+            if (!store.rotateSpace()) close();
           }}
         >
           <Icon name="rotate-cw" size={16} />
