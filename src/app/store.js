@@ -221,6 +221,7 @@ function sanitizeTurn(t) {
     if (t.spaceRequest) {
       turn.spaceRequest = cleanText(t.spaceRequest, 1500);
       turn.spaceAnchor = cleanText(t.spaceAnchor, 100) || undefined;
+      if (Object.hasOwn(ops.SIDES, t.spaceSide)) turn.spaceSide = t.spaceSide;
       if (Array.isArray(t.spaceAnchors))
         turn.spaceAnchors = t.spaceAnchors.slice(0, 12).map((id) => cleanText(id, 100));
       const choice = spaceTypeAnswer(cleanText(t.spaceChoice, 40));
@@ -969,6 +970,7 @@ function finishTurn(turn, plan, meta) {
   if (plan.spaceRequest) turn.spaceRequest = plan.spaceRequest;
   if (plan.spaceAnchor) turn.spaceAnchor = plan.spaceAnchor;
   if (plan.spaceAnchors) turn.spaceAnchors = plan.spaceAnchors;
+  if (plan.spaceSide) turn.spaceSide = plan.spaceSide;
   if (plan.spaceDims) turn.spaceDims = plan.spaceDims;
   if (plan.spaceChoice) turn.spaceChoice = plan.spaceChoice;
   if (plan.recommendation) turn.recommendation = plan.recommendation;
@@ -1065,7 +1067,13 @@ export async function send(raw) {
     if (last.spaceAnchors?.length) {
       const selected = spaceAnchorAnswer(text, last.spaceAnchors);
       if (selected)
-        return respondToText(last.spaceRequest, turn, history, extra, { anchor: selected });
+        return respondToText(last.spaceRequest, turn, history, extra, {
+          anchor: selected,
+          side: last.spaceSide,
+          dims: last.spaceDims,
+        });
+      if (answer && !answer.choice)
+        return respondToSpaceFollowup(answer, last, turn, history, extra);
       if (answer || /^\d+\s*번/.test(text)) {
         finishTurn(
           turn,
@@ -1074,6 +1082,8 @@ export async function send(raw) {
             suggestions: last.suggestions,
             spaceRequest: last.spaceRequest,
             spaceAnchors: last.spaceAnchors,
+            spaceSide: last.spaceSide,
+            spaceDims: last.spaceDims,
           },
           { engine: 'app' },
         );
@@ -1098,14 +1108,21 @@ function spaceAnchorAnswer(text, ids) {
 }
 
 function respondToSpaceFollowup(answer, last, turn, history, extra) {
-  const { sizeText } = answer;
+  const { sizeText, side } = answer;
   const choice = answer.choice || spaceTypeAnswer(last.spaceChoice || '');
   const plan = {
     spaceRequest: last.spaceRequest,
     spaceAnchor: last.spaceAnchor,
+    spaceAnchors: last.spaceAnchors,
+    spaceSide: side || last.spaceSide,
     spaceDims: last.spaceDims,
     suggestions: last.suggestions,
   };
+  const direction = side ? `붙일 위치를 ${ops.SIDES[side]}으로 바꿨어요. ` : '';
+  const prompt = last.spaceAnchors?.length
+    ? '기준으로 삼을 방을 골라 주세요.'
+    : '어떤 공간을 추가할까요?';
+  plan.reply = direction + prompt;
   if (sizeText) {
     try {
       const dims = parseRoomDimensions(sizeText);
@@ -1114,14 +1131,14 @@ function respondToSpaceFollowup(answer, last, turn, history, extra) {
         .map(([key, value]) => `${labels[key]} ${value}m`)
         .join(', ');
       plan.spaceDims = { ...last.spaceDims, ...dims };
-      plan.reply = `${said}로 적어 뒀어요. 어떤 공간을 추가할까요?`;
+      plan.reply = `${direction}${said}로 적어 뒀어요. ${prompt}`;
     } catch (e) {
       if (choice && !choice.unsupported) {
         plan.spaceChoice = choice.name;
         plan.suggestions = [];
         plan.reply = `${josa(choice.name, '으로/로')} 기억해 둘게요. ${e.message}`;
       } else {
-        plan.reply = `${e.message} 새로 붙일 방 종류도 알려 주세요.`;
+        plan.reply = `${e.message} ${prompt}`;
       }
       finishTurn(turn, plan, { engine: 'app' });
       return;
@@ -1134,6 +1151,7 @@ function respondToSpaceFollowup(answer, last, turn, history, extra) {
         ...unsupportedSpacePlan(choice.name, last.spaceRequest),
         spaceDims: plan.spaceDims,
         spaceAnchor: last.spaceAnchor,
+        spaceSide: plan.spaceSide,
       },
       { engine: 'app' },
     );
@@ -1143,6 +1161,7 @@ function respondToSpaceFollowup(answer, last, turn, history, extra) {
     return respondToText(`${last.spaceRequest}. 거기는 ${choice.name}임`, turn, history, extra, {
       dims: plan.spaceDims,
       anchor: last.spaceAnchor,
+      side: plan.spaceSide,
     });
   finishTurn(turn, plan, { engine: 'app' });
 }
@@ -1234,8 +1253,10 @@ async function respondToText(text, turn, history, extra = [], spaceContext = {})
     return;
   }
   const ctx = context();
+  if (turn.photoId) ctx.photoCaption = true;
   if (spaceContext.dims) ctx.spaceDims = spaceContext.dims;
   if (spaceContext.anchor) ctx.spaceAnchor = spaceContext.anchor;
+  if (spaceContext.side) ctx.spaceSide = spaceContext.side;
   if (named?.room) {
     text = named.text;
     if (named.room.roomId !== app.state.roomId) {

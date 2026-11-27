@@ -662,3 +662,49 @@ test('키보드로 방 종류 목록을 벗어나면 점선 미리보기가 사�
   await expect(picker.getByLabel('붙일 위치')).toBeFocused();
   expect(await readPreview()).toBeNull();
 });
+
+for (const { names, answer } of [
+  { names: ['서재', '작은 서재'] },
+  { names: ['별채', '별채'], answer: '2번' },
+]) {
+  test(`기준 방의 이름 일부가 겹쳐도 요청한 방과 벽에 붙인다 (${names.join(', ')})`, async ({
+    page,
+  }) => {
+    const state = freshState();
+    const first = state.roomId;
+    renameSpace(state, names[0]);
+    const second = addSpace(state, 'office', 'left');
+    renameSpace(state, names[1]);
+    switchSpace(state, first);
+    await page.addInitScript((seed) => {
+      if (!localStorage.getItem('room-ggu-v2'))
+        localStorage.setItem('room-ggu-v2', JSON.stringify(seed));
+    }, state);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/?model=off');
+    await expect(plan(page)).toBeVisible();
+    const say = async (text) => {
+      await page.locator('#chat-input').fill(text);
+      await page.locator('#chat-input').press('Enter');
+    };
+    const reply = page.locator('.msg.assistant').last();
+    await say(`${names[1]} 위쪽에 가로 2m 세로 2.5m 침실 추가해줘`);
+    if (answer) {
+      await expect(reply).toContainText('어느 별채 옆에 붙일까요');
+      await expect(reply.getByRole('button', { name: '2번 별채' })).toBeVisible();
+      expect((await read(page)).roomOrder).toHaveLength(2);
+      await page.reload();
+      await page.waitForFunction(() => window.__roomggu?.ready());
+      await say(answer);
+    }
+    await expect(reply).toContainText(`${names[1]} 위쪽에 나의 침실을 붙였어요`);
+    const added = await read(page);
+    const connected = connections(spaces(added), added.floorplan).filter(({ ids }) =>
+      ids.includes(added.roomId),
+    );
+    expect(connected.some(({ ids, opening }) => ids.includes(second) && !!opening)).toBe(true);
+    expect(added.floorplan.positions[added.roomId].z).toBeCloseTo(
+      state.floorplan.positions[second].z - (state.otherRooms[0].room.d + added.room.d) / 2,
+    );
+  });
+}
